@@ -1779,36 +1779,19 @@ function setupMap() {
     disableDefaultUI: true,
     zoomControl: false,
     styles: [
-      // 땅/물 구분 유지
-      { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f5f5f0' }] },
-      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9d8e8' }] },
-      { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#7a9ab8' }] },
-      // 도로
-      { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#ffffff' }] },
-      { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#e8e4dc' }] },
-      { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#888880' }] },
-      { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#ede8df' }] },
-      // 공원
-      { featureType: 'park', elementType: 'geometry', stylers: [{ color: '#e8ede8' }] },
-      { featureType: 'park', elementType: 'labels.text.fill', stylers: [{ color: '#7a9a7a' }] },
-      // POI 전체 기본 숨김
+      // POI 전체 숨김 후 필요한 것만 켜기
       { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
-      // 음식점 — 켜기
       { featureType: 'poi.food_and_drink', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.food_and_drink', elementType: 'labels.text.fill', stylers: [{ color: '#c07040' }] },
-      // 숙소 — 켜기
       { featureType: 'poi.lodging', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.lodging', elementType: 'labels.text.fill', stylers: [{ color: '#5080b0' }] },
-      // 관광지/명소 — 켜기
       { featureType: 'poi.attraction', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.attraction', elementType: 'labels.text.fill', stylers: [{ color: '#9060a0' }] },
-      // 쇼핑 — 켜기
       { featureType: 'poi.shop', elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.shop', elementType: 'labels.text.fill', stylers: [{ color: '#808040' }] },
-      // 공원 POI — 켜기
-      { featureType: 'poi.park', elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.shop', elementType: 'labels.text.fill', stylers: [{ color: '#807030' }] },
+      { featureType: 'poi.park', elementType: 'labels', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#5a8a5a' }] },
-      // 대중교통 — 아이콘 숨기고 역명만
+      // 대중교통 아이콘 숨기고 역명만
       { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
       { featureType: 'transit.station', elementType: 'labels.text', stylers: [{ visibility: 'on' }] },
       { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#6868a0' }] },
