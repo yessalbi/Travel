@@ -1779,12 +1779,33 @@ function setupMap() {
     disableDefaultUI: true,
     zoomControl: false,
     styles: [
-      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-      { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
+      // 기본 지형 색
       { elementType: 'geometry', stylers: [{ color: '#f5f5f0' }] },
+      { elementType: 'labels.text.fill', stylers: [{ color: '#555550' }] },
+      { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f0' }] },
+      // 도로
       { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
       { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#888880' }] },
+      { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#e8e0d0' }] },
+      { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#666660' }] },
+      // 물
       { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9d8e8' }] },
+      { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#7a9ab8' }] },
+      // 공원/자연
+      { featureType: 'park', elementType: 'geometry', stylers: [{ color: '#e8f0e8' }] },
+      { featureType: 'park', elementType: 'labels.text.fill', stylers: [{ color: '#7a9a7a' }] },
+      // POI — 아이콘 숨기고 주요 장소 이름만 표시
+      { featureType: 'poi', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+      { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#aaa898' }] },
+      { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#7a9a7a' }, { visibility: 'on' }] },
+      { featureType: 'poi.attraction', elementType: 'labels.text', stylers: [{ visibility: 'on' }, { color: '#9a8878' }] },
+      { featureType: 'poi.place_of_worship', elementType: 'labels.text', stylers: [{ visibility: 'on' }, { color: '#9a8878' }] },
+      // 대중교통 — 간략하게
+      { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+      { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ visibility: 'on' }, { color: '#8888a8' }] },
+      // 행정구역 경계
+      { featureType: 'administrative', elementType: 'labels.text.fill', stylers: [{ color: '#777770' }] },
+      { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#555550' }, { visibility: 'on' }] },
     ],
   });
 
