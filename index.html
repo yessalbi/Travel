@@ -66,9 +66,9 @@
   // module 스크립트는 defer라 DOMContentLoaded 후에 실행됨
   // init()을 여기서 직접 호출
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => init());
+    document.addEventListener('DOMContentLoaded', () => window.init());
   } else {
-    init();
+    window.init();
   }
 </script>
 
@@ -1202,7 +1202,7 @@ function generateId() {
 }
 
 // ── 초기화 ────────────────────────────────────────────────────
-async function init() {
+window.init = async function init() {
   TRIP_ID = getTripIdFromUrl() || generateId();
   setTripIdInUrl(TRIP_ID);
   document.getElementById('trip-id-badge').textContent = '🔑 ' + TRIP_ID;
