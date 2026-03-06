@@ -606,6 +606,22 @@ html, body {
 }
 #pl-pick-btn:hover { border-color: var(--accent); color: var(--accent); background: #FEF5EE; }
 #pl-pick-btn.picked { border-color: var(--green); color: var(--green); background: #EBF7F2; border-style: solid; }
+/* ── 커스텀 시간 선택기 ── */
+.time-picker {
+  display: flex; align-items: center; gap: 4px; flex: 1;
+}
+.time-picker select {
+  border: 1.5px solid var(--sand); border-radius: 7px;
+  padding: 7px 4px; font-family: inherit; font-size: 13px;
+  background: var(--white); outline: none; transition: border-color .18s;
+  color: var(--ink); cursor: pointer; text-align: center;
+  -webkit-appearance: none; appearance: none;
+}
+.time-picker select:focus { border-color: var(--accent2); }
+.time-picker .tp-hour  { width: 52px; }
+.time-picker .tp-min   { width: 52px; }
+.time-picker .tp-ampm  { width: 52px; }
+.time-picker .tp-sep   { color: var(--ink3); font-weight: 600; font-size: 14px; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -682,12 +698,12 @@ html, body {
           </div>
           <div class="flight-row">
             <span class="lbl">출발</span>
-            <input type="time" id="flight-depart" />
+            <div class="time-picker" id="tp-flight-depart"></div>
             <input type="text" id="flight-from" placeholder="ICN" style="width:70px;flex:none;" />
           </div>
           <div class="flight-row">
             <span class="lbl">도착</span>
-            <input type="time" id="flight-arrive" />
+            <div class="time-picker" id="tp-flight-arrive"></div>
             <input type="text" id="flight-to" placeholder="NRT" style="width:70px;flex:none;" />
           </div>
           <!-- 귀국편 -->
@@ -700,12 +716,12 @@ html, body {
           </div>
           <div class="flight-row">
             <span class="lbl">출발</span>
-            <input type="time" id="return-depart" />
+            <div class="time-picker" id="tp-return-depart"></div>
             <input type="text" id="return-from" placeholder="NRT" style="width:70px;flex:none;" />
           </div>
           <div class="flight-row">
             <span class="lbl">도착</span>
-            <input type="time" id="return-arrive" />
+            <div class="time-picker" id="tp-return-arrive"></div>
             <input type="text" id="return-to" placeholder="ICN" style="width:70px;flex:none;" />
           </div>
         </div>
@@ -777,7 +793,7 @@ html, body {
     </div>
     <div class="popup-field">
       <label>시간</label>
-      <input type="time" id="sch-time" />
+      <div class="time-picker" id="tp-sch-time"></div>
     </div>
     <div class="popup-field">
       <label>메모</label>
@@ -946,6 +962,10 @@ async function init() {
   setTripIdInUrl(TRIP_ID);
   document.getElementById('trip-id-badge').textContent = '🔑 ' + TRIP_ID;
 
+  // 시간 선택기 + 날짜 연동 먼저 초기화
+  initTimePickers();
+  initDateMinLink();
+
   if (window.firebaseReady) await loadFromFirebase();
   else document.addEventListener('firebase-ready', async () => { await loadFromFirebase(); });
 
@@ -985,15 +1005,16 @@ function applyTripData(data) {
   setVal('trip-end',      data.endDate);
   setVal('trip-note',     data.note);
   setVal('flight-airline',data.flightAirline);
-  setVal('flight-depart', data.flightDepart);
   setVal('flight-from',   data.flightFrom);
-  setVal('flight-arrive', data.flightArrive);
   setVal('flight-to',     data.flightTo);
   setVal('return-airline',data.returnAirline);
-  setVal('return-depart', data.returnDepart);
   setVal('return-from',   data.returnFrom);
-  setVal('return-arrive', data.returnArrive);
   setVal('return-to',     data.returnTo);
+  // 커스텀 시간 선택기 복원
+  timeToTp('fdep', data.flightDepart);
+  timeToTp('farr', data.flightArrive);
+  timeToTp('rdep', data.returnDepart);
+  timeToTp('rarr', data.returnArrive);
   if (data.schedule) scheduleData = data.schedule;
   if (data.routePoints) {
     routePoints = data.routePoints;
@@ -1019,14 +1040,14 @@ async function saveAll() {
     endDate:       document.getElementById('trip-end').value,
     note:          document.getElementById('trip-note').value,
     flightAirline: document.getElementById('flight-airline').value,
-    flightDepart:  document.getElementById('flight-depart').value,
+    flightDepart:  tpToTime('fdep'),
     flightFrom:    document.getElementById('flight-from').value,
-    flightArrive:  document.getElementById('flight-arrive').value,
+    flightArrive:  tpToTime('farr'),
     flightTo:      document.getElementById('flight-to').value,
     returnAirline: document.getElementById('return-airline').value,
-    returnDepart:  document.getElementById('return-depart').value,
+    returnDepart:  tpToTime('rdep'),
     returnFrom:    document.getElementById('return-from').value,
-    returnArrive:  document.getElementById('return-arrive').value,
+    returnArrive:  tpToTime('rarr'),
     returnTo:      document.getElementById('return-to').value,
     schedule:      scheduleData,
     routePoints,
@@ -1130,7 +1151,7 @@ function saveScheduleItem() {
   scheduleData[currentDay].push({
     type: selectedType,
     name,
-    time: document.getElementById('sch-time').value,
+    time: tpToTime('scht'),
     desc: document.getElementById('sch-desc').value,
   });
   scheduleData[currentDay].sort((a,b) => (a.time||'').localeCompare(b.time||''));
@@ -1144,7 +1165,88 @@ function deleteScheduleItem(idx) {
   autoSave();
 }
 
-// ── 지도 설정 ─────────────────────────────────────────────────
+// ── 커스텀 시간 선택기 ────────────────────────────────────────
+// 시간을 "HH:MM" 24시간제 문자열로 변환
+function tpToTime(prefix) {
+  const h   = document.getElementById(prefix + '-h').value;
+  const m   = document.getElementById(prefix + '-m').value;
+  const ap  = document.getElementById(prefix + '-ap').value;
+  if (!h || !m) return '';
+  let hour = parseInt(h);
+  if (ap === 'PM' && hour !== 12) hour += 12;
+  if (ap === 'AM' && hour === 12) hour = 0;
+  return String(hour).padStart(2,'0') + ':' + m;
+}
+
+// "HH:MM" 24시간제 → 선택기에 세팅
+function timeToTp(prefix, timeStr) {
+  if (!timeStr) return;
+  const [hh, mm] = timeStr.split(':');
+  let hour = parseInt(hh);
+  const ap = hour >= 12 ? 'PM' : 'AM';
+  if (hour > 12) hour -= 12;
+  if (hour === 0) hour = 12;
+  const hSel  = document.getElementById(prefix + '-h');
+  const mSel  = document.getElementById(prefix + '-m');
+  const apSel = document.getElementById(prefix + '-ap');
+  if (hSel)  hSel.value  = String(hour);
+  if (mSel)  mSel.value  = mm;
+  if (apSel) apSel.value = ap;
+}
+
+// 선택기 렌더링
+function buildTimePicker(containerId, prefix, onChange) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+
+  // 시 옵션 (1~12)
+  let hOpts = '';
+  for (let i = 1; i <= 12; i++) hOpts += `<option value="${i}">${String(i).padStart(2,'0')}</option>`;
+
+  // 분 옵션 (00~59)
+  let mOpts = '';
+  for (let i = 0; i < 60; i++) mOpts += `<option value="${String(i).padStart(2,'0')}">${String(i).padStart(2,'0')}</option>`;
+
+  wrap.innerHTML = `
+    <select class="tp-hour" id="${prefix}-h">${hOpts}</select>
+    <span class="tp-sep">:</span>
+    <select class="tp-min"  id="${prefix}-m">${mOpts}</select>
+    <select class="tp-ampm" id="${prefix}-ap">
+      <option value="AM">AM</option>
+      <option value="PM">PM</option>
+    </select>`;
+
+  if (onChange) {
+    wrap.querySelectorAll('select').forEach(s => s.addEventListener('change', onChange));
+  }
+}
+
+// 모든 시간 선택기 초기화
+function initTimePickers() {
+  const cb = () => autoSave();
+  buildTimePicker('tp-flight-depart', 'fdep',  cb);
+  buildTimePicker('tp-flight-arrive', 'farr',  cb);
+  buildTimePicker('tp-return-depart', 'rdep',  cb);
+  buildTimePicker('tp-return-arrive', 'rarr',  cb);
+  buildTimePicker('tp-sch-time',      'scht',  null); // 일정은 저장 시 읽음
+}
+
+// ── 날짜 min 연동 ─────────────────────────────────────────────
+function initDateMinLink() {
+  const startEl = document.getElementById('setup-start');
+  const endEl   = document.getElementById('setup-end');
+  if (!startEl || !endEl) return;
+  startEl.addEventListener('change', () => {
+    if (startEl.value) {
+      endEl.min = startEl.value;
+      // 귀국일이 출발일보다 이전이면 초기화
+      if (endEl.value && endEl.value < startEl.value) endEl.value = '';
+      // 귀국일 달력을 출발일 달짜 기준으로 자동 포커스
+      endEl.focus();
+    }
+  });
+}
+
 function setupMap() {
   map = new google.maps.Map(document.getElementById('map'), {
     center: { lat: 35.6762, lng: 139.6503 },
