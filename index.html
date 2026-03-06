@@ -573,6 +573,39 @@ html, body {
   border-top-color: var(--accent);
   animation: spin .7s linear infinite;
 }
+/* 핀 찍기 모드 */
+#pin-mode-banner {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+  z-index: 300;
+  background: var(--ink); color: #fff;
+  padding: 10px 22px; border-radius: 30px;
+  font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.22);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+  white-space: nowrap;
+}
+#pin-mode-banner.show { opacity: 1; pointer-events: all; }
+#pin-mode-banner .cancel-pin {
+  background: rgba(255,255,255,0.2); border: none; border-radius: 20px;
+  color: #fff; font-size: 12px; padding: 4px 10px; cursor: pointer;
+  font-family: inherit; transition: background .14s;
+}
+#pin-mode-banner .cancel-pin:hover { background: rgba(255,255,255,0.35); }
+#map-wrapper.pin-mode,
+#map-wrapper.pin-mode #map { cursor: crosshair !important; }
+
+/* 핀 위치 선택 버튼 */
+#pl-pick-btn {
+  width: 100%; padding: 10px 14px; border-radius: 8px;
+  border: 1.5px dashed var(--sand); background: var(--cream);
+  font-family: inherit; font-size: 13px; color: var(--ink3);
+  cursor: pointer; transition: all .16s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+#pl-pick-btn:hover { border-color: var(--accent); color: var(--accent); background: #FEF5EE; }
+#pl-pick-btn.picked { border-color: var(--green); color: var(--green); background: #EBF7F2; border-style: solid; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -770,18 +803,28 @@ html, body {
       <input type="text" id="pl-desc" placeholder="예: 예약 필수, 런치 추천" />
     </div>
     <div class="popup-field">
-      <label>대표 사진 URL <small style="color:var(--ink3)">(없으면 구글 검색 이미지 자동)</small></label>
+      <label>대표 사진 URL <small style="color:var(--ink3)">(없으면 자동)</small></label>
       <input type="url" id="pl-img" placeholder="https://..." />
     </div>
     <div class="popup-field">
-      <label>지도에서 핀 위치 선택 <small style="color:var(--ink3)">(지도 클릭 후 좌표가 자동 입력됩니다)</small></label>
-      <input type="text" id="pl-latlng" readonly placeholder="지도를 클릭하세요" />
+      <label>지도에서 위치 선택</label>
+      <button id="pl-pick-btn" onclick="enterPinMode()">
+        📍 지도에서 위치 클릭하기
+      </button>
+      <input type="hidden" id="pl-latlng" />
     </div>
     <div class="popup-actions">
       <button class="btn-cancel" onclick="closeOverlay('place-overlay')">취소</button>
-      <button class="btn-save"   onclick="savePlaceItem()">핀 추가</button>
+      <button class="btn-save" id="pl-save-btn" onclick="savePlaceItem()" disabled
+        style="opacity:.45;cursor:not-allowed;">핀 추가</button>
     </div>
   </div>
+</div>
+
+<!-- 핀 찍기 모드 배너 -->
+<div id="pin-mode-banner">
+  📍 지도를 클릭해서 위치를 선택하세요
+  <button class="cancel-pin" onclick="cancelPinMode()">취소</button>
 </div>
 
 <!-- 장소 사진 팝업 -->
@@ -961,6 +1004,9 @@ function applyTripData(data) {
   if (data.mapCenter && map) {
     map.setCenter(data.mapCenter);
     map.setZoom(data.mapZoom || 12);
+  } else if (data.title) {
+    // 저장된 지도 위치 없으면 제목으로 자동 이동
+    if (map) geocodeAndMoveMap(data.title);
   }
   updateAirlineLogo();
 }
@@ -1101,7 +1147,7 @@ function deleteScheduleItem(idx) {
 // ── 지도 설정 ─────────────────────────────────────────────────
 function setupMap() {
   map = new google.maps.Map(document.getElementById('map'), {
-    center: { lat: 35.6762, lng: 139.6503 }, // 기본: 도쿄
+    center: { lat: 35.6762, lng: 139.6503 },
     zoom: 12,
     disableDefaultUI: true,
     zoomControl: false,
@@ -1118,15 +1164,31 @@ function setupMap() {
   map.addListener('click', (e) => {
     if (routeMode) {
       addRoutePoint(e.latLng);
-    } else if (document.getElementById('place-overlay').classList.contains('show')) {
-      pendingLatLng = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-      document.getElementById('pl-latlng').value =
-        pendingLatLng.lat.toFixed(5) + ', ' + pendingLatLng.lng.toFixed(5);
+    } else if (pinMode) {
+      confirmPinLocation(e.latLng);
     }
   });
 
   renderMapMarkers();
   if (routePoints.length) drawRoute();
+
+  // 저장된 지도 위치가 없으면 여행 제목으로 지오코딩
+  const savedCenter = document.getElementById('trip-title').value;
+  if (savedCenter) geocodeAndMoveMap(savedCenter);
+}
+
+// 여행 제목으로 지도 위치 자동 이동
+function geocodeAndMoveMap(titleText) {
+  if (!map || !titleText) return;
+  const geocoder = new google.maps.Geocoder();
+  // 제목에서 지명 추출 시도 (예: "시즈오카 여행" → "시즈오카")
+  const cleaned = titleText.replace(/(여행|trip|travel|투어|tour|\d{4}|🗼|🏔|🌸|✈|🎌)/gi, '').trim();
+  geocoder.geocode({ address: cleaned, language: 'ko' }, (results, status) => {
+    if (status === 'OK' && results[0]) {
+      map.setCenter(results[0].geometry.location);
+      map.setZoom(12);
+    }
+  });
 }
 
 function mapZoom(d) { if (map) map.setZoom(map.getZoom() + d); }
@@ -1185,13 +1247,78 @@ function clearRoute() {
 }
 
 // ── 맛집 핀 ───────────────────────────────────────────────────
+let pinMode = false;
+let tempPinMarker = null;
+
 function openPlacePopup() {
-  document.getElementById('pl-name').value = '';
-  document.getElementById('pl-desc').value = '';
-  document.getElementById('pl-img').value  = '';
+  document.getElementById('pl-name').value  = '';
+  document.getElementById('pl-desc').value  = '';
+  document.getElementById('pl-img').value   = '';
   document.getElementById('pl-latlng').value = '';
   pendingLatLng = null;
+  const btn = document.getElementById('pl-pick-btn');
+  btn.textContent = '📍 지도에서 위치 클릭하기';
+  btn.classList.remove('picked');
+  const saveBtn = document.getElementById('pl-save-btn');
+  saveBtn.disabled = true;
+  saveBtn.style.opacity = '.45';
+  saveBtn.style.cursor = 'not-allowed';
   openOverlay('place-overlay');
+}
+
+function enterPinMode() {
+  // 팝업 숨기기 (오버레이 배경은 유지, 팝업만 fade)
+  const popup = document.querySelector('#place-overlay .popup');
+  popup.style.opacity = '0';
+  popup.style.pointerEvents = 'none';
+  pinMode = true;
+  document.getElementById('map-wrapper').classList.add('pin-mode');
+  document.getElementById('pin-mode-banner').classList.add('show');
+}
+
+function exitPinMode() {
+  pinMode = false;
+  document.getElementById('map-wrapper').classList.remove('pin-mode');
+  document.getElementById('pin-mode-banner').classList.remove('show');
+  // 팝업 다시 보이기
+  const popup = document.querySelector('#place-overlay .popup');
+  popup.style.opacity = '1';
+  popup.style.pointerEvents = '';
+}
+
+function cancelPinMode() {
+  exitPinMode();
+  // 임시 마커 제거
+  if (tempPinMarker) { tempPinMarker.setMap(null); tempPinMarker = null; }
+  pendingLatLng = null;
+}
+
+function confirmPinLocation(latLng) {
+  pendingLatLng = { lat: latLng.lat(), lng: latLng.lng() };
+  // 임시 마커
+  if (tempPinMarker) tempPinMarker.setMap(null);
+  tempPinMarker = new google.maps.Marker({
+    position: pendingLatLng, map,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 10,
+      fillColor: '#E07A3A', fillOpacity: 1,
+      strokeColor: '#fff', strokeWeight: 3,
+    },
+    animation: google.maps.Animation.DROP,
+  });
+  document.getElementById('pl-latlng').value =
+    pendingLatLng.lat.toFixed(5) + ', ' + pendingLatLng.lng.toFixed(5);
+  // 버튼 업데이트
+  const btn = document.getElementById('pl-pick-btn');
+  btn.textContent = '✅ 위치 선택됨 (' + pendingLatLng.lat.toFixed(4) + ', ' + pendingLatLng.lng.toFixed(4) + ')';
+  btn.classList.add('picked');
+  // 저장 버튼 활성화
+  const saveBtn = document.getElementById('pl-save-btn');
+  saveBtn.disabled = false;
+  saveBtn.style.opacity = '1';
+  saveBtn.style.cursor = 'pointer';
+  exitPinMode();
 }
 async function savePlaceItem() {
   const name = document.getElementById('pl-name').value.trim();
@@ -1340,6 +1467,9 @@ function setupFinish() {
   updateTripSummary();
   autoSave();
   showToast('여행 정보가 저장되었습니다 ✓');
+  // 여행 제목으로 지도 자동 이동
+  if (map) geocodeAndMoveMap(title);
+  else document.addEventListener('maps-ready', () => geocodeAndMoveMap(title), { once: true });
 }
 
 function updateTripSummary() {
