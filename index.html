@@ -63,7 +63,13 @@
   };
 
   window.firebaseReady = true;
-  document.dispatchEvent(new Event("firebase-ready"));
+  // module 스크립트는 defer라 DOMContentLoaded 후에 실행됨
+  // init()을 여기서 직접 호출
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => init());
+  } else {
+    init();
+  }
 </script>
 
 <!-- Google Maps API -->
@@ -1201,18 +1207,22 @@ async function init() {
   setTripIdInUrl(TRIP_ID);
   document.getElementById('trip-id-badge').textContent = '🔑 ' + TRIP_ID;
 
-  // 시간 선택기 + 날짜 연동 먼저 초기화
+  // UI 초기화
   initTimePickers();
   initDateMinLink();
   renderChecklist();
   renderVouchers();
 
-  if (window.firebaseReady) await loadFromFirebase();
-  else document.addEventListener('firebase-ready', async () => { await loadFromFirebase(); });
-
+  // Maps 초기화 (별도 async 로드)
   if (window.mapsReady) setupMap();
   else document.addEventListener('maps-ready', setupMap);
 
+  // Firebase는 이미 준비된 상태로 호출됨
+  try {
+    await loadFromFirebase();
+  } catch(e) {
+    console.error('Firebase 로드 실패:', e);
+  }
   document.getElementById('loading').style.display = 'none';
 }
 
@@ -2172,8 +2182,7 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-// ── 시작 ─────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', init);
+// ── 시작 (Firebase 모듈에서 직접 호출됨) ─────────────────────
 </script>
 </body>
 </html>
