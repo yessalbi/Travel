@@ -15,12 +15,14 @@
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   // ── 🔑 여기에 Firebase 설정 입력 ──────────────────────────────
+  const firebaseConfig = {
     apiKey: "AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ",
-  authDomain: "cyh-travel.firebaseapp.com",
-  projectId: "cyh-travel",
-  storageBucket: "cyh-travel.firebasestorage.app",
-  messagingSenderId: "423848709658",
-  appId: "1:423848709658:web:2521fb48726fcf96adcba3"
+    authDomain: "cyh-travel.firebaseapp.com",
+    databaseURL: "https://cyh-travel-default-rtdb.firebaseio.com",
+    projectId: "cyh-travel",
+    storageBucket: "cyh-travel.firebasestorage.app",
+    messagingSenderId: "423848709658",
+    appId: "1:423848709658:web:2521fb48726fcf96adcba3"
   };
   // ──────────────────────────────────────────────────────────────
 
@@ -63,14 +65,14 @@
 
 <!-- Google Maps API: YOUR_MAPS_API_KEY 교체 -->
 <script>
-  window.MAPS_API_KEY = "AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo";
+  window.MAPS_API_KEY = "YOUR_MAPS_API_KEY";
   window.initMap = function() {
     window.mapsReady = true;
     document.dispatchEvent(new Event("maps-ready"));
   };
 </script>
 <script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo&libraries=places&callback=initMap&language=ko">
+  src="https://maps.googleapis.com/maps/api/js?key=YOUR_MAPS_API_KEY&libraries=places&callback=initMap&language=ko">
 </script>
 
 <style>
@@ -150,12 +152,35 @@ html, body {
   width: 380px; min-width: 300px;
   background: var(--white);
   border-right: 1px solid var(--sand);
-  overflow-y: auto;
   flex-shrink: 0;
   display: flex; flex-direction: column;
+  overflow: hidden;
 }
-#left-panel::-webkit-scrollbar { width: 4px; }
-#left-panel::-webkit-scrollbar-thumb { background: var(--sand); border-radius: 4px; }
+
+/* ── 왼쪽 패널 탭 ── */
+#panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--sand);
+  background: var(--white);
+  flex-shrink: 0;
+}
+.panel-tab {
+  flex: 1; padding: 14px 0;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  border: none; background: none; cursor: pointer;
+  color: var(--ink3); transition: all .18s;
+  border-bottom: 2px solid transparent;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.panel-tab:hover { color: var(--ink2); background: var(--stone); }
+.panel-tab.active {
+  color: var(--accent); border-bottom-color: var(--accent);
+  background: var(--white); font-weight: 600;
+}
+.panel-page { display: none; flex-direction: column; flex: 1; overflow-y: auto; }
+.panel-page.active { display: flex; }
+.panel-page::-webkit-scrollbar { width: 4px; }
+.panel-page::-webkit-scrollbar-thumb { background: var(--sand); border-radius: 4px; }
 
 /* ── 여행 기본 정보 ── */
 #trip-info {
@@ -190,7 +215,7 @@ html, body {
   background: var(--stone); color: var(--ink3); cursor: default;
 }
 
-/* 날짜 배지 */
+/* 날짜 배지 - 클릭 가능 버튼 스타일 */
 #duration-badge {
   grid-column: 1 / -1;
   background: linear-gradient(135deg, var(--accent) 0%, #f0954a 100%);
@@ -198,9 +223,60 @@ html, body {
   padding: 12px 16px;
   display: flex; align-items: center; gap: 10px;
   font-weight: 600; font-size: 15px;
+  cursor: pointer; border: none; width: 100%;
+  font-family: inherit; text-align: left;
+  transition: opacity .16s, transform .12s;
 }
-#duration-badge .icon { font-size: 20px; }
+#duration-badge:hover { opacity: .92; transform: translateY(-1px); }
+#duration-badge:active { transform: scale(.98); }
+#duration-badge .icon { font-size: 20px; flex-shrink: 0; }
 #duration-badge .sub  { font-size: 11px; font-weight: 400; opacity: .85; }
+#duration-badge .edit-hint {
+  margin-left: auto; font-size: 11px; opacity: .7;
+  border: 1px solid rgba(255,255,255,0.5); border-radius: 6px;
+  padding: 2px 7px; flex-shrink: 0;
+}
+
+/* 여행 설정 팝업 */
+#trip-setup-overlay .popup { width: 460px; }
+.setup-steps {
+  display: flex; gap: 6px; margin-bottom: 22px;
+  align-items: center;
+}
+.setup-step-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--sand); background: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--ink3);
+  flex-shrink: 0; transition: all .2s;
+}
+.setup-step-dot.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.setup-step-dot.done   { border-color: var(--green);  background: var(--green);  color: #fff; }
+.setup-step-line {
+  flex: 1; height: 2px; background: var(--sand); border-radius: 2px;
+  transition: background .2s;
+}
+.setup-step-line.done { background: var(--green); }
+.setup-page { display: none; flex-direction: column; gap: 14px; }
+.setup-page.active { display: flex; }
+.setup-page-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 17px; font-weight: 700; color: var(--ink);
+  margin-bottom: 2px;
+}
+.setup-page-sub { font-size: 13px; color: var(--ink3); margin-top: -10px; }
+.setup-nav { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+.setup-nav button {
+  padding: 9px 22px; border-radius: 9px; border: none;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .16s;
+}
+.btn-next   { background: var(--accent); color: #fff; }
+.btn-next:hover   { background: #c96a2e; }
+.btn-back   { background: var(--stone); color: var(--ink2); }
+.btn-back:hover   { background: var(--sand); }
+.btn-finish { background: var(--ink); color: #fff; }
+.btn-finish:hover { background: #333; }
 
 /* 항공 정보 */
 #flight-section {
@@ -233,7 +309,7 @@ html, body {
 }
 
 /* 일정 탭 */
-#schedule-section { flex: 1; padding: 16px 20px; }
+#schedule-section { padding: 16px 20px; flex: 1; }
 .day-tabs {
   display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
 }
@@ -462,8 +538,10 @@ html, body {
   #left-panel {
     width: 100%; border-right: none;
     border-bottom: 1px solid var(--sand);
-    overflow: visible;
+    overflow: hidden;
+    min-height: 0;
   }
+  .panel-page { overflow: visible; }
   #map-wrapper { height: 60vw; min-height: 300px; flex-shrink: 0; }
   #header h1  { font-size: 17px; }
   .popup { padding: 20px; }
@@ -520,92 +598,106 @@ html, body {
   <!-- 왼쪽 패널 -->
   <div id="left-panel">
 
-    <!-- 여행 기본 정보 -->
-    <div id="trip-info">
-      <div class="section-label">여행 기본 정보</div>
-      <div class="info-grid">
-        <div id="duration-badge">
-          <span class="icon">🏖️</span>
-          <div>
-            <div id="duration-text">날짜를 선택하세요</div>
-            <div class="sub" id="duration-nights">—</div>
-          </div>
-        </div>
-        <div class="info-field full">
-          <label>여행지 / 제목</label>
-          <input type="text" id="trip-title" placeholder="예: 도쿄 여행 2025" />
-        </div>
-        <div class="info-field">
-          <label>출발일</label>
-          <input type="date" id="trip-start" />
-        </div>
-        <div class="info-field">
-          <label>귀국일</label>
-          <input type="date" id="trip-end" />
-        </div>
-        <div class="info-field full">
-          <label>여행 메모</label>
-          <input type="text" id="trip-note" placeholder="예: 친구 3명, 자유여행" />
-        </div>
-      </div>
-    </div>
-
-    <!-- 항공편 -->
-    <div id="flight-section">
-      <div class="section-label">항공편</div>
-      <div class="flight-card">
-        <div class="flight-row">
-          <span class="lbl">항공사</span>
-          <div class="airline-logo" id="airline-logo">✈</div>
-          <input type="text" id="flight-airline" placeholder="예: 대한항공 KE701" oninput="updateAirlineLogo()" />
-        </div>
-        <div class="flight-row">
-          <span class="lbl">출발</span>
-          <input type="time" id="flight-depart" />
-          <input type="text" id="flight-from" placeholder="ICN" style="width:70px;flex:none;" />
-        </div>
-        <div class="flight-row">
-          <span class="lbl">도착</span>
-          <input type="time" id="flight-arrive" />
-          <input type="text" id="flight-to" placeholder="NRT" style="width:70px;flex:none;" />
-        </div>
-        <!-- 귀국편 -->
-        <div style="border-top:1px solid var(--sand);margin:4px 0;padding-top:8px;">
-          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">귀국편</div>
-        </div>
-        <div class="flight-row">
-          <span class="lbl">항공사</span>
-          <input type="text" id="return-airline" placeholder="예: 아시아나 OZ102" />
-        </div>
-        <div class="flight-row">
-          <span class="lbl">출발</span>
-          <input type="time" id="return-depart" />
-          <input type="text" id="return-from" placeholder="NRT" style="width:70px;flex:none;" />
-        </div>
-        <div class="flight-row">
-          <span class="lbl">도착</span>
-          <input type="time" id="return-arrive" />
-          <input type="text" id="return-to" placeholder="ICN" style="width:70px;flex:none;" />
-        </div>
-      </div>
-    </div>
-
-    <!-- 일정 -->
-    <div id="schedule-section">
-      <div class="section-label">일별 일정</div>
-      <div class="day-tabs" id="day-tabs"></div>
-      <div class="schedule-list" id="schedule-list"></div>
-      <button id="add-schedule-btn" onclick="openSchedulePopup()">
-        <span>＋</span> 일정 추가
+    <!-- 패널 탭 -->
+    <div id="panel-tabs">
+      <button class="panel-tab active" onclick="switchPanelTab(0)">
+        ✈️ 여행 정보
+      </button>
+      <button class="panel-tab" onclick="switchPanelTab(1)">
+        📅 일별 일정
       </button>
     </div>
 
-    <!-- 맛집 핀 -->
-    <div id="places-section">
-      <div class="section-label">📍 맛집 &amp; 장소</div>
-      <div class="place-chips" id="place-chips"></div>
-      <button id="add-place-btn" onclick="openPlacePopup()">＋ 장소 추가</button>
-    </div>
+    <!-- 탭 1: 여행 정보 + 항공편 -->
+    <div class="panel-page active" id="panel-page-0">
+
+      <!-- 여행 기본 정보 -->
+      <div id="trip-info">
+        <div class="section-label">여행 기본 정보</div>
+        <div class="info-grid">
+          <button id="duration-badge" onclick="openTripSetup()">
+            <span class="icon">🏖️</span>
+            <div>
+              <div id="duration-text">날짜를 선택하세요</div>
+              <div class="sub" id="duration-nights">—</div>
+            </div>
+            <span class="edit-hint">✏️ 편집</span>
+          </button>
+          <!-- 숨김 필드 (데이터용) -->
+          <input type="hidden" id="trip-title" />
+          <input type="hidden" id="trip-start" />
+          <input type="hidden" id="trip-end" />
+          <input type="hidden" id="trip-note" />
+        </div>
+        <!-- 여행 정보 요약 표시 -->
+        <div id="trip-summary" style="margin-top:12px;display:none;">
+          <div style="background:var(--stone);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;">
+            <div id="summary-title" style="font-size:14px;font-weight:600;color:var(--ink);"></div>
+            <div id="summary-note"  style="font-size:12px;color:var(--ink3);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 항공편 -->
+      <div id="flight-section">
+        <div class="section-label">항공편</div>
+        <div class="flight-card">
+          <div class="flight-row">
+            <span class="lbl">항공사</span>
+            <div class="airline-logo" id="airline-logo">✈</div>
+            <input type="text" id="flight-airline" placeholder="예: 대한항공 KE701" oninput="updateAirlineLogo()" />
+          </div>
+          <div class="flight-row">
+            <span class="lbl">출발</span>
+            <input type="time" id="flight-depart" />
+            <input type="text" id="flight-from" placeholder="ICN" style="width:70px;flex:none;" />
+          </div>
+          <div class="flight-row">
+            <span class="lbl">도착</span>
+            <input type="time" id="flight-arrive" />
+            <input type="text" id="flight-to" placeholder="NRT" style="width:70px;flex:none;" />
+          </div>
+          <!-- 귀국편 -->
+          <div style="border-top:1px solid var(--sand);margin:4px 0;padding-top:8px;">
+            <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">귀국편</div>
+          </div>
+          <div class="flight-row">
+            <span class="lbl">항공사</span>
+            <input type="text" id="return-airline" placeholder="예: 아시아나 OZ102" />
+          </div>
+          <div class="flight-row">
+            <span class="lbl">출발</span>
+            <input type="time" id="return-depart" />
+            <input type="text" id="return-from" placeholder="NRT" style="width:70px;flex:none;" />
+          </div>
+          <div class="flight-row">
+            <span class="lbl">도착</span>
+            <input type="time" id="return-arrive" />
+            <input type="text" id="return-to" placeholder="ICN" style="width:70px;flex:none;" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 맛집 핀 -->
+      <div id="places-section">
+        <div class="section-label">📍 맛집 &amp; 장소</div>
+        <div class="place-chips" id="place-chips"></div>
+        <button id="add-place-btn" onclick="openPlacePopup()">＋ 장소 추가</button>
+      </div>
+
+    </div><!-- /panel-page-0 -->
+
+    <!-- 탭 2: 일별 일정 -->
+    <div class="panel-page" id="panel-page-1">
+      <div id="schedule-section" style="flex:1;padding:16px 20px;">
+        <div class="section-label">일별 일정</div>
+        <div class="day-tabs" id="day-tabs"></div>
+        <div class="schedule-list" id="schedule-list"></div>
+        <button id="add-schedule-btn" onclick="openSchedulePopup()">
+          <span>＋</span> 일정 추가
+        </button>
+      </div>
+    </div><!-- /panel-page-1 -->
 
   </div><!-- /left-panel -->
 
@@ -707,6 +799,74 @@ html, body {
   </div>
 </div>
 
+<!-- 여행 설정 위자드 팝업 -->
+<div class="overlay" id="trip-setup-overlay" onclick="closeIfBg(event,'trip-setup-overlay')">
+  <div class="popup">
+    <!-- 진행 단계 표시 -->
+    <div class="setup-steps">
+      <div class="setup-step-dot active" id="step-dot-1">1</div>
+      <div class="setup-step-line" id="step-line-1"></div>
+      <div class="setup-step-dot" id="step-dot-2">2</div>
+      <div class="setup-step-line" id="step-line-2"></div>
+      <div class="setup-step-dot" id="step-dot-3">3</div>
+    </div>
+
+    <!-- Step 1: 여행지 & 제목 -->
+    <div class="setup-page active" id="setup-page-1">
+      <div class="setup-page-title">어디로 여행을 떠나시나요? 🌏</div>
+      <div class="setup-page-sub">여행의 제목을 정해주세요</div>
+      <div class="popup-field">
+        <label>여행지 / 제목</label>
+        <input type="text" id="setup-title" placeholder="예: 도쿄 여행 2025 🗼" />
+      </div>
+      <div class="popup-field">
+        <label>여행 메모 <small style="color:var(--ink3)">(선택)</small></label>
+        <input type="text" id="setup-note" placeholder="예: 친구 3명, 자유여행" />
+      </div>
+      <div class="setup-nav">
+        <button class="btn-cancel" onclick="closeOverlay('trip-setup-overlay')">취소</button>
+        <button class="btn-next" onclick="setupNext(1)">다음 →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: 날짜 -->
+    <div class="setup-page" id="setup-page-2">
+      <div class="setup-page-title">언제 떠나시나요? 📅</div>
+      <div class="setup-page-sub">출발일과 귀국일을 선택해주세요</div>
+      <div class="popup-field">
+        <label>출발일</label>
+        <input type="date" id="setup-start" />
+      </div>
+      <div class="popup-field">
+        <label>귀국일</label>
+        <input type="date" id="setup-end" />
+      </div>
+      <div id="setup-duration-preview" style="background:var(--stone);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--ink3);text-align:center;display:none;">
+        ✈️ <span id="setup-dur-text"></span>
+      </div>
+      <div class="setup-nav">
+        <button class="btn-back" onclick="setupBack(2)">← 이전</button>
+        <button class="btn-next" onclick="setupNext(2)">다음 →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: 확인 -->
+    <div class="setup-page" id="setup-page-3">
+      <div class="setup-page-title">여행 준비 완료! 🎉</div>
+      <div class="setup-page-sub">아래 내용으로 여행 계획을 시작합니다</div>
+      <div style="background:linear-gradient(135deg,var(--accent),#f0954a);border-radius:14px;padding:20px;color:#fff;display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:20px;font-weight:700;" id="confirm-title"></div>
+        <div style="font-size:14px;opacity:.9;" id="confirm-dates"></div>
+        <div style="font-size:13px;opacity:.75;" id="confirm-note"></div>
+      </div>
+      <div class="setup-nav">
+        <button class="btn-back" onclick="setupBack(3)">← 이전</button>
+        <button class="btn-finish" onclick="setupFinish()">🚀 시작하기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 토스트 -->
 <div id="toast"></div>
 
@@ -763,15 +923,14 @@ async function loadFromFirebase() {
     renderMapMarkers();
   });
 
-  // 자동저장 감시
-  const watchedFields = ['trip-title','trip-start','trip-end','trip-note',
+  // 자동저장 감시 (항공편 필드들)
+  const watchedFields = [
     'flight-airline','flight-depart','flight-from','flight-arrive','flight-to',
     'return-airline','return-depart','return-from','return-arrive','return-to'];
   watchedFields.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener('change', () => { updateDuration(); autoSave(); });
-      el.addEventListener('input',  () => { updateDuration(); });
+      el.addEventListener('change', () => { autoSave(); });
     }
   });
 }
@@ -798,6 +957,7 @@ function applyTripData(data) {
     if (map) drawRoute();
   }
   updateDuration();
+  updateTripSummary();
   if (data.mapCenter && map) {
     map.setCenter(data.mapCenter);
     map.setZoom(data.mapZoom || 12);
@@ -830,8 +990,7 @@ async function saveAll() {
   };
   await window.fbSaveTrip(TRIP_ID, payload);
   showToast('저장되었습니다 ✓');
-  const t = document.getElementById('trip-title').value;
-  if (t) document.getElementById('trip-title-display').innerHTML = t + ' <span>✈</span>';
+  updateTripSummary();
 }
 
 let saveTimer = null;
@@ -1108,7 +1267,117 @@ function openGoogleMapsPlace() {
   window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
 }
 
-// ── 항공사 로고 이니셜 ─────────────────────────────────────────
+// ── 패널 탭 전환 ──────────────────────────────────────────────
+function switchPanelTab(idx) {
+  document.querySelectorAll('.panel-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
+}
+
+// ── 여행 설정 위자드 ──────────────────────────────────────────
+let currentSetupStep = 1;
+
+function openTripSetup() {
+  // 현재 값을 위자드에 미리 채움
+  document.getElementById('setup-title').value = document.getElementById('trip-title').value || '';
+  document.getElementById('setup-note').value  = document.getElementById('trip-note').value  || '';
+  document.getElementById('setup-start').value = document.getElementById('trip-start').value || '';
+  document.getElementById('setup-end').value   = document.getElementById('trip-end').value   || '';
+  goSetupStep(1);
+  openOverlay('trip-setup-overlay');
+}
+
+function goSetupStep(step) {
+  currentSetupStep = step;
+  [1,2,3].forEach(n => {
+    document.getElementById('setup-page-' + n).classList.toggle('active', n === step);
+    const dot = document.getElementById('step-dot-' + n);
+    dot.classList.toggle('active', n === step);
+    dot.classList.toggle('done',   n < step);
+  });
+  if (document.getElementById('step-line-1'))
+    document.getElementById('step-line-1').classList.toggle('done', step > 1);
+  if (document.getElementById('step-line-2'))
+    document.getElementById('step-line-2').classList.toggle('done', step > 2);
+}
+
+function setupNext(from) {
+  if (from === 1) {
+    const title = document.getElementById('setup-title').value.trim();
+    if (!title) { showToast('여행 제목을 입력해주세요'); return; }
+    goSetupStep(2);
+  } else if (from === 2) {
+    const s = document.getElementById('setup-start').value;
+    const e = document.getElementById('setup-end').value;
+    if (!s || !e) { showToast('출발일과 귀국일을 모두 선택해주세요'); return; }
+    if (new Date(e) < new Date(s)) { showToast('귀국일이 출발일보다 빠릅니다'); return; }
+    // 확인 페이지 채우기
+    const sd = new Date(s), ed = new Date(e);
+    const diff = Math.round((ed - sd) / 86400000);
+    const fmt = d => d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+    document.getElementById('confirm-title').textContent = document.getElementById('setup-title').value;
+    document.getElementById('confirm-dates').textContent =
+      fmt(sd) + ' ~ ' + fmt(ed) + '  (' + diff + '박 ' + (diff+1) + '일)';
+    document.getElementById('confirm-note').textContent  = document.getElementById('setup-note').value || '';
+    goSetupStep(3);
+  }
+}
+function setupBack(from) { goSetupStep(from - 1); }
+
+function setupFinish() {
+  const title = document.getElementById('setup-title').value.trim();
+  const note  = document.getElementById('setup-note').value.trim();
+  const start = document.getElementById('setup-start').value;
+  const end   = document.getElementById('setup-end').value;
+
+  // 숨김 필드에 값 저장
+  document.getElementById('trip-title').value = title;
+  document.getElementById('trip-note').value  = note;
+  document.getElementById('trip-start').value = start;
+  document.getElementById('trip-end').value   = end;
+
+  closeOverlay('trip-setup-overlay');
+  updateDuration();
+  updateTripSummary();
+  autoSave();
+  showToast('여행 정보가 저장되었습니다 ✓');
+}
+
+function updateTripSummary() {
+  const title = document.getElementById('trip-title').value;
+  const note  = document.getElementById('trip-note').value;
+  const summary = document.getElementById('trip-summary');
+  if (title) {
+    document.getElementById('summary-title').textContent = title;
+    document.getElementById('summary-note').textContent  = note || '';
+    summary.style.display = 'block';
+  } else {
+    summary.style.display = 'none';
+  }
+  // 헤더 제목도 업데이트
+  if (title) document.getElementById('trip-title-display').innerHTML = title + ' <span>✈</span>';
+}
+
+// 날짜 입력 시 미리보기
+document.addEventListener('DOMContentLoaded', () => {
+  ['setup-start','setup-end'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => {
+      const s = document.getElementById('setup-start').value;
+      const e = document.getElementById('setup-end').value;
+      const prev = document.getElementById('setup-duration-preview');
+      if (s && e && new Date(e) >= new Date(s)) {
+        const diff = Math.round((new Date(e)-new Date(s))/86400000);
+        const fmt = d => d.toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
+        document.getElementById('setup-dur-text').textContent =
+          fmt(new Date(s)) + ' ~ ' + fmt(new Date(e)) + ' · ' + diff + '박 ' + (diff+1) + '일';
+        prev.style.display = 'block';
+      } else {
+        prev.style.display = 'none';
+      }
+    });
+  });
+});
+
 function updateAirlineLogo() {
   const v = document.getElementById('flight-airline').value;
   const logo = document.getElementById('airline-logo');
