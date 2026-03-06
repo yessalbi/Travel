@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>나의 여행 계획</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #map { height: 400px; width: 100%; border: 1px solid #ccc; }
+        .day-box { margin-top: 20px; padding: 10px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <h1>✈️ 나의 일본 여행 계획</h1>
+    <div id="map"></div>
+
+    <div class="day-box">
+        <h3>1일차: 도쿄 맛집 투어</h3>
+        <p>위치: 신주쿠</p>
+        <img src="https://via.placeholder.com/150" alt="맛집사진">
+    </div>
+
+    <script>
+        // 지도 초기화
+        function initMap() {
+            const map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 12,
+                center: { lat: 35.6762, lng: 139.6503 }
+            });
+            // 여기에 마커 찍는 로직 추가 가능
+        }
+        window.onload = initMap;
+    </script>
+</body>
+</html>
