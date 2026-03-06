@@ -6,8 +6,7 @@
     <meta name="apple-mobile-web-app-title" content="여행앱">
     
     <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon.png?raw=true">
-</head>
-<meta charset="UTF-8">
+</head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>여행 계획판</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -697,6 +696,85 @@ html, body {
   font-size: 12px; font-weight: 500; cursor: pointer;
 }
 .tp-close-btn:hover { background: #333; }
+/* ── 챙겨야할 것 탭 ── */
+#checklist-section { padding: 16px 20px; display: flex; flex-direction: column; gap: 20px; }
+
+/* 체크박스 리스트 */
+.check-group { display: flex; flex-direction: column; gap: 6px; }
+.check-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--stone); cursor: pointer;
+  transition: background .14s; user-select: none;
+  border: 1.5px solid transparent;
+}
+.check-item:hover { background: var(--sand); }
+.check-item.checked {
+  background: #EBF7EF; border-color: var(--green);
+}
+.check-item input[type="checkbox"] { display: none; }
+.check-box {
+  width: 20px; height: 20px; border-radius: 6px;
+  border: 2px solid var(--sand); background: var(--white);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: all .14s; font-size: 12px;
+}
+.check-item.checked .check-box {
+  background: var(--green); border-color: var(--green); color: #fff;
+}
+.check-label { font-size: 13px; font-weight: 500; color: var(--ink2); flex: 1; }
+.check-item.checked .check-label { color: var(--ink3); text-decoration: line-through; }
+.check-emoji { font-size: 16px; flex-shrink: 0; }
+
+/* 바우처 그리드 */
+.voucher-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.voucher-card {
+  border-radius: 12px; overflow: hidden;
+  border: 1.5px solid var(--sand);
+  background: var(--stone); cursor: pointer;
+  transition: all .16s; position: relative;
+  aspect-ratio: 3/2;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px;
+}
+.voucher-card:hover { border-color: var(--accent2); background: #EEF5FF; }
+.voucher-card.has-image { border-color: var(--accent2); background: var(--white); }
+.voucher-card .vc-empty-icon { font-size: 22px; opacity: .4; }
+.voucher-card .vc-label {
+  font-size: 11px; font-weight: 600; color: var(--ink3);
+  text-align: center; padding: 0 8px; line-height: 1.3;
+}
+.voucher-card.has-image .vc-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.55));
+  color: #fff; padding: 14px 8px 6px; font-size: 11px;
+}
+.voucher-card img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  position: absolute; inset: 0;
+}
+.voucher-del {
+  position: absolute; top: 5px; right: 5px;
+  background: rgba(0,0,0,0.45); border: none; border-radius: 50%;
+  width: 22px; height: 22px; color: #fff; cursor: pointer;
+  font-size: 11px; display: none; align-items: center; justify-content: center;
+}
+.voucher-card.has-image:hover .voucher-del { display: flex; }
+.voucher-card .vc-add { font-size: 20px; color: var(--ink3); opacity: .5; }
+
+/* 바우처 뷰어 팝업 */
+#voucher-viewer .popup { padding: 0; overflow: hidden; width: 500px; }
+#vv-img { width: 100%; max-height: 70vh; object-fit: contain; display: block; background: var(--ink); }
+#vv-label { padding: 14px 18px; font-size: 14px; font-weight: 600; color: var(--ink); }
+#vv-close {
+  position: absolute; top: 10px; right: 10px;
+  background: rgba(0,0,0,0.45); border: none; border-radius: 50%;
+  width: 32px; height: 32px; color: #fff; cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -729,6 +807,9 @@ html, body {
       </button>
       <button class="panel-tab" onclick="switchPanelTab(1)">
         📅 일별 일정
+      </button>
+      <button class="panel-tab" onclick="switchPanelTab(2)">
+        🎒 챙겨야할 것
       </button>
     </div>
 
@@ -822,6 +903,29 @@ html, body {
         </button>
       </div>
     </div><!-- /panel-page-1 -->
+
+    <!-- 탭 3: 챙겨야할 것 -->
+    <div class="panel-page" id="panel-page-2">
+      <div id="checklist-section">
+
+        <!-- 체크리스트 -->
+        <div>
+          <div class="section-label">여행 준비물</div>
+          <div class="check-group" id="check-group">
+            <!-- JS로 렌더링 -->
+          </div>
+        </div>
+
+        <!-- 바우처 -->
+        <div>
+          <div class="section-label">바우처 / 티켓</div>
+          <div class="voucher-grid" id="voucher-grid">
+            <!-- JS로 렌더링 -->
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /panel-page-2 -->
 
   </div><!-- /left-panel -->
 
@@ -1017,6 +1121,15 @@ html, body {
   </div>
 </div>
 
+<!-- 바우처 이미지 뷰어 -->
+<div class="overlay" id="voucher-viewer" onclick="closeIfBg(event,'voucher-viewer')">
+  <div class="popup" style="position:relative;">
+    <button id="vv-close" onclick="closeOverlay('voucher-viewer')">✕</button>
+    <img id="vv-img" src="" alt="" />
+    <div id="vv-label"></div>
+  </div>
+</div>
+
 <!-- 토스트 -->
 <div id="toast"></div>
 
@@ -1025,11 +1138,13 @@ html, body {
 let TRIP_ID = null;
 let map = null, markers = [], routePolyline = null, routePoints = [];
 let routeMode = false;
-let scheduleData = {};   // { "1": [{...}], "2": [...] }
-let placesData   = [];   // [{id,name,desc,img,lat,lng}]
-let currentDay   = 1;
-let totalDays    = 1;
-let selectedType = 'food';
+let scheduleData  = {};
+let placesData    = [];
+let checklistData = {};   // { "passport": true, "license": false, ... }
+let voucherData   = {};   // { "flight-out": "base64...", ... }
+let currentDay    = 1;
+let totalDays     = 1;
+let selectedType  = 'food';
 let pendingLatLng = null;
 let currentPlaceForMaps = null;
 
@@ -1056,6 +1171,8 @@ async function init() {
   // 시간 선택기 + 날짜 연동 먼저 초기화
   initTimePickers();
   initDateMinLink();
+  renderChecklist();
+  renderVouchers();
 
   if (window.firebaseReady) await loadFromFirebase();
   else document.addEventListener('firebase-ready', async () => { await loadFromFirebase(); });
@@ -1107,6 +1224,8 @@ function applyTripData(data) {
   timeToTp('rdep', data.returnDepart);
   timeToTp('rarr', data.returnArrive);
   if (data.schedule) scheduleData = data.schedule;
+  if (data.checklist) { checklistData = data.checklist; renderChecklist(); }
+  if (data.vouchers)  { voucherData   = data.vouchers;  renderVouchers(); }
   if (data.routePoints) {
     routePoints = data.routePoints;
     if (map) drawRoute();
@@ -1121,6 +1240,102 @@ function applyTripData(data) {
     if (map) geocodeAndMoveMap(data.title);
   }
   updateAirlineLogo();
+}
+
+// ── 챙겨야할 것 ───────────────────────────────────────────────
+const CHECKLIST_ITEMS = [
+  { id: 'passport',   label: '여권',          emoji: '🛂' },
+  { id: 'id-card',    label: '신분증',         emoji: '🪪' },
+  { id: 'intl-license',label:'국제면허증',      emoji: '🚗' },
+  { id: 'toiletry',   label: '세면도구',        emoji: '🧴' },
+  { id: 'adapter',    label: '변압기 / 어댑터', emoji: '🔌' },
+  { id: 'visit-japan',label: 'Visit Japan Web', emoji: '🇯🇵' },
+];
+
+const VOUCHER_ITEMS = [
+  { id: 'eticket-out',  label: '비행기 출국 E-Ticket', icon: '✈️' },
+  { id: 'eticket-in',   label: '비행기 귀국 E-Ticket', icon: '🛬' },
+  { id: 'rentcar',      label: '렌트카 바우처',          icon: '🚗' },
+  { id: 'hotel1',       label: '호텔 바우처 1',          icon: '🏨' },
+  { id: 'hotel2',       label: '호텔 바우처 2',          icon: '🏩' },
+];
+
+function renderChecklist() {
+  const group = document.getElementById('check-group');
+  if (!group) return;
+  group.innerHTML = '';
+  CHECKLIST_ITEMS.forEach(item => {
+    const checked = !!checklistData[item.id];
+    const div = document.createElement('label');
+    div.className = 'check-item' + (checked ? ' checked' : '');
+    div.innerHTML = `
+      <span class="check-emoji">${item.emoji}</span>
+      <span class="check-label">${item.label}</span>
+      <div class="check-box">${checked ? '✓' : ''}</div>`;
+    div.onclick = () => toggleCheck(item.id);
+    group.appendChild(div);
+  });
+}
+
+function toggleCheck(id) {
+  checklistData[id] = !checklistData[id];
+  renderChecklist();
+  autoSave();
+}
+
+function renderVouchers() {
+  const grid = document.getElementById('voucher-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  VOUCHER_ITEMS.forEach(v => {
+    const imgData = voucherData[v.id];
+    const card = document.createElement('div');
+    card.className = 'voucher-card' + (imgData ? ' has-image' : '');
+    card.dataset.id = v.id;
+    if (imgData) {
+      card.innerHTML = `
+        <img src="${imgData}" alt="${v.label}" />
+        <button class="voucher-del" onclick="deleteVoucher('${v.id}',event)">✕</button>
+        <span class="vc-label">${v.label}</span>`;
+      card.onclick = () => openVoucherViewer(v.id, v.label);
+    } else {
+      card.innerHTML = `
+        <span class="vc-add">＋</span>
+        <span class="vc-label">${v.icon} ${v.label}</span>`;
+      card.onclick = () => pickVoucherImage(v.id);
+    }
+    grid.appendChild(card);
+  });
+}
+
+function pickVoucherImage(id) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      voucherData[id] = ev.target.result;
+      renderVouchers();
+      autoSave();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function deleteVoucher(id, e) {
+  e.stopPropagation();
+  delete voucherData[id];
+  renderVouchers();
+  autoSave();
+}
+
+function openVoucherViewer(id, label) {
+  document.getElementById('vv-img').src   = voucherData[id] || '';
+  document.getElementById('vv-label').textContent = label;
+  openOverlay('voucher-viewer');
 }
 
 // ── 저장 ─────────────────────────────────────────────────────
@@ -1142,6 +1357,8 @@ async function saveAll() {
     returnTo:      document.getElementById('return-to').value,
     schedule:      scheduleData,
     routePoints,
+    checklist:     checklistData,
+    vouchers:      voucherData,
     mapCenter:     map ? { lat: map.getCenter().lat(), lng: map.getCenter().lng() } : null,
     mapZoom:       map ? map.getZoom() : 12,
     updatedAt:     new Date().toISOString(),
