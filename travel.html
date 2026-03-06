@@ -1,35 +1,1138 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>나의 여행 계획</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        #map { height: 400px; width: 100%; border: 1px solid #ccc; }
-        .day-box { margin-top: 20px; padding: 10px; border-bottom: 1px solid #eee; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>여행 계획판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, addDoc, deleteDoc, updateDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // ── 🔑 여기에 Firebase 설정 입력 ──────────────────────────────
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+  // ──────────────────────────────────────────────────────────────
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  window._db = db;
+
+  // ── Firestore helpers ─────────────────────────────────────────
+  window.fbSaveTrip = async (tripId, data) => {
+    await setDoc(doc(db, "trips", tripId), data, { merge: true });
+  };
+  window.fbGetTrip = async (tripId) => {
+    const snap = await getDoc(doc(db, "trips", tripId));
+    return snap.exists() ? snap.data() : null;
+  };
+  window.fbWatchTrip = (tripId, cb) => {
+    return onSnapshot(doc(db, "trips", tripId), snap => cb(snap.exists() ? snap.data() : null));
+  };
+  window.fbAddPlace = async (tripId, place) => {
+    const ref = await addDoc(collection(db, "trips", tripId, "places"), place);
+    return ref.id;
+  };
+  window.fbDeletePlace = async (tripId, placeId) => {
+    await deleteDoc(doc(db, "trips", tripId, "places", placeId));
+  };
+  window.fbWatchPlaces = (tripId, cb) => {
+    return onSnapshot(collection(db, "trips", tripId, "places"), snap => {
+      const places = [];
+      snap.forEach(d => places.push({ id: d.id, ...d.data() }));
+      cb(places);
+    });
+  };
+  window.fbUpdatePlace = async (tripId, placeId, data) => {
+    await updateDoc(doc(db, "trips", tripId, "places", placeId), data);
+  };
+
+  window.firebaseReady = true;
+  document.dispatchEvent(new Event("firebase-ready"));
+</script>
+
+<!-- Google Maps API: YOUR_MAPS_API_KEY 교체 -->
+<script>
+  window.MAPS_API_KEY = "YOUR_MAPS_API_KEY";
+  window.initMap = function() {
+    window.mapsReady = true;
+    document.dispatchEvent(new Event("maps-ready"));
+  };
+</script>
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=YOUR_MAPS_API_KEY&libraries=places&callback=initMap&language=ko">
+</script>
+
+<style>
+:root {
+  --cream:   #FAFAF7;
+  --white:   #FFFFFF;
+  --stone:   #F2F0EB;
+  --sand:    #E8E4DC;
+  --ink:     #1A1A18;
+  --ink2:    #3D3D38;
+  --ink3:    #6B6B64;
+  --accent:  #E07A3A;
+  --accent2: #3A8FE0;
+  --green:   #3AAF7A;
+  --red:     #E03A3A;
+  --shadow:  0 4px 24px rgba(0,0,0,0.08);
+  --shadow2: 0 2px 12px rgba(0,0,0,0.06);
+  --r:       14px;
+  --r2:      10px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: 'DM Sans', 'Noto Sans KR', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+/* ── 헤더 ── */
+#header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 60px;
+  background: rgba(250,250,247,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--sand);
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 24px;
+}
+#header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px; font-weight: 700;
+  color: var(--ink); flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#header h1 span { color: var(--accent); }
+.header-btn {
+  border: none; cursor: pointer; border-radius: 8px;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  padding: 7px 14px; transition: all .18s;
+}
+.header-btn.primary {
+  background: var(--accent); color: #fff;
+}
+.header-btn.primary:hover { background: #c96a2e; }
+.header-btn.ghost {
+  background: var(--stone); color: var(--ink2);
+  border: 1px solid var(--sand);
+}
+.header-btn.ghost:hover { background: var(--sand); }
+#trip-id-badge {
+  font-size: 11px; color: var(--ink3); background: var(--stone);
+  border: 1px solid var(--sand); border-radius: 6px;
+  padding: 4px 10px; white-space: nowrap;
+}
+
+/* ── 메인 레이아웃 ── */
+#main {
+  display: flex;
+  height: 100vh;
+  padding-top: 60px;
+}
+
+/* ── 왼쪽 패널 ── */
+#left-panel {
+  width: 380px; min-width: 300px;
+  background: var(--white);
+  border-right: 1px solid var(--sand);
+  overflow-y: auto;
+  flex-shrink: 0;
+  display: flex; flex-direction: column;
+}
+#left-panel::-webkit-scrollbar { width: 4px; }
+#left-panel::-webkit-scrollbar-thumb { background: var(--sand); border-radius: 4px; }
+
+/* ── 여행 기본 정보 ── */
+#trip-info {
+  padding: 20px;
+  border-bottom: 1px solid var(--stone);
+}
+.section-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--ink3);
+  margin-bottom: 14px;
+}
+.info-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.info-field { display: flex; flex-direction: column; gap: 5px; }
+.info-field.full { grid-column: 1 / -1; }
+.info-field label {
+  font-size: 11px; color: var(--ink3); font-weight: 500;
+}
+.info-field input, .info-field select {
+  border: 1.5px solid var(--sand);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: inherit; font-size: 13px; color: var(--ink);
+  background: var(--cream);
+  outline: none; transition: border-color .18s;
+}
+.info-field input:focus, .info-field select:focus {
+  border-color: var(--accent);
+}
+.info-field input[readonly] {
+  background: var(--stone); color: var(--ink3); cursor: default;
+}
+
+/* 날짜 배지 */
+#duration-badge {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, var(--accent) 0%, #f0954a 100%);
+  color: #fff; border-radius: 10px;
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 600; font-size: 15px;
+}
+#duration-badge .icon { font-size: 20px; }
+#duration-badge .sub  { font-size: 11px; font-weight: 400; opacity: .85; }
+
+/* 항공 정보 */
+#flight-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--stone);
+}
+.flight-card {
+  background: var(--stone);
+  border-radius: var(--r2);
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.flight-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.flight-row .lbl {
+  font-size: 11px; color: var(--ink3); font-weight: 500; width: 52px; flex-shrink: 0;
+}
+.flight-row input {
+  flex: 1; border: 1.5px solid var(--sand); border-radius: 7px;
+  padding: 7px 10px; font-family: inherit; font-size: 13px;
+  background: var(--white); outline: none; transition: border-color .18s;
+}
+.flight-row input:focus { border-color: var(--accent2); }
+.airline-logo {
+  width: 30px; height: 30px; border-radius: 6px;
+  background: var(--accent2); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+
+/* 일정 탭 */
+#schedule-section { flex: 1; padding: 16px 20px; }
+.day-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.day-tab {
+  padding: 5px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 500;
+  border: 1.5px solid var(--sand); background: var(--white);
+  cursor: pointer; transition: all .16s; color: var(--ink3);
+}
+.day-tab.active {
+  background: var(--ink); color: var(--white); border-color: var(--ink);
+}
+.day-tab:hover:not(.active) { background: var(--stone); }
+
+/* 일정 아이템 */
+.schedule-list { display: flex; flex-direction: column; gap: 8px; }
+.schedule-item {
+  background: var(--stone); border-radius: var(--r2);
+  padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 10px;
+  border-left: 3px solid transparent;
+  transition: border-color .16s, box-shadow .16s;
+  cursor: pointer;
+  position: relative;
+}
+.schedule-item:hover { box-shadow: var(--shadow2); border-left-color: var(--accent); }
+.schedule-item.type-food   { border-left-color: var(--accent); }
+.schedule-item.type-sight  { border-left-color: var(--accent2); }
+.schedule-item.type-hotel  { border-left-color: var(--green); }
+.schedule-item.type-move   { border-left-color: var(--ink3); }
+.item-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.type-food  .item-icon { background: #FEF0E6; }
+.type-sight .item-icon { background: #E6F1FE; }
+.type-hotel .item-icon { background: #E6F7EF; }
+.type-move  .item-icon { background: var(--sand); }
+.item-body  { flex: 1; min-width: 0; }
+.item-time  { font-size: 11px; color: var(--ink3); }
+.item-name  { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-desc  { font-size: 12px; color: var(--ink3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-del {
+  position: absolute; top: 8px; right: 8px;
+  background: none; border: none; cursor: pointer;
+  color: var(--ink3); font-size: 14px; opacity: 0;
+  transition: opacity .14s;
+  padding: 2px 4px; border-radius: 4px;
+}
+.schedule-item:hover .item-del { opacity: 1; }
+.item-del:hover { background: var(--red); color: #fff; }
+
+/* 일정 추가 버튼 */
+#add-schedule-btn {
+  width: 100%; margin-top: 10px;
+  padding: 10px; border-radius: var(--r2);
+  border: 1.5px dashed var(--sand); background: none;
+  font-family: inherit; font-size: 13px; color: var(--ink3);
+  cursor: pointer; transition: all .16s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+#add-schedule-btn:hover { border-color: var(--accent); color: var(--accent); background: #FEF5EE; }
+
+/* 맛집 핀 섹션 */
+#places-section {
+  padding: 16px 20px;
+  border-top: 1px solid var(--stone);
+}
+.place-chips {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+}
+.place-chip {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--stone); border-radius: 20px;
+  padding: 5px 10px 5px 8px;
+  font-size: 12px; color: var(--ink2); cursor: pointer;
+  border: 1.5px solid transparent; transition: all .14s;
+}
+.place-chip:hover  { border-color: var(--accent); color: var(--accent); }
+.place-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.place-chip .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); flex-shrink: 0;
+}
+.place-chip.active .dot { background: #fff; }
+#add-place-btn {
+  background: none; border: 1.5px dashed var(--sand);
+  border-radius: 20px; padding: 5px 12px;
+  font-family: inherit; font-size: 12px; color: var(--ink3);
+  cursor: pointer; transition: all .14s;
+}
+#add-place-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── 지도 ── */
+#map-wrapper {
+  flex: 1;
+  position: relative;
+  background: var(--stone);
+}
+#map { width: 100%; height: 100%; }
+#map-fab {
+  position: absolute; bottom: 24px; right: 24px;
+  background: var(--white); border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  display: flex; flex-direction: column; gap: 4px;
+  z-index: 10;
+}
+.fab-btn {
+  width: 40px; height: 40px; border-radius: 8px;
+  border: none; cursor: pointer; background: none;
+  font-size: 16px; transition: background .14s;
+  display: flex; align-items: center; justify-content: center;
+}
+.fab-btn:hover { background: var(--stone); }
+.fab-btn.active { background: var(--accent); }
+
+/* ── 팝업 공통 ── */
+.overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.35);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.overlay.show { opacity: 1; pointer-events: all; }
+.popup {
+  background: var(--white); border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  padding: 28px;
+  width: 420px; max-width: calc(100vw - 32px);
+  transform: translateY(16px);
+  transition: transform .2s;
+  max-height: 90vh; overflow-y: auto;
+}
+.overlay.show .popup { transform: none; }
+.popup-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px; font-weight: 700;
+  margin-bottom: 20px; color: var(--ink);
+}
+.popup-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.popup-field label { font-size: 12px; color: var(--ink3); font-weight: 500; }
+.popup-field input, .popup-field select, .popup-field textarea {
+  border: 1.5px solid var(--sand); border-radius: 8px;
+  padding: 9px 12px; font-family: inherit; font-size: 13px;
+  background: var(--cream); outline: none; transition: border-color .18s; color: var(--ink);
+}
+.popup-field input:focus, .popup-field select:focus, .popup-field textarea:focus { border-color: var(--accent); }
+.popup-field textarea { resize: vertical; min-height: 70px; }
+.popup-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.popup-actions button {
+  padding: 9px 20px; border-radius: 9px;
+  border: none; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  transition: all .16s;
+}
+.btn-cancel { background: var(--stone); color: var(--ink2); }
+.btn-cancel:hover { background: var(--sand); }
+.btn-save   { background: var(--accent); color: #fff; }
+.btn-save:hover { background: #c96a2e; }
+.type-selector {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 6px;
+}
+.type-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 6px; border-radius: 10px;
+  border: 1.5px solid var(--sand); cursor: pointer;
+  font-size: 11px; color: var(--ink3); transition: all .14s;
+  background: var(--cream);
+}
+.type-opt .ico { font-size: 20px; }
+.type-opt.sel { border-color: var(--accent); background: #FEF5EE; color: var(--accent); font-weight: 600; }
+
+/* 맛집 사진 팝업 */
+#place-popup .popup { width: 340px; padding: 0; overflow: hidden; }
+#place-popup-img {
+  width: 100%; height: 200px; object-fit: cover; display: block;
+  background: var(--stone);
+}
+#place-popup-body { padding: 20px; }
+#place-popup-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px; font-weight: 700; margin-bottom: 4px;
+}
+#place-popup-desc { font-size: 13px; color: var(--ink3); margin-bottom: 14px; }
+#place-popup-close {
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(0,0,0,0.4); border: none; border-radius: 50%;
+  width: 30px; height: 30px; cursor: pointer; color: #fff;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+}
+
+/* 저장 토스트 */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
+  background: var(--ink); color: #fff;
+  padding: 10px 20px; border-radius: 30px;
+  font-size: 13px; z-index: 999;
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+
+/* 경로 추가 버튼 */
+#route-controls {
+  position: absolute; top: 16px; left: 16px; z-index: 10;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.route-btn {
+  background: var(--white); border: none;
+  border-radius: 10px; box-shadow: var(--shadow2);
+  padding: 8px 14px; font-family: inherit;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  color: var(--ink2); transition: all .14s;
+  display: flex; align-items: center; gap: 6px;
+}
+.route-btn:hover { background: var(--accent); color: #fff; }
+.route-btn.active { background: var(--accent2); color: #fff; }
+
+/* ── 모바일 ── */
+@media (max-width: 768px) {
+  html, body { overflow: auto; }
+  #main { flex-direction: column; height: auto; overflow: visible; }
+  #left-panel {
+    width: 100%; border-right: none;
+    border-bottom: 1px solid var(--sand);
+    overflow: visible;
+  }
+  #map-wrapper { height: 60vw; min-height: 300px; flex-shrink: 0; }
+  #header h1  { font-size: 17px; }
+  .popup { padding: 20px; }
+}
+
+@media (max-width: 480px) {
+  #header { padding: 0 14px; gap: 8px; }
+  #trip-info, #flight-section, #schedule-section, #places-section { padding: 14px; }
+  .info-grid { grid-template-columns: 1fr; }
+  #duration-badge { grid-column: 1; }
+  .type-selector { grid-template-columns: repeat(2,1fr); }
+}
+
+/* 로딩 */
+#loading {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--cream);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px;
+}
+#loading .logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 32px; font-weight: 700; color: var(--ink);
+}
+#loading .logo span { color: var(--accent); }
+#loading .spinner {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 3px solid var(--sand);
+  border-top-color: var(--accent);
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </head>
 <body>
-    <h1>✈️ 나의 일본 여행 계획</h1>
-    <div id="map"></div>
 
-    <div class="day-box">
-        <h3>1일차: 도쿄 맛집 투어</h3>
-        <p>위치: 신주쿠</p>
-        <img src="https://via.placeholder.com/150" alt="맛집사진">
+<!-- 로딩 -->
+<div id="loading">
+  <div class="logo">travel<span>.</span></div>
+  <div class="spinner"></div>
+</div>
+
+<!-- 헤더 -->
+<div id="header">
+  <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
+  <span id="trip-id-badge">ID 로드 중…</span>
+  <button class="header-btn ghost" id="share-btn">🔗 공유</button>
+  <button class="header-btn primary" id="save-btn">저장</button>
+</div>
+
+<!-- 메인 -->
+<div id="main">
+
+  <!-- 왼쪽 패널 -->
+  <div id="left-panel">
+
+    <!-- 여행 기본 정보 -->
+    <div id="trip-info">
+      <div class="section-label">여행 기본 정보</div>
+      <div class="info-grid">
+        <div id="duration-badge">
+          <span class="icon">🏖️</span>
+          <div>
+            <div id="duration-text">날짜를 선택하세요</div>
+            <div class="sub" id="duration-nights">—</div>
+          </div>
+        </div>
+        <div class="info-field full">
+          <label>여행지 / 제목</label>
+          <input type="text" id="trip-title" placeholder="예: 도쿄 여행 2025" />
+        </div>
+        <div class="info-field">
+          <label>출발일</label>
+          <input type="date" id="trip-start" />
+        </div>
+        <div class="info-field">
+          <label>귀국일</label>
+          <input type="date" id="trip-end" />
+        </div>
+        <div class="info-field full">
+          <label>여행 메모</label>
+          <input type="text" id="trip-note" placeholder="예: 친구 3명, 자유여행" />
+        </div>
+      </div>
     </div>
 
-    <script>
-        // 지도 초기화
-        function initMap() {
-            const map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 12,
-                center: { lat: 35.6762, lng: 139.6503 }
-            });
-            // 여기에 마커 찍는 로직 추가 가능
-        }
-        window.onload = initMap;
-    </script>
+    <!-- 항공편 -->
+    <div id="flight-section">
+      <div class="section-label">항공편</div>
+      <div class="flight-card">
+        <div class="flight-row">
+          <span class="lbl">항공사</span>
+          <div class="airline-logo" id="airline-logo">✈</div>
+          <input type="text" id="flight-airline" placeholder="예: 대한항공 KE701" oninput="updateAirlineLogo()" />
+        </div>
+        <div class="flight-row">
+          <span class="lbl">출발</span>
+          <input type="time" id="flight-depart" />
+          <input type="text" id="flight-from" placeholder="ICN" style="width:70px;flex:none;" />
+        </div>
+        <div class="flight-row">
+          <span class="lbl">도착</span>
+          <input type="time" id="flight-arrive" />
+          <input type="text" id="flight-to" placeholder="NRT" style="width:70px;flex:none;" />
+        </div>
+        <!-- 귀국편 -->
+        <div style="border-top:1px solid var(--sand);margin:4px 0;padding-top:8px;">
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">귀국편</div>
+        </div>
+        <div class="flight-row">
+          <span class="lbl">항공사</span>
+          <input type="text" id="return-airline" placeholder="예: 아시아나 OZ102" />
+        </div>
+        <div class="flight-row">
+          <span class="lbl">출발</span>
+          <input type="time" id="return-depart" />
+          <input type="text" id="return-from" placeholder="NRT" style="width:70px;flex:none;" />
+        </div>
+        <div class="flight-row">
+          <span class="lbl">도착</span>
+          <input type="time" id="return-arrive" />
+          <input type="text" id="return-to" placeholder="ICN" style="width:70px;flex:none;" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 일정 -->
+    <div id="schedule-section">
+      <div class="section-label">일별 일정</div>
+      <div class="day-tabs" id="day-tabs"></div>
+      <div class="schedule-list" id="schedule-list"></div>
+      <button id="add-schedule-btn" onclick="openSchedulePopup()">
+        <span>＋</span> 일정 추가
+      </button>
+    </div>
+
+    <!-- 맛집 핀 -->
+    <div id="places-section">
+      <div class="section-label">📍 맛집 &amp; 장소</div>
+      <div class="place-chips" id="place-chips"></div>
+      <button id="add-place-btn" onclick="openPlacePopup()">＋ 장소 추가</button>
+    </div>
+
+  </div><!-- /left-panel -->
+
+  <!-- 지도 -->
+  <div id="map-wrapper">
+    <div id="map"></div>
+    <div id="route-controls">
+      <button class="route-btn" id="btn-route-mode" onclick="toggleRouteMode()">🛣️ 경로 추가 모드</button>
+      <button class="route-btn" id="btn-clear-route" onclick="clearRoute()">🗑️ 경로 삭제</button>
+    </div>
+    <div id="map-fab">
+      <button class="fab-btn" onclick="mapZoom(1)" title="확대">＋</button>
+      <button class="fab-btn" onclick="mapZoom(-1)" title="축소">－</button>
+      <button class="fab-btn" onclick="mapFitRoute()" title="경로 맞춤">⊞</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- 일정 추가 팝업 -->
+<div class="overlay" id="schedule-overlay" onclick="closeIfBg(event,'schedule-overlay')">
+  <div class="popup">
+    <div class="popup-title">일정 추가</div>
+    <div class="popup-field">
+      <label>유형</label>
+      <div class="type-selector">
+        <div class="type-opt sel" data-type="food"  onclick="selectType(this,'food')">
+          <span class="ico">🍜</span>맛집
+        </div>
+        <div class="type-opt" data-type="sight" onclick="selectType(this,'sight')">
+          <span class="ico">🏛️</span>관광
+        </div>
+        <div class="type-opt" data-type="hotel" onclick="selectType(this,'hotel')">
+          <span class="ico">🏨</span>숙소
+        </div>
+        <div class="type-opt" data-type="move"  onclick="selectType(this,'move')">
+          <span class="ico">🚆</span>이동
+        </div>
+      </div>
+    </div>
+    <div class="popup-field">
+      <label>이름</label>
+      <input type="text" id="sch-name" placeholder="장소 또는 일정 이름" />
+    </div>
+    <div class="popup-field">
+      <label>시간</label>
+      <input type="time" id="sch-time" />
+    </div>
+    <div class="popup-field">
+      <label>메모</label>
+      <textarea id="sch-desc" placeholder="간단한 메모를 입력하세요"></textarea>
+    </div>
+    <div class="popup-actions">
+      <button class="btn-cancel" onclick="closeOverlay('schedule-overlay')">취소</button>
+      <button class="btn-save"   onclick="saveScheduleItem()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 장소(맛집) 추가 팝업 -->
+<div class="overlay" id="place-overlay" onclick="closeIfBg(event,'place-overlay')">
+  <div class="popup">
+    <div class="popup-title">장소 추가</div>
+    <div class="popup-field">
+      <label>장소명</label>
+      <input type="text" id="pl-name" placeholder="예: 이치란 라멘 신주쿠점" />
+    </div>
+    <div class="popup-field">
+      <label>설명 / 메모</label>
+      <input type="text" id="pl-desc" placeholder="예: 예약 필수, 런치 추천" />
+    </div>
+    <div class="popup-field">
+      <label>대표 사진 URL <small style="color:var(--ink3)">(없으면 구글 검색 이미지 자동)</small></label>
+      <input type="url" id="pl-img" placeholder="https://..." />
+    </div>
+    <div class="popup-field">
+      <label>지도에서 핀 위치 선택 <small style="color:var(--ink3)">(지도 클릭 후 좌표가 자동 입력됩니다)</small></label>
+      <input type="text" id="pl-latlng" readonly placeholder="지도를 클릭하세요" />
+    </div>
+    <div class="popup-actions">
+      <button class="btn-cancel" onclick="closeOverlay('place-overlay')">취소</button>
+      <button class="btn-save"   onclick="savePlaceItem()">핀 추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 장소 사진 팝업 -->
+<div class="overlay" id="place-popup" onclick="closeIfBg(event,'place-popup')">
+  <div class="popup" style="padding:0;overflow:hidden;position:relative;border-radius:20px;">
+    <button id="place-popup-close" onclick="closeOverlay('place-popup')">✕</button>
+    <img id="place-popup-img" src="" alt="" />
+    <div id="place-popup-body">
+      <div id="place-popup-name"></div>
+      <div id="place-popup-desc"></div>
+      <button class="btn-save" style="width:100%;padding:10px;border-radius:10px;" onclick="openGoogleMapsPlace()">
+        🗺️ Google Maps에서 보기
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div id="toast"></div>
+
+<script>
+// ── 상태 ──────────────────────────────────────────────────────
+let TRIP_ID = null;
+let map = null, markers = [], routePolyline = null, routePoints = [];
+let routeMode = false;
+let scheduleData = {};   // { "1": [{...}], "2": [...] }
+let placesData   = [];   // [{id,name,desc,img,lat,lng}]
+let currentDay   = 1;
+let totalDays    = 1;
+let selectedType = 'food';
+let pendingLatLng = null;
+let currentPlaceForMaps = null;
+
+// ── URL 파라미터에서 trip ID ─────────────────────────────────
+function getTripIdFromUrl() {
+  const p = new URLSearchParams(location.search);
+  return p.get('trip');
+}
+function setTripIdInUrl(id) {
+  const url = new URL(location.href);
+  url.searchParams.set('trip', id);
+  history.replaceState({}, '', url);
+}
+function generateId() {
+  return Math.random().toString(36).slice(2,9).toUpperCase();
+}
+
+// ── 초기화 ────────────────────────────────────────────────────
+async function init() {
+  TRIP_ID = getTripIdFromUrl() || generateId();
+  setTripIdInUrl(TRIP_ID);
+  document.getElementById('trip-id-badge').textContent = '🔑 ' + TRIP_ID;
+
+  if (window.firebaseReady) await loadFromFirebase();
+  else document.addEventListener('firebase-ready', async () => { await loadFromFirebase(); });
+
+  if (window.mapsReady) setupMap();
+  else document.addEventListener('maps-ready', setupMap);
+
+  document.getElementById('loading').style.display = 'none';
+}
+
+// ── Firebase 로드 ─────────────────────────────────────────────
+async function loadFromFirebase() {
+  const data = await window.fbGetTrip(TRIP_ID);
+  if (data) applyTripData(data);
+
+  window.fbWatchPlaces(TRIP_ID, (places) => {
+    placesData = places;
+    renderPlaceChips();
+    renderMapMarkers();
+  });
+
+  // 자동저장 감시
+  const watchedFields = ['trip-title','trip-start','trip-end','trip-note',
+    'flight-airline','flight-depart','flight-from','flight-arrive','flight-to',
+    'return-airline','return-depart','return-from','return-arrive','return-to'];
+  watchedFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', () => { updateDuration(); autoSave(); });
+      el.addEventListener('input',  () => { updateDuration(); });
+    }
+  });
+}
+
+function applyTripData(data) {
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e && v !== undefined) e.value = v; };
+  setVal('trip-title',    data.title);
+  setVal('trip-start',    data.startDate);
+  setVal('trip-end',      data.endDate);
+  setVal('trip-note',     data.note);
+  setVal('flight-airline',data.flightAirline);
+  setVal('flight-depart', data.flightDepart);
+  setVal('flight-from',   data.flightFrom);
+  setVal('flight-arrive', data.flightArrive);
+  setVal('flight-to',     data.flightTo);
+  setVal('return-airline',data.returnAirline);
+  setVal('return-depart', data.returnDepart);
+  setVal('return-from',   data.returnFrom);
+  setVal('return-arrive', data.returnArrive);
+  setVal('return-to',     data.returnTo);
+  if (data.schedule) scheduleData = data.schedule;
+  if (data.routePoints) {
+    routePoints = data.routePoints;
+    if (map) drawRoute();
+  }
+  updateDuration();
+  if (data.mapCenter && map) {
+    map.setCenter(data.mapCenter);
+    map.setZoom(data.mapZoom || 12);
+  }
+  updateAirlineLogo();
+}
+
+// ── 저장 ─────────────────────────────────────────────────────
+async function saveAll() {
+  const payload = {
+    title:         document.getElementById('trip-title').value,
+    startDate:     document.getElementById('trip-start').value,
+    endDate:       document.getElementById('trip-end').value,
+    note:          document.getElementById('trip-note').value,
+    flightAirline: document.getElementById('flight-airline').value,
+    flightDepart:  document.getElementById('flight-depart').value,
+    flightFrom:    document.getElementById('flight-from').value,
+    flightArrive:  document.getElementById('flight-arrive').value,
+    flightTo:      document.getElementById('flight-to').value,
+    returnAirline: document.getElementById('return-airline').value,
+    returnDepart:  document.getElementById('return-depart').value,
+    returnFrom:    document.getElementById('return-from').value,
+    returnArrive:  document.getElementById('return-arrive').value,
+    returnTo:      document.getElementById('return-to').value,
+    schedule:      scheduleData,
+    routePoints,
+    mapCenter:     map ? { lat: map.getCenter().lat(), lng: map.getCenter().lng() } : null,
+    mapZoom:       map ? map.getZoom() : 12,
+    updatedAt:     new Date().toISOString(),
+  };
+  await window.fbSaveTrip(TRIP_ID, payload);
+  showToast('저장되었습니다 ✓');
+  const t = document.getElementById('trip-title').value;
+  if (t) document.getElementById('trip-title-display').innerHTML = t + ' <span>✈</span>';
+}
+
+let saveTimer = null;
+function autoSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveAll, 1500);
+}
+
+document.getElementById('save-btn').onclick = saveAll;
+
+// ── 공유 ─────────────────────────────────────────────────────
+document.getElementById('share-btn').onclick = () => {
+  const url = location.href;
+  navigator.clipboard.writeText(url).then(() => showToast('링크가 복사되었습니다! 🔗'));
+};
+
+// ── 날짜/기간 ─────────────────────────────────────────────────
+function updateDuration() {
+  const s = document.getElementById('trip-start').value;
+  const e = document.getElementById('trip-end').value;
+  if (!s || !e) return;
+  const sd = new Date(s), ed = new Date(e);
+  const diff = Math.round((ed - sd) / 86400000);
+  if (diff < 0) return;
+  totalDays = diff + 1;
+  const nights = diff;
+  document.getElementById('duration-text').textContent =
+    sd.toLocaleDateString('ko-KR',{month:'short',day:'numeric'}) + ' ~ ' +
+    ed.toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
+  document.getElementById('duration-nights').textContent =
+    nights + '박 ' + totalDays + '일';
+  renderDayTabs();
+}
+
+// ── 일별 탭 ───────────────────────────────────────────────────
+function renderDayTabs() {
+  const c = document.getElementById('day-tabs');
+  c.innerHTML = '';
+  for (let i = 1; i <= totalDays; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'day-tab' + (i === currentDay ? ' active' : '');
+    btn.textContent = 'Day ' + i;
+    btn.onclick = () => { currentDay = i; renderDayTabs(); renderScheduleList(); };
+    c.appendChild(btn);
+  }
+  renderScheduleList();
+}
+
+// ── 일정 렌더링 ───────────────────────────────────────────────
+function renderScheduleList() {
+  const list = document.getElementById('schedule-list');
+  const items = scheduleData[currentDay] || [];
+  list.innerHTML = '';
+  const typeIcon = { food:'🍜', sight:'🏛️', hotel:'🏨', move:'🚆' };
+  items.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'schedule-item type-' + item.type;
+    div.innerHTML = `
+      <div class="item-icon">${typeIcon[item.type]||'📌'}</div>
+      <div class="item-body">
+        <div class="item-time">${item.time || ''}</div>
+        <div class="item-name">${item.name}</div>
+        <div class="item-desc">${item.desc || ''}</div>
+      </div>
+      <button class="item-del" onclick="deleteScheduleItem(${idx})">✕</button>`;
+    list.appendChild(div);
+  });
+}
+
+// ── 일정 추가 팝업 ────────────────────────────────────────────
+function openSchedulePopup() {
+  document.getElementById('sch-name').value = '';
+  document.getElementById('sch-time').value = '';
+  document.getElementById('sch-desc').value = '';
+  selectTypeByValue('food');
+  openOverlay('schedule-overlay');
+}
+function selectType(el, type) {
+  document.querySelectorAll('.type-opt').forEach(e => e.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedType = type;
+}
+function selectTypeByValue(type) {
+  const el = document.querySelector(`.type-opt[data-type="${type}"]`);
+  if (el) selectType(el, type);
+}
+function saveScheduleItem() {
+  const name = document.getElementById('sch-name').value.trim();
+  if (!name) { showToast('이름을 입력해주세요'); return; }
+  if (!scheduleData[currentDay]) scheduleData[currentDay] = [];
+  scheduleData[currentDay].push({
+    type: selectedType,
+    name,
+    time: document.getElementById('sch-time').value,
+    desc: document.getElementById('sch-desc').value,
+  });
+  scheduleData[currentDay].sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  closeOverlay('schedule-overlay');
+  renderScheduleList();
+  autoSave();
+}
+function deleteScheduleItem(idx) {
+  scheduleData[currentDay].splice(idx, 1);
+  renderScheduleList();
+  autoSave();
+}
+
+// ── 지도 설정 ─────────────────────────────────────────────────
+function setupMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: { lat: 35.6762, lng: 139.6503 }, // 기본: 도쿄
+    zoom: 12,
+    disableDefaultUI: true,
+    zoomControl: false,
+    styles: [
+      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+      { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
+      { elementType: 'geometry', stylers: [{ color: '#f5f5f0' }] },
+      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+      { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#888880' }] },
+      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9d8e8' }] },
+    ],
+  });
+
+  map.addListener('click', (e) => {
+    if (routeMode) {
+      addRoutePoint(e.latLng);
+    } else if (document.getElementById('place-overlay').classList.contains('show')) {
+      pendingLatLng = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+      document.getElementById('pl-latlng').value =
+        pendingLatLng.lat.toFixed(5) + ', ' + pendingLatLng.lng.toFixed(5);
+    }
+  });
+
+  renderMapMarkers();
+  if (routePoints.length) drawRoute();
+}
+
+function mapZoom(d) { if (map) map.setZoom(map.getZoom() + d); }
+function mapFitRoute() {
+  if (!map || routePoints.length < 2) return;
+  const bounds = new google.maps.LatLngBounds();
+  routePoints.forEach(p => bounds.extend(p));
+  map.fitBounds(bounds, 60);
+}
+
+// ── 경로 ─────────────────────────────────────────────────────
+function toggleRouteMode() {
+  routeMode = !routeMode;
+  const btn = document.getElementById('btn-route-mode');
+  btn.classList.toggle('active', routeMode);
+  btn.textContent = routeMode ? '✅ 경로 추가 중 (지도 클릭)' : '🛣️ 경로 추가 모드';
+  document.getElementById('map').style.cursor = routeMode ? 'crosshair' : '';
+}
+function addRoutePoint(latLng) {
+  routePoints.push({ lat: latLng.lat(), lng: latLng.lng() });
+  drawRoute();
+  autoSave();
+}
+function drawRoute() {
+  if (routePolyline) routePolyline.setMap(null);
+  if (routePoints.length < 2) return;
+  routePolyline = new google.maps.Polyline({
+    path: routePoints,
+    geodesic: true,
+    strokeColor: '#E07A3A',
+    strokeOpacity: 0.85,
+    strokeWeight: 4,
+    map,
+  });
+  // 웨이포인트 점
+  routePoints.forEach((p, i) => {
+    new google.maps.Marker({
+      position: p, map,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: i === 0 || i === routePoints.length-1 ? 8 : 5,
+        fillColor: i === 0 ? '#3A8FE0' : i === routePoints.length-1 ? '#E03A3A' : '#E07A3A',
+        fillOpacity: 1,
+        strokeColor: '#fff',
+        strokeWeight: 2,
+      },
+    });
+  });
+}
+function clearRoute() {
+  routePoints = [];
+  if (routePolyline) { routePolyline.setMap(null); routePolyline = null; }
+  renderMapMarkers();
+  autoSave();
+  showToast('경로가 삭제되었습니다');
+}
+
+// ── 맛집 핀 ───────────────────────────────────────────────────
+function openPlacePopup() {
+  document.getElementById('pl-name').value = '';
+  document.getElementById('pl-desc').value = '';
+  document.getElementById('pl-img').value  = '';
+  document.getElementById('pl-latlng').value = '';
+  pendingLatLng = null;
+  openOverlay('place-overlay');
+}
+async function savePlaceItem() {
+  const name = document.getElementById('pl-name').value.trim();
+  if (!name) { showToast('장소명을 입력해주세요'); return; }
+  if (!pendingLatLng) { showToast('지도에서 위치를 클릭해주세요'); return; }
+  const place = {
+    name,
+    desc:  document.getElementById('pl-desc').value,
+    img:   document.getElementById('pl-img').value || getGooglePhotoUrl(name),
+    lat:   pendingLatLng.lat,
+    lng:   pendingLatLng.lng,
+    createdAt: new Date().toISOString(),
+  };
+  await window.fbAddPlace(TRIP_ID, place);
+  closeOverlay('place-overlay');
+  showToast('📍 ' + name + ' 핀이 추가되었습니다');
+}
+function getGooglePhotoUrl(name) {
+  // Google Custom Search로 대체 가능. 기본값으로 placeholder 사용
+  return 'https://source.unsplash.com/400x300/?' + encodeURIComponent(name + ' food restaurant');
+}
+
+function renderPlaceChips() {
+  const c = document.getElementById('place-chips');
+  c.innerHTML = '';
+  placesData.forEach(p => {
+    const chip = document.createElement('button');
+    chip.className = 'place-chip';
+    chip.innerHTML = `<span class="dot"></span>${p.name}`;
+    chip.onclick = () => showPlacePopup(p);
+    c.appendChild(chip);
+  });
+}
+
+function renderMapMarkers() {
+  markers.forEach(m => m.setMap(null));
+  markers = [];
+  if (!map) return;
+  placesData.forEach(p => {
+    const marker = new google.maps.Marker({
+      position: { lat: p.lat, lng: p.lng },
+      map,
+      title: p.name,
+      icon: {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+            <ellipse cx="18" cy="41" rx="7" ry="3" fill="rgba(0,0,0,0.15)"/>
+            <path d="M18 2 C9.16 2 2 9.16 2 18 C2 28.5 18 42 18 42 C18 42 34 28.5 34 18 C34 9.16 26.84 2 18 2Z"
+                  fill="#E07A3A" stroke="#fff" stroke-width="2"/>
+            <circle cx="18" cy="18" r="7" fill="#fff" opacity=".9"/>
+            <text x="18" y="22" text-anchor="middle" font-size="10" fill="#E07A3A">🍴</text>
+          </svg>`),
+        scaledSize: new google.maps.Size(36, 44),
+        anchor: new google.maps.Point(18, 44),
+      },
+    });
+    marker.addListener('click', () => showPlacePopup(p));
+    markers.push(marker);
+  });
+}
+
+function showPlacePopup(place) {
+  currentPlaceForMaps = place;
+  document.getElementById('place-popup-img').src  = place.img || '';
+  document.getElementById('place-popup-name').textContent = place.name;
+  document.getElementById('place-popup-desc').textContent = place.desc || '';
+  openOverlay('place-popup');
+  if (map) map.panTo({ lat: place.lat, lng: place.lng });
+}
+function openGoogleMapsPlace() {
+  if (!currentPlaceForMaps) return;
+  const q = encodeURIComponent(currentPlaceForMaps.name);
+  window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
+}
+
+// ── 항공사 로고 이니셜 ─────────────────────────────────────────
+function updateAirlineLogo() {
+  const v = document.getElementById('flight-airline').value;
+  const logo = document.getElementById('airline-logo');
+  logo.textContent = v ? v.slice(0,2).toUpperCase() : '✈';
+}
+
+// ── 오버레이 유틸 ─────────────────────────────────────────────
+function openOverlay(id)  { document.getElementById(id).classList.add('show'); }
+function closeOverlay(id) { document.getElementById(id).classList.remove('show'); }
+function closeIfBg(e, id) { if (e.target === document.getElementById(id)) closeOverlay(id); }
+
+// ── 토스트 ────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── 시작 ─────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', init);
+</script>
 </body>
 </html>
