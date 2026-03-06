@@ -19,8 +19,9 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, addDoc, deleteDoc, updateDoc }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-  // ── 🔑 여기에 Firebase 설정 입력 ──────────────────────────────
   const firebaseConfig = {
     apiKey: "AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ",
     authDomain: "cyh-travel.firebaseapp.com",
@@ -30,10 +31,10 @@
     messagingSenderId: "423848709658",
     appId: "1:423848709658:web:2521fb48726fcf96adcba3"
   };
-  // ──────────────────────────────────────────────────────────────
 
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
+  const app     = initializeApp(firebaseConfig);
+  const db      = getFirestore(app);
+  const storage = getStorage(app);
   window._db = db;
 
   // ── Firestore helpers ─────────────────────────────────────────
@@ -48,8 +49,8 @@
     return onSnapshot(doc(db, "trips", tripId), snap => cb(snap.exists() ? snap.data() : null));
   };
   window.fbAddPlace = async (tripId, place) => {
-    const ref = await addDoc(collection(db, "trips", tripId, "places"), place);
-    return ref.id;
+    const ref2 = await addDoc(collection(db, "trips", tripId, "places"), place);
+    return ref2.id;
   };
   window.fbDeletePlace = async (tripId, placeId) => {
     await deleteDoc(doc(db, "trips", tripId, "places", placeId));
@@ -63,6 +64,32 @@
   };
   window.fbUpdatePlace = async (tripId, placeId, data) => {
     await updateDoc(doc(db, "trips", tripId, "places", placeId), data);
+  };
+
+  // ── Storage helpers ───────────────────────────────────────────
+  // 파일(Blob/File)을 Storage에 업로드하고 다운로드 URL 반환
+  window.fbUploadVoucher = async (tripId, voucherId, file) => {
+    const ext  = file.type === 'application/pdf' ? 'pdf' : 'jpg';
+    const path = `trips/${tripId}/vouchers/${voucherId}.${ext}`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file, { contentType: file.type });
+    return await getDownloadURL(storageRef);
+  };
+
+  // 썸네일(base64 → Blob) 업로드
+  window.fbUploadThumb = async (tripId, voucherId, base64) => {
+    const blob = await fetch(base64).then(r => r.blob());
+    const path = `trips/${tripId}/vouchers/${voucherId}_thumb.jpg`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
+    return await getDownloadURL(storageRef);
+  };
+
+  // Storage 파일 삭제
+  window.fbDeleteVoucher = async (tripId, voucherId, isPdf) => {
+    const ext = isPdf ? 'pdf' : 'jpg';
+    try { await deleteObject(ref(storage, `trips/${tripId}/vouchers/${voucherId}.${ext}`)); } catch(e) {}
+    try { await deleteObject(ref(storage, `trips/${tripId}/vouchers/${voucherId}_thumb.jpg`)); } catch(e) {}
   };
 
   window.firebaseReady = true;
@@ -1284,9 +1311,10 @@ function applyTripData(data) {
   timeToTp('farr', data.flightArrive);
   timeToTp('rdep', data.returnDepart);
   timeToTp('rarr', data.returnArrive);
-  if (data.schedule) scheduleData = data.schedule;
+  if (data.schedule)  scheduleData  = data.schedule;
   if (data.checklist) { checklistData = data.checklist; renderChecklist(); }
-  if (data.vouchers)  { voucherData   = data.vouchers;  renderVouchers(); }
+  if (data.vouchers)  applyVouchers(data.vouchers);
+  // 바우처는 localStorage에서 별도 로드 (각자 기기에만 저장)
   if (data.routePoints) {
     routePoints = data.routePoints;
     if (map) drawRoute();
@@ -1382,39 +1410,41 @@ function pickVoucherFile(id) {
   input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    showToast('파일 처리 중…');
-    if (file.type === 'application/pdf') {
-      await processPdfVoucher(id, file);
-    } else {
-      await processImageVoucher(id, file);
+    showToast('⏫ 업로드 중…');
+    try {
+      if (file.type === 'application/pdf') {
+        await processPdfVoucher(id, file);
+      } else {
+        await processImageVoucher(id, file);
+      }
+      renderVouchers();
+      await saveVouchersFirestore();
+      showToast('✅ 업로드 완료');
+    } catch(err) {
+      console.error(err);
+      showToast('❌ 업로드 실패: ' + err.message);
     }
-    renderVouchers();
-    autoSave();
-    showToast('✅ 업로드 완료');
   };
   input.click();
 }
 
-// 이미지 처리 — 썸네일 생성
+// 이미지 처리 → Storage 업로드, URL 저장
 async function processImageVoucher(id, file) {
-  const full = await fileToBase64(file);
-  const thumb = await resizeImage(full, 300, 200);
-  voucherData[id] = { type: 'image', data: full, thumb, pages: 1 };
+  const thumb64 = await resizeImageFile(file, 300, 200);
+  const [url, thumbUrl] = await Promise.all([
+    window.fbUploadVoucher(TRIP_ID, id, file),
+    window.fbUploadThumb(TRIP_ID, id, thumb64),
+  ]);
+  voucherData[id] = { type: 'image', url, thumbUrl, pages: 1 };
 }
 
-// PDF 처리 — 각 페이지 캔버스 렌더 → base64 배열로 저장, 첫 페이지 썸네일
+// PDF 처리 → 페이지 렌더 → 첫 페이지 썸네일 업로드, 원본 Storage 업로드
 async function processPdfVoucher(id, file) {
-  const base64 = await fileToBase64(file);
-  // PDF.js 로드 체크
-  if (!window.pdfjsLib) {
-    showToast('PDF 라이브러리 로딩 중, 잠시 후 다시 시도해주세요');
-    return;
-  }
-  const pdfData = atob(base64.split(',')[1]);
-  const pdfBytes = new Uint8Array(pdfData.length);
-  for (let i = 0; i < pdfData.length; i++) pdfBytes[i] = pdfData.charCodeAt(i);
+  if (!window.pdfjsLib) throw new Error('PDF 라이브러리 미로드');
 
-  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+  // 페이지 이미지 렌더
+  const arrayBuf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
   const totalPages = pdf.numPages;
   const pageImages = [];
 
@@ -1422,15 +1452,21 @@ async function processPdfVoucher(id, file) {
     const page = await pdf.getPage(p);
     const viewport = page.getViewport({ scale: 1.8 });
     const canvas = document.createElement('canvas');
-    canvas.width  = viewport.width;
-    canvas.height = viewport.height;
+    canvas.width = viewport.width; canvas.height = viewport.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
     pageImages.push(canvas.toDataURL('image/jpeg', 0.85));
   }
 
-  // 썸네일: 첫 페이지 축소
-  const thumb = await resizeImage(pageImages[0], 300, 200);
-  voucherData[id] = { type: 'pdf', data: base64, thumb, pages: totalPages, pageImages };
+  // 썸네일 = 첫 페이지 축소
+  const thumb64 = await resizeImage(pageImages[0], 300, 200);
+
+  // Storage에 원본 PDF + 썸네일 업로드
+  const [url, thumbUrl] = await Promise.all([
+    window.fbUploadVoucher(TRIP_ID, id, file),
+    window.fbUploadThumb(TRIP_ID, id, thumb64),
+  ]);
+
+  voucherData[id] = { type: 'pdf', url, thumbUrl, pages: totalPages, pageImages };
 }
 
 // ── 바우처 뷰어 ───────────────────────────────────────────────
@@ -1445,62 +1481,46 @@ function openVoucherViewer(id, label) {
     document.getElementById('vv-page-info').textContent = '';
     const img = document.createElement('img');
     img.id  = 'vv-img';
-    img.src = vc.data;
+    img.src = vc.url;
     body.appendChild(img);
   } else {
-    // PDF: 저장된 페이지 이미지 세로로 나열
+    // PDF: 저장된 페이지 이미지 세로 나열
     document.getElementById('vv-page-info').textContent = vc.pages + '페이지';
     if (vc.pageImages && vc.pageImages.length) {
       vc.pageImages.forEach((src, i) => {
-        const canvas = document.createElement('img');
-        canvas.className = 'vv-pdf-page';
-        canvas.src   = src;
-        canvas.title = (i + 1) + ' / ' + vc.pages;
-        body.appendChild(canvas);
+        const img = document.createElement('img');
+        img.className = 'vv-pdf-page';
+        img.src   = src;
+        img.title = (i + 1) + ' / ' + vc.pages;
+        body.appendChild(img);
       });
     } else {
-      // pageImages 없는 구버전 데이터 → 재렌더
-      body.innerHTML = '<div id="vv-loading"><div class="mini-spin"></div>PDF 렌더링 중…</div>';
-      reRenderPdfPages(id).then(() => {
+      // pageImages 캐시 없으면 Storage에서 재렌더
+      body.innerHTML = '<div id="vv-loading"><div class="mini-spin"></div>PDF 불러오는 중…</div>';
+      loadPdfPages(id).then(() => {
         body.innerHTML = '';
+        document.getElementById('vv-page-info').textContent = voucherData[id].pages + '페이지';
         (voucherData[id].pageImages || []).forEach((src, i) => {
           const img = document.createElement('img');
           img.className = 'vv-pdf-page'; img.src = src;
           img.title = (i+1) + ' / ' + voucherData[id].pages;
           body.appendChild(img);
         });
-        document.getElementById('vv-page-info').textContent = voucherData[id].pages + '페이지';
+      }).catch(() => {
+        body.innerHTML = '<div id="vv-loading">❌ 로드 실패</div>';
       });
     }
   }
   openOverlay('voucher-viewer');
 }
 
-async function reRenderPdfPages(id) {
-  const vc = voucherData[id];
-  if (!vc || vc.type !== 'pdf' || !window.pdfjsLib) return;
-  const pdfData = atob(vc.data.split(',')[1]);
-  const pdfBytes = new Uint8Array(pdfData.length);
-  for (let i = 0; i < pdfData.length; i++) pdfBytes[i] = pdfData.charCodeAt(i);
-  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
-  const pages = [];
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const viewport = page.getViewport({ scale: 1.8 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width; canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    pages.push(canvas.toDataURL('image/jpeg', 0.85));
-  }
-  voucherData[id].pageImages = pages;
-  voucherData[id].pages = pages.length;
-}
-
 function deleteVoucher(id, e) {
   e.stopPropagation();
+  const vc = voucherData[id];
+  if (vc) window.fbDeleteVoucher(TRIP_ID, id, vc.type === 'pdf').catch(() => {});
   delete voucherData[id];
   renderVouchers();
-  autoSave();
+  saveVouchersFirestore();
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
@@ -1510,6 +1530,25 @@ function fileToBase64(file) {
     r.onload  = e => res(e.target.result);
     r.onerror = rej;
     r.readAsDataURL(file);
+  });
+}
+
+// File 객체 → 리사이즈된 base64 (썸네일용)
+function resizeImageFile(file, maxW, maxH) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.width  * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      res(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = rej;
+    img.src = url;
   });
 }
 
@@ -1526,6 +1565,47 @@ function resizeImage(src, maxW, maxH) {
     };
     img.src = src;
   });
+}
+
+// ── 바우처 Firestore 저장/불러오기 ───────────────────────────
+// Firestore에는 URL + 메타만 저장 (용량 無), 실제 파일은 Storage에 있음
+
+async function saveVouchersFirestore() {
+  // pageImages(렌더링된 base64)는 Firestore에 넣지 않음 — URL만 저장
+  const slim = {};
+  Object.entries(voucherData).forEach(([id, vc]) => {
+    slim[id] = { type: vc.type, url: vc.url, thumbUrl: vc.thumbUrl, pages: vc.pages };
+  });
+  await window.fbSaveTrip(TRIP_ID, { vouchers: slim });
+}
+
+function applyVouchers(data) {
+  if (!data) return;
+  // Firestore에서 받은 URL 메타 복원, pageImages는 뷰어 열 때 렌더
+  voucherData = {};
+  Object.entries(data).forEach(([id, vc]) => {
+    voucherData[id] = { ...vc, pageImages: null };
+  });
+  renderVouchers();
+}
+
+// PDF 뷰어에서 pageImages가 없을 때 Storage URL → PDF.js 재렌더
+async function loadPdfPages(id) {
+  const vc = voucherData[id];
+  if (!vc || vc.type !== 'pdf' || !window.pdfjsLib) return;
+  const resp = await fetch(vc.url);
+  const arrayBuf = await resp.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
+  const pages = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale: 1.8 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    pages.push(canvas.toDataURL('image/jpeg', 0.85));
+  }
+  voucherData[id].pageImages = pages;
 }
 
 // ── 저장 ─────────────────────────────────────────────────────
@@ -1548,7 +1628,6 @@ async function saveAll() {
     schedule:      scheduleData,
     routePoints,
     checklist:     checklistData,
-    vouchers:      voucherData,
     mapCenter:     map ? { lat: map.getCenter().lat(), lng: map.getCenter().lng() } : null,
     mapZoom:       map ? map.getZoom() : 12,
     updatedAt:     new Date().toISOString(),
