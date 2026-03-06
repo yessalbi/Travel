@@ -14,13 +14,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, addDoc, deleteDoc, updateDoc }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-  const firebaseConfig = {
+<!-- Firebase compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
     apiKey: "AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ",
     authDomain: "cyh-travel.firebaseapp.com",
     databaseURL: "https://cyh-travel-default-rtdb.firebaseio.com",
@@ -28,48 +26,33 @@
     storageBucket: "cyh-travel.firebasestorage.app",
     messagingSenderId: "423848709658",
     appId: "1:423848709658:web:2521fb48726fcf96adcba3"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
-  window._db = db;
+  });
+  const db = firebase.firestore();
 
   window.fbSaveTrip = async (tripId, data) => {
-    await setDoc(doc(db, "trips", tripId), data, { merge: true });
+    await db.collection("trips").doc(tripId).set(data, { merge: true });
   };
   window.fbGetTrip = async (tripId) => {
-    const snap = await getDoc(doc(db, "trips", tripId));
-    return snap.exists() ? snap.data() : null;
-  };
-  window.fbWatchTrip = (tripId, cb) => {
-    return onSnapshot(doc(db, "trips", tripId), snap => cb(snap.exists() ? snap.data() : null));
+    const snap = await db.collection("trips").doc(tripId).get();
+    return snap.exists ? snap.data() : null;
   };
   window.fbAddPlace = async (tripId, place) => {
-    const ref2 = await addDoc(collection(db, "trips", tripId, "places"), place);
-    return ref2.id;
+    const ref = await db.collection("trips").doc(tripId).collection("places").add(place);
+    return ref.id;
   };
   window.fbDeletePlace = async (tripId, placeId) => {
-    await deleteDoc(doc(db, "trips", tripId, "places", placeId));
+    await db.collection("trips").doc(tripId).collection("places").doc(placeId).delete();
   };
   window.fbWatchPlaces = (tripId, cb) => {
-    return onSnapshot(collection(db, "trips", tripId, "places"), snap => {
+    return db.collection("trips").doc(tripId).collection("places").onSnapshot(snap => {
       const places = [];
       snap.forEach(d => places.push({ id: d.id, ...d.data() }));
       cb(places);
     });
   };
   window.fbUpdatePlace = async (tripId, placeId, data) => {
-    await updateDoc(doc(db, "trips", tripId, "places", placeId), data);
+    await db.collection("trips").doc(tripId).collection("places").doc(placeId).update(data);
   };
-
-  window.firebaseReady = true;
-  // module 스크립트는 defer라 DOMContentLoaded 후에 실행됨
-  // init()을 여기서 직접 호출
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => window.init());
-  } else {
-    window.init();
-  }
 </script>
 
 <!-- Google Maps API -->
@@ -1202,7 +1185,7 @@ function generateId() {
 }
 
 // ── 초기화 ────────────────────────────────────────────────────
-window.init = async function init() {
+async function init() {
   TRIP_ID = getTripIdFromUrl() || generateId();
   setTripIdInUrl(TRIP_ID);
   document.getElementById('trip-id-badge').textContent = '🔑 ' + TRIP_ID;
@@ -2182,7 +2165,8 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-// ── 시작 (Firebase 모듈에서 직접 호출됨) ─────────────────────
+// ── 시작 ─────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
