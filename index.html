@@ -353,17 +353,49 @@ html, body {
 .item-time  { font-size: 11px; color: var(--ink3); }
 .item-name  { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-desc  { font-size: 12px; color: var(--ink3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-del {
-  position: absolute; top: 8px; right: 8px;
-  background: none; border: none; cursor: pointer;
-  color: var(--ink3); font-size: 14px; opacity: 0;
-  transition: opacity .14s;
-  padding: 2px 4px; border-radius: 4px;
-}
-.schedule-item:hover .item-del { opacity: 1; }
-.item-del:hover { background: var(--red); color: #fff; }
 
-/* 일정 추가 버튼 */
+/* 일정 아이템 액션 버튼들 */
+.item-actions {
+  display: flex; flex-direction: column; gap: 4px;
+  opacity: 0; transition: opacity .14s; flex-shrink: 0;
+}
+.schedule-item:hover .item-actions { opacity: 1; }
+.item-act-btn {
+  border: none; cursor: pointer; border-radius: 5px;
+  font-size: 11px; font-weight: 500; padding: 3px 7px;
+  font-family: inherit; transition: all .13s;
+}
+.item-edit { background: var(--sand); color: var(--ink2); }
+.item-edit:hover { background: var(--accent2); color: #fff; }
+.item-del  { background: none; color: var(--ink3); font-size: 13px; padding: 3px 5px; }
+.item-del:hover  { background: var(--red); color: #fff; }
+.item-loc  { background: var(--stone); color: var(--ink3); }
+.item-loc:hover  { background: var(--green); color: #fff; }
+
+/* 일정 위치 핀 배지 */
+.item-has-loc {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; color: var(--green); font-weight: 500;
+  margin-top: 3px;
+}
+
+/* 지도 위 일정 팝오버 */
+#sch-map-card {
+  position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: var(--white); border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.14);
+  padding: 10px 14px; z-index: 10;
+  display: none; align-items: center; gap: 10px;
+  min-width: 180px; max-width: 260px;
+  border-left: 3px solid var(--accent);
+}
+#sch-map-card.show { display: flex; }
+#sch-map-card .smc-icon { font-size: 18px; flex-shrink: 0; }
+#sch-map-card .smc-body { flex: 1; min-width: 0; }
+#sch-map-card .smc-time { font-size: 10px; color: var(--ink3); }
+#sch-map-card .smc-name { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sch-map-card .smc-close { background: none; border: none; cursor: pointer; color: var(--ink3); font-size: 16px; flex-shrink: 0; padding: 0 2px; }
+#sch-map-card .smc-close:hover { color: var(--ink); }
 #add-schedule-btn {
   width: 100%; margin-top: 10px;
   padding: 10px; border-radius: var(--r2);
@@ -597,15 +629,15 @@ html, body {
 #map-wrapper.pin-mode #map { cursor: crosshair !important; }
 
 /* 핀 위치 선택 버튼 */
-#pl-pick-btn {
+#pl-pick-btn, #sch-pick-btn {
   width: 100%; padding: 10px 14px; border-radius: 8px;
   border: 1.5px dashed var(--sand); background: var(--cream);
   font-family: inherit; font-size: 13px; color: var(--ink3);
   cursor: pointer; transition: all .16s;
   display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-#pl-pick-btn:hover { border-color: var(--accent); color: var(--accent); background: #FEF5EE; }
-#pl-pick-btn.picked { border-color: var(--green); color: var(--green); background: #EBF7F2; border-style: solid; }
+#pl-pick-btn:hover, #sch-pick-btn:hover { border-color: var(--accent); color: var(--accent); background: #FEF5EE; }
+#pl-pick-btn.picked, #sch-pick-btn.picked { border-color: var(--green); color: var(--green); background: #EBF7F2; border-style: solid; }
 /* ── 커스텀 시간 선택기 ── */
 .time-picker {
   display: flex; align-items: center; gap: 6px; flex: 1;
@@ -790,6 +822,15 @@ html, body {
   <!-- 지도 -->
   <div id="map-wrapper">
     <div id="map"></div>
+    <!-- 일정 카드 클릭 시 지도 위 표시 -->
+    <div id="sch-map-card">
+      <span class="smc-icon" id="smc-icon">📌</span>
+      <div class="smc-body">
+        <div class="smc-time" id="smc-time"></div>
+        <div class="smc-name" id="smc-name"></div>
+      </div>
+      <button class="smc-close" onclick="hideSchMapCard()">✕</button>
+    </div>
     <div id="route-controls">
       <button class="route-btn" id="btn-route-mode" onclick="toggleRouteMode()">🛣️ 경로 추가 모드</button>
       <button class="route-btn" id="btn-clear-route" onclick="clearRoute()">🗑️ 경로 삭제</button>
@@ -835,6 +876,13 @@ html, body {
     <div class="popup-field">
       <label>메모</label>
       <textarea id="sch-desc" placeholder="간단한 메모를 입력하세요"></textarea>
+    </div>
+    <div class="popup-field">
+      <label>위치 <small style="color:var(--ink3)">(선택 — 카드 클릭 시 지도에 표시)</small></label>
+      <button id="sch-pick-btn" onclick="enterSchPinMode()">
+        📍 지도에서 위치 클릭하기
+      </button>
+      <input type="hidden" id="sch-latlng" />
     </div>
     <div class="popup-actions">
       <button class="btn-cancel" onclick="closeOverlay('schedule-overlay')">취소</button>
@@ -1152,29 +1200,99 @@ function renderScheduleList() {
   items.forEach((item, idx) => {
     const div = document.createElement('div');
     div.className = 'schedule-item type-' + item.type;
+    const hasLoc = item.lat && item.lng;
     div.innerHTML = `
       <div class="item-icon">${typeIcon[item.type]||'📌'}</div>
-      <div class="item-body">
-        <div class="item-time">${item.time || ''}</div>
+      <div class="item-body" onclick="onScheduleItemClick(${idx})">
+        <div class="item-time">${item.time ? fmtTime(item.time) : ''}</div>
         <div class="item-name">${item.name}</div>
         <div class="item-desc">${item.desc || ''}</div>
+        ${hasLoc ? '<div class="item-has-loc">📍 위치 등록됨</div>' : ''}
       </div>
-      <button class="item-del" onclick="deleteScheduleItem(${idx})">✕</button>`;
+      <div class="item-actions">
+        <button class="item-act-btn item-edit" onclick="openEditSchedule(${idx})">편집</button>
+        <button class="item-act-btn item-del"  onclick="deleteScheduleItem(${idx})">✕</button>
+      </div>`;
     list.appendChild(div);
   });
 }
 
-// ── 일정 추가 팝업 ────────────────────────────────────────────
+// 시간 표시 포맷 (HH:MM → 12시간제)
+function fmtTime(t) {
+  if (!t) return '';
+  const [hh, mm] = t.split(':');
+  let h = parseInt(hh);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  return `${String(h).padStart(2,'0')}:${mm} ${ap}`;
+}
+
+// 일정 카드 클릭 → 위치 있으면 지도 이동
+function onScheduleItemClick(idx) {
+  const item = (scheduleData[currentDay] || [])[idx];
+  if (!item || !item.lat || !item.lng) return;
+  if (!map) return;
+  map.panTo({ lat: item.lat, lng: item.lng });
+  map.setZoom(15);
+  // 지도 위 카드 표시
+  const typeIcon = { food:'🍜', sight:'🏛️', hotel:'🏨', move:'🚆' };
+  document.getElementById('smc-icon').textContent = typeIcon[item.type] || '📌';
+  document.getElementById('smc-time').textContent = item.time ? fmtTime(item.time) : '';
+  document.getElementById('smc-name').textContent = item.name;
+  document.getElementById('sch-map-card').classList.add('show');
+}
+function hideSchMapCard() {
+  document.getElementById('sch-map-card').classList.remove('show');
+}
+
+// ── 일정 추가/편집 팝업 ───────────────────────────────────────
+let editingScheduleIdx = null;   // null=추가, 숫자=편집 중
+let schPendingLatLng   = null;   // 일정용 핀 좌표
+
 function openSchedulePopup() {
+  editingScheduleIdx = null;
   document.getElementById('sch-name').value = '';
   document.getElementById('sch-desc').value = '';
-  // 시간 선택기 초기화 (1시 00분 AM)
+  document.getElementById('sch-latlng').value = '';
+  schPendingLatLng = null;
+  const pb = document.getElementById('sch-pick-btn');
+  pb.textContent = '📍 지도에서 위치 클릭하기';
+  pb.classList.remove('picked');
   tpState['scht'] = { h: '1', m: '00', ap: 'AM' };
   updateTpDisplay('scht');
   syncTpPopup('scht');
   selectTypeByValue('food');
+  document.querySelector('#schedule-overlay .popup-title').textContent = '일정 추가';
+  document.querySelector('#schedule-overlay .btn-save').textContent = '추가';
   openOverlay('schedule-overlay');
 }
+
+function openEditSchedule(idx) {
+  const item = (scheduleData[currentDay] || [])[idx];
+  if (!item) return;
+  editingScheduleIdx = idx;
+  document.getElementById('sch-name').value = item.name || '';
+  document.getElementById('sch-desc').value = item.desc || '';
+  // 위치 복원
+  schPendingLatLng = (item.lat && item.lng) ? { lat: item.lat, lng: item.lng } : null;
+  const pb = document.getElementById('sch-pick-btn');
+  if (schPendingLatLng) {
+    pb.textContent = '✅ 위치 선택됨 (' + schPendingLatLng.lat.toFixed(4) + ', ' + schPendingLatLng.lng.toFixed(4) + ')';
+    pb.classList.add('picked');
+  } else {
+    pb.textContent = '📍 지도에서 위치 클릭하기';
+    pb.classList.remove('picked');
+  }
+  // 시간 복원
+  if (item.time) timeToTp('scht', item.time);
+  else { tpState['scht'] = { h: '1', m: '00', ap: 'AM' }; updateTpDisplay('scht'); syncTpPopup('scht'); }
+  selectTypeByValue(item.type || 'food');
+  document.querySelector('#schedule-overlay .popup-title').textContent = '일정 편집';
+  document.querySelector('#schedule-overlay .btn-save').textContent = '저장';
+  openOverlay('schedule-overlay');
+}
+
 function selectType(el, type) {
   document.querySelectorAll('.type-opt').forEach(e => e.classList.remove('sel'));
   el.classList.add('sel');
@@ -1184,25 +1302,67 @@ function selectTypeByValue(type) {
   const el = document.querySelector(`.type-opt[data-type="${type}"]`);
   if (el) selectType(el, type);
 }
+
 function saveScheduleItem() {
   const name = document.getElementById('sch-name').value.trim();
   if (!name) { showToast('이름을 입력해주세요'); return; }
   if (!scheduleData[currentDay]) scheduleData[currentDay] = [];
-  scheduleData[currentDay].push({
+  const item = {
     type: selectedType,
     name,
     time: tpToTime('scht'),
     desc: document.getElementById('sch-desc').value,
-  });
+    lat:  schPendingLatLng ? schPendingLatLng.lat : null,
+    lng:  schPendingLatLng ? schPendingLatLng.lng : null,
+  };
+  if (editingScheduleIdx !== null) {
+    scheduleData[currentDay][editingScheduleIdx] = item;
+  } else {
+    scheduleData[currentDay].push(item);
+  }
   scheduleData[currentDay].sort((a,b) => (a.time||'').localeCompare(b.time||''));
   closeOverlay('schedule-overlay');
   renderScheduleList();
   autoSave();
 }
+
 function deleteScheduleItem(idx) {
   scheduleData[currentDay].splice(idx, 1);
   renderScheduleList();
   autoSave();
+}
+
+// ── 일정 핀 모드 (장소 핀과 독립) ────────────────────────────
+let schPinMode = false;
+
+function enterSchPinMode() {
+  const overlay = document.getElementById('schedule-overlay');
+  overlay.classList.remove('show');
+  overlay.style.display = 'none';
+  schPinMode = true;
+  document.getElementById('map-wrapper').classList.add('pin-mode');
+  // 배너 텍스트 업데이트
+  const banner = document.getElementById('pin-mode-banner');
+  banner.querySelector('span') ?
+    banner.childNodes[0].textContent = '📍 일정 위치를 지도에서 클릭하세요  ' : null;
+  banner.classList.add('show');
+}
+
+function exitSchPinMode() {
+  schPinMode = false;
+  document.getElementById('map-wrapper').classList.remove('pin-mode');
+  document.getElementById('pin-mode-banner').classList.remove('show');
+  const overlay = document.getElementById('schedule-overlay');
+  overlay.style.display = '';
+  overlay.classList.add('show');
+}
+
+function confirmSchPinLocation(latLng) {
+  schPendingLatLng = { lat: latLng.lat(), lng: latLng.lng() };
+  const pb = document.getElementById('sch-pick-btn');
+  pb.textContent = '✅ 위치 선택됨 (' + schPendingLatLng.lat.toFixed(4) + ', ' + schPendingLatLng.lng.toFixed(4) + ')';
+  pb.classList.add('picked');
+  exitSchPinMode();
 }
 
 // ── 커스텀 시간 선택기 (버튼 그리드 방식) ────────────────────
@@ -1412,6 +1572,8 @@ function setupMap() {
   map.addListener('click', (e) => {
     if (routeMode) {
       addRoutePoint(e.latLng);
+    } else if (schPinMode) {
+      confirmSchPinLocation(e.latLng);
     } else if (pinMode) {
       confirmPinLocation(e.latLng);
     }
@@ -1537,9 +1699,8 @@ function exitPinMode() {
 }
 
 function cancelPinMode() {
-  exitPinMode();
-  if (tempPinMarker) { tempPinMarker.setMap(null); tempPinMarker = null; }
-  pendingLatLng = null;
+  if (schPinMode) { exitSchPinMode(); }
+  else { exitPinMode(); if (tempPinMarker) { tempPinMarker.setMap(null); tempPinMarker = null; } pendingLatLng = null; }
 }
 
 function confirmPinLocation(latLng) {
