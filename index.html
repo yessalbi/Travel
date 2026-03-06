@@ -1186,7 +1186,7 @@ function geocodeAndMoveMap(titleText) {
   geocoder.geocode({ address: cleaned, language: 'ko' }, (results, status) => {
     if (status === 'OK' && results[0]) {
       map.setCenter(results[0].geometry.location);
-      map.setZoom(12);
+      map.setZoom(11);
     }
   });
 }
@@ -1267,10 +1267,11 @@ function openPlacePopup() {
 }
 
 function enterPinMode() {
-  // 팝업 숨기기 (오버레이 배경은 유지, 팝업만 fade)
-  const popup = document.querySelector('#place-overlay .popup');
-  popup.style.opacity = '0';
-  popup.style.pointerEvents = 'none';
+  // 오버레이 전체를 숨겨서 어두운 배경 제거
+  const overlay = document.getElementById('place-overlay');
+  overlay.classList.remove('show');
+  overlay.style.display = 'none';
+
   pinMode = true;
   document.getElementById('map-wrapper').classList.add('pin-mode');
   document.getElementById('pin-mode-banner').classList.add('show');
@@ -1280,22 +1281,22 @@ function exitPinMode() {
   pinMode = false;
   document.getElementById('map-wrapper').classList.remove('pin-mode');
   document.getElementById('pin-mode-banner').classList.remove('show');
-  // 팝업 다시 보이기
-  const popup = document.querySelector('#place-overlay .popup');
-  popup.style.opacity = '1';
-  popup.style.pointerEvents = '';
+
+  // 오버레이 다시 표시
+  const overlay = document.getElementById('place-overlay');
+  overlay.style.display = '';
+  overlay.classList.add('show');
 }
 
 function cancelPinMode() {
   exitPinMode();
-  // 임시 마커 제거
   if (tempPinMarker) { tempPinMarker.setMap(null); tempPinMarker = null; }
   pendingLatLng = null;
 }
 
 function confirmPinLocation(latLng) {
   pendingLatLng = { lat: latLng.lat(), lng: latLng.lng() };
-  // 임시 마커
+  // 임시 마커 (낙하 애니메이션)
   if (tempPinMarker) tempPinMarker.setMap(null);
   tempPinMarker = new google.maps.Marker({
     position: pendingLatLng, map,
