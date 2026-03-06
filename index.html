@@ -6,7 +6,8 @@
     <meta name="apple-mobile-web-app-title" content="여행앱">
     
     <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon.png?raw=true">
-</head><meta charset="UTF-8">
+</head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>여행 계획판</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -68,7 +69,14 @@
   document.dispatchEvent(new Event("firebase-ready"));
 </script>
 
-<!-- Google Maps API: YOUR_MAPS_API_KEY 교체 -->
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+</script>
+
+<!-- Google Maps API -->
 <script>
   window.MAPS_API_KEY = "AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo";
   window.initMap = function() {
@@ -765,15 +773,63 @@ html, body {
 .voucher-card.has-image:hover .voucher-del { display: flex; }
 .voucher-card .vc-add { font-size: 20px; color: var(--ink3); opacity: .5; }
 
-/* 바우처 뷰어 팝업 */
-#voucher-viewer .popup { padding: 0; overflow: hidden; width: 500px; }
-#vv-img { width: 100%; max-height: 70vh; object-fit: contain; display: block; background: var(--ink); }
-#vv-label { padding: 14px 18px; font-size: 14px; font-weight: 600; color: var(--ink); }
+/* 바우처 뷰어 팝업 — PDF/이미지 통합 */
+#voucher-viewer .popup {
+  padding: 0; overflow: hidden;
+  width: min(560px, calc(100vw - 32px));
+  max-height: 92vh;
+  display: flex; flex-direction: column;
+}
+#vv-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--sand);
+  flex-shrink: 0;
+}
+#vv-label {
+  flex: 1; font-size: 14px; font-weight: 600; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#vv-page-info { font-size: 12px; color: var(--ink3); flex-shrink: 0; }
 #vv-close {
-  position: absolute; top: 10px; right: 10px;
-  background: rgba(0,0,0,0.45); border: none; border-radius: 50%;
-  width: 32px; height: 32px; color: #fff; cursor: pointer; font-size: 15px;
-  display: flex; align-items: center; justify-content: center;
+  background: var(--stone); border: none; border-radius: 50%;
+  width: 28px; height: 28px; color: var(--ink2); cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+#vv-close:hover { background: var(--sand); }
+#vv-body {
+  flex: 1; overflow-y: auto; background: #2a2a2a;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; padding: 12px;
+  min-height: 0;
+}
+#vv-body::-webkit-scrollbar { width: 6px; }
+#vv-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+/* 이미지 뷰어 */
+#vv-img {
+  max-width: 100%; border-radius: 4px;
+  display: block; box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+/* PDF 캔버스들 */
+.vv-pdf-page {
+  max-width: 100%; border-radius: 4px;
+  display: block; box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+#vv-loading {
+  color: rgba(255,255,255,0.6); font-size: 13px; padding: 40px;
+  display: flex; align-items: center; gap: 10px;
+}
+#vv-loading .mini-spin {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: rgba(255,255,255,0.7);
+  animation: spin .7s linear infinite;
+}
+/* 썸네일 PDF 배지 */
+.vc-pdf-badge {
+  position: absolute; top: 6px; left: 6px;
+  background: rgba(58,143,224,0.9); color: #fff;
+  font-size: 10px; font-weight: 700; border-radius: 4px;
+  padding: 2px 6px; letter-spacing: .5px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -1121,12 +1177,17 @@ html, body {
   </div>
 </div>
 
-<!-- 바우처 이미지 뷰어 -->
+<!-- 바우처 이미지/PDF 뷰어 -->
 <div class="overlay" id="voucher-viewer" onclick="closeIfBg(event,'voucher-viewer')">
   <div class="popup" style="position:relative;">
-    <button id="vv-close" onclick="closeOverlay('voucher-viewer')">✕</button>
-    <img id="vv-img" src="" alt="" />
-    <div id="vv-label"></div>
+    <div id="vv-header">
+      <span id="vv-label">바우처</span>
+      <span id="vv-page-info"></span>
+      <button id="vv-close" onclick="closeOverlay('voucher-viewer')">✕</button>
+    </div>
+    <div id="vv-body">
+      <!-- 이미지 or PDF 캔버스가 동적으로 삽입됨 -->
+    </div>
   </div>
 </div>
 
@@ -1244,20 +1305,20 @@ function applyTripData(data) {
 
 // ── 챙겨야할 것 ───────────────────────────────────────────────
 const CHECKLIST_ITEMS = [
-  { id: 'passport',   label: '여권',          emoji: '🛂' },
-  { id: 'id-card',    label: '신분증',         emoji: '🪪' },
-  { id: 'intl-license',label:'국제면허증',      emoji: '🚗' },
-  { id: 'toiletry',   label: '세면도구',        emoji: '🧴' },
-  { id: 'adapter',    label: '변압기 / 어댑터', emoji: '🔌' },
-  { id: 'visit-japan',label: 'Visit Japan Web', emoji: '🇯🇵' },
+  { id: 'passport',    label: '여권',           emoji: '🛂' },
+  { id: 'id-card',     label: '신분증',          emoji: '🪪' },
+  { id: 'intl-license',label: '국제면허증',       emoji: '🚗' },
+  { id: 'toiletry',    label: '세면도구',         emoji: '🧴' },
+  { id: 'adapter',     label: '변압기 / 어댑터',  emoji: '🔌' },
+  { id: 'visit-japan', label: 'Visit Japan Web',  emoji: '🇯🇵' },
 ];
 
 const VOUCHER_ITEMS = [
-  { id: 'eticket-out',  label: '비행기 출국 E-Ticket', icon: '✈️' },
-  { id: 'eticket-in',   label: '비행기 귀국 E-Ticket', icon: '🛬' },
-  { id: 'rentcar',      label: '렌트카 바우처',          icon: '🚗' },
-  { id: 'hotel1',       label: '호텔 바우처 1',          icon: '🏨' },
-  { id: 'hotel2',       label: '호텔 바우처 2',          icon: '🏩' },
+  { id: 'eticket-out', label: '비행기 출국 E-Ticket', icon: '✈️' },
+  { id: 'eticket-in',  label: '비행기 귀국 E-Ticket', icon: '🛬' },
+  { id: 'rentcar',     label: '렌트카 바우처',          icon: '🚗' },
+  { id: 'hotel1',      label: '호텔 바우처 1',          icon: '🏨' },
+  { id: 'hotel2',      label: '호텔 바우처 2',          icon: '🏩' },
 ];
 
 function renderChecklist() {
@@ -1283,18 +1344,24 @@ function toggleCheck(id) {
   autoSave();
 }
 
+// ── 바우처 ────────────────────────────────────────────────────
+// voucherData[id] = { type: 'image'|'pdf', data: base64, thumb: base64, pages: number }
+
 function renderVouchers() {
   const grid = document.getElementById('voucher-grid');
   if (!grid) return;
   grid.innerHTML = '';
   VOUCHER_ITEMS.forEach(v => {
-    const imgData = voucherData[v.id];
+    const vc = voucherData[v.id];
     const card = document.createElement('div');
-    card.className = 'voucher-card' + (imgData ? ' has-image' : '');
+    card.className = 'voucher-card' + (vc ? ' has-image' : '');
     card.dataset.id = v.id;
-    if (imgData) {
+
+    if (vc) {
+      const isPdf = vc.type === 'pdf';
       card.innerHTML = `
-        <img src="${imgData}" alt="${v.label}" />
+        <img src="${vc.thumb}" alt="${v.label}" />
+        ${isPdf ? `<span class="vc-pdf-badge">PDF · ${vc.pages}p</span>` : ''}
         <button class="voucher-del" onclick="deleteVoucher('${v.id}',event)">✕</button>
         <span class="vc-label">${v.label}</span>`;
       card.onclick = () => openVoucherViewer(v.id, v.label);
@@ -1302,27 +1369,131 @@ function renderVouchers() {
       card.innerHTML = `
         <span class="vc-add">＋</span>
         <span class="vc-label">${v.icon} ${v.label}</span>`;
-      card.onclick = () => pickVoucherImage(v.id);
+      card.onclick = () => pickVoucherFile(v.id);
     }
     grid.appendChild(card);
   });
 }
 
-function pickVoucherImage(id) {
+function pickVoucherFile(id) {
   const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*';
-  input.onchange = (e) => {
+  input.type = 'file';
+  input.accept = 'image/*,application/pdf';
+  input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      voucherData[id] = ev.target.result;
-      renderVouchers();
-      autoSave();
-    };
-    reader.readAsDataURL(file);
+    showToast('파일 처리 중…');
+    if (file.type === 'application/pdf') {
+      await processPdfVoucher(id, file);
+    } else {
+      await processImageVoucher(id, file);
+    }
+    renderVouchers();
+    autoSave();
+    showToast('✅ 업로드 완료');
   };
   input.click();
+}
+
+// 이미지 처리 — 썸네일 생성
+async function processImageVoucher(id, file) {
+  const full = await fileToBase64(file);
+  const thumb = await resizeImage(full, 300, 200);
+  voucherData[id] = { type: 'image', data: full, thumb, pages: 1 };
+}
+
+// PDF 처리 — 각 페이지 캔버스 렌더 → base64 배열로 저장, 첫 페이지 썸네일
+async function processPdfVoucher(id, file) {
+  const base64 = await fileToBase64(file);
+  // PDF.js 로드 체크
+  if (!window.pdfjsLib) {
+    showToast('PDF 라이브러리 로딩 중, 잠시 후 다시 시도해주세요');
+    return;
+  }
+  const pdfData = atob(base64.split(',')[1]);
+  const pdfBytes = new Uint8Array(pdfData.length);
+  for (let i = 0; i < pdfData.length; i++) pdfBytes[i] = pdfData.charCodeAt(i);
+
+  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+  const totalPages = pdf.numPages;
+  const pageImages = [];
+
+  for (let p = 1; p <= totalPages; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale: 1.8 });
+    const canvas = document.createElement('canvas');
+    canvas.width  = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    pageImages.push(canvas.toDataURL('image/jpeg', 0.85));
+  }
+
+  // 썸네일: 첫 페이지 축소
+  const thumb = await resizeImage(pageImages[0], 300, 200);
+  voucherData[id] = { type: 'pdf', data: base64, thumb, pages: totalPages, pageImages };
+}
+
+// ── 바우처 뷰어 ───────────────────────────────────────────────
+function openVoucherViewer(id, label) {
+  const vc = voucherData[id];
+  if (!vc) return;
+  document.getElementById('vv-label').textContent = label;
+  const body = document.getElementById('vv-body');
+  body.innerHTML = '';
+
+  if (vc.type === 'image') {
+    document.getElementById('vv-page-info').textContent = '';
+    const img = document.createElement('img');
+    img.id  = 'vv-img';
+    img.src = vc.data;
+    body.appendChild(img);
+  } else {
+    // PDF: 저장된 페이지 이미지 세로로 나열
+    document.getElementById('vv-page-info').textContent = vc.pages + '페이지';
+    if (vc.pageImages && vc.pageImages.length) {
+      vc.pageImages.forEach((src, i) => {
+        const canvas = document.createElement('img');
+        canvas.className = 'vv-pdf-page';
+        canvas.src   = src;
+        canvas.title = (i + 1) + ' / ' + vc.pages;
+        body.appendChild(canvas);
+      });
+    } else {
+      // pageImages 없는 구버전 데이터 → 재렌더
+      body.innerHTML = '<div id="vv-loading"><div class="mini-spin"></div>PDF 렌더링 중…</div>';
+      reRenderPdfPages(id).then(() => {
+        body.innerHTML = '';
+        (voucherData[id].pageImages || []).forEach((src, i) => {
+          const img = document.createElement('img');
+          img.className = 'vv-pdf-page'; img.src = src;
+          img.title = (i+1) + ' / ' + voucherData[id].pages;
+          body.appendChild(img);
+        });
+        document.getElementById('vv-page-info').textContent = voucherData[id].pages + '페이지';
+      });
+    }
+  }
+  openOverlay('voucher-viewer');
+}
+
+async function reRenderPdfPages(id) {
+  const vc = voucherData[id];
+  if (!vc || vc.type !== 'pdf' || !window.pdfjsLib) return;
+  const pdfData = atob(vc.data.split(',')[1]);
+  const pdfBytes = new Uint8Array(pdfData.length);
+  for (let i = 0; i < pdfData.length; i++) pdfBytes[i] = pdfData.charCodeAt(i);
+  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+  const pages = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale: 1.8 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    pages.push(canvas.toDataURL('image/jpeg', 0.85));
+  }
+  voucherData[id].pageImages = pages;
+  voucherData[id].pages = pages.length;
 }
 
 function deleteVoucher(id, e) {
@@ -1332,10 +1503,29 @@ function deleteVoucher(id, e) {
   autoSave();
 }
 
-function openVoucherViewer(id, label) {
-  document.getElementById('vv-img').src   = voucherData[id] || '';
-  document.getElementById('vv-label').textContent = label;
-  openOverlay('voucher-viewer');
+// ── 유틸 ─────────────────────────────────────────────────────
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function resizeImage(src, maxW, maxH) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.width  * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      res(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.src = src;
+  });
 }
 
 // ── 저장 ─────────────────────────────────────────────────────
