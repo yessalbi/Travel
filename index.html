@@ -608,20 +608,57 @@ html, body {
 #pl-pick-btn.picked { border-color: var(--green); color: var(--green); background: #EBF7F2; border-style: solid; }
 /* ── 커스텀 시간 선택기 ── */
 .time-picker {
-  display: flex; align-items: center; gap: 4px; flex: 1;
+  display: flex; align-items: center; gap: 6px; flex: 1;
 }
-.time-picker select {
-  border: 1.5px solid var(--sand); border-radius: 7px;
-  padding: 7px 4px; font-family: inherit; font-size: 13px;
-  background: var(--white); outline: none; transition: border-color .18s;
-  color: var(--ink); cursor: pointer; text-align: center;
-  -webkit-appearance: none; appearance: none;
+.tp-display {
+  flex: 1; border: 1.5px solid var(--sand); border-radius: 7px;
+  padding: 7px 10px; font-family: inherit; font-size: 13px;
+  background: var(--white); color: var(--ink); cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  transition: border-color .18s; user-select: none;
 }
-.time-picker select:focus { border-color: var(--accent2); }
-.time-picker .tp-hour  { width: 52px; }
-.time-picker .tp-min   { width: 52px; }
-.time-picker .tp-ampm  { width: 52px; }
-.time-picker .tp-sep   { color: var(--ink3); font-weight: 600; font-size: 14px; flex-shrink: 0; }
+.tp-display:hover { border-color: var(--accent2); }
+.tp-display .tp-val { font-weight: 500; }
+.tp-display .tp-arrow { color: var(--ink3); font-size: 10px; }
+
+/* 시간 팝업 */
+.tp-popup {
+  position: fixed; z-index: 500;
+  background: var(--white); border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+  padding: 16px; display: none;
+  flex-direction: column; gap: 12px;
+  min-width: 220px;
+}
+.tp-popup.open { display: flex; }
+.tp-popup-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--ink3); margin-bottom: 2px;
+}
+.tp-section { display: flex; flex-direction: column; gap: 6px; }
+.tp-section-label { font-size: 11px; color: var(--ink3); }
+.tp-grid {
+  display: grid; gap: 4px;
+}
+.tp-grid.hour-grid { grid-template-columns: repeat(6, 1fr); }
+.tp-grid.min-grid  { grid-template-columns: repeat(6, 1fr); }
+.tp-grid.ampm-grid { grid-template-columns: repeat(2, 1fr); }
+.tp-btn {
+  padding: 6px 2px; border-radius: 6px; border: 1.5px solid var(--sand);
+  background: var(--cream); font-family: inherit; font-size: 12px;
+  font-weight: 500; color: var(--ink2); cursor: pointer;
+  transition: all .12s; text-align: center;
+}
+.tp-btn:hover { border-color: var(--accent2); color: var(--accent2); background: #EBF3FE; }
+.tp-btn.sel { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+.tp-btn.ampm { font-size: 13px; padding: 8px; }
+.tp-close-row { display: flex; justify-content: flex-end; margin-top: 2px; }
+.tp-close-btn {
+  padding: 6px 16px; border-radius: 8px; border: none;
+  background: var(--ink); color: #fff; font-family: inherit;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.tp-close-btn:hover { background: #333; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -1130,8 +1167,11 @@ function renderScheduleList() {
 // ── 일정 추가 팝업 ────────────────────────────────────────────
 function openSchedulePopup() {
   document.getElementById('sch-name').value = '';
-  document.getElementById('sch-time').value = '';
   document.getElementById('sch-desc').value = '';
+  // 시간 선택기 초기화 (1시 00분 AM)
+  tpState['scht'] = { h: '1', m: '00', ap: 'AM' };
+  updateTpDisplay('scht');
+  syncTpPopup('scht');
   selectTypeByValue('food');
   openOverlay('schedule-overlay');
 }
@@ -1165,20 +1205,22 @@ function deleteScheduleItem(idx) {
   autoSave();
 }
 
-// ── 커스텀 시간 선택기 ────────────────────────────────────────
-// 시간을 "HH:MM" 24시간제 문자열로 변환
+// ── 커스텀 시간 선택기 (버튼 그리드 방식) ────────────────────
+// 상태 저장: prefix → { h, m, ap }
+const tpState = {};
+let activeTpPrefix = null;
+
+// "HH:MM" 24시간제 문자열로 변환
 function tpToTime(prefix) {
-  const h   = document.getElementById(prefix + '-h').value;
-  const m   = document.getElementById(prefix + '-m').value;
-  const ap  = document.getElementById(prefix + '-ap').value;
-  if (!h || !m) return '';
-  let hour = parseInt(h);
-  if (ap === 'PM' && hour !== 12) hour += 12;
-  if (ap === 'AM' && hour === 12) hour = 0;
-  return String(hour).padStart(2,'0') + ':' + m;
+  const s = tpState[prefix];
+  if (!s || !s.h) return '';
+  let hour = parseInt(s.h);
+  if (s.ap === 'PM' && hour !== 12) hour += 12;
+  if (s.ap === 'AM' && hour === 12) hour = 0;
+  return String(hour).padStart(2,'0') + ':' + s.m;
 }
 
-// "HH:MM" 24시간제 → 선택기에 세팅
+// "HH:MM" → 상태에 복원 후 표시 업데이트
 function timeToTp(prefix, timeStr) {
   if (!timeStr) return;
   const [hh, mm] = timeStr.split(':');
@@ -1186,50 +1228,154 @@ function timeToTp(prefix, timeStr) {
   const ap = hour >= 12 ? 'PM' : 'AM';
   if (hour > 12) hour -= 12;
   if (hour === 0) hour = 12;
-  const hSel  = document.getElementById(prefix + '-h');
-  const mSel  = document.getElementById(prefix + '-m');
-  const apSel = document.getElementById(prefix + '-ap');
-  if (hSel)  hSel.value  = String(hour);
-  if (mSel)  mSel.value  = mm;
-  if (apSel) apSel.value = ap;
+  tpState[prefix] = { h: String(hour), m: mm, ap };
+  updateTpDisplay(prefix);
 }
 
-// 선택기 렌더링
+// 디스플레이 버튼 텍스트 업데이트
+function updateTpDisplay(prefix) {
+  const s = tpState[prefix];
+  const el = document.getElementById('tp-disp-' + prefix);
+  if (!el) return;
+  if (s && s.h) {
+    el.querySelector('.tp-val').textContent =
+      String(s.h).padStart(2,'0') + ':' + s.m + ' ' + s.ap;
+  } else {
+    el.querySelector('.tp-val').textContent = '시간 선택';
+  }
+}
+
+// 팝업 내 버튼 선택 상태 동기화
+function syncTpPopup(prefix) {
+  const s = tpState[prefix] || {};
+  document.querySelectorAll(`#tp-pop-${prefix} .tp-btn[data-role="h"]`).forEach(b => {
+    b.classList.toggle('sel', b.dataset.val === s.h);
+  });
+  document.querySelectorAll(`#tp-pop-${prefix} .tp-btn[data-role="m"]`).forEach(b => {
+    b.classList.toggle('sel', b.dataset.val === s.m);
+  });
+  document.querySelectorAll(`#tp-pop-${prefix} .tp-btn[data-role="ap"]`).forEach(b => {
+    b.classList.toggle('sel', b.dataset.val === (s.ap || 'AM'));
+  });
+}
+
+// 팝업 열기
+function openTpPopup(prefix, anchorEl, onChange) {
+  // 다른 팝업 닫기
+  document.querySelectorAll('.tp-popup').forEach(p => p.classList.remove('open'));
+  activeTpPrefix = prefix;
+  const pop = document.getElementById('tp-pop-' + prefix);
+  if (!pop) return;
+
+  // 위치 계산
+  const rect = anchorEl.getBoundingClientRect();
+  pop.style.top  = (rect.bottom + 6) + 'px';
+  pop.style.left = rect.left + 'px';
+  // 화면 오른쪽 넘침 방지
+  pop.classList.add('open');
+  const popRect = pop.getBoundingClientRect();
+  if (popRect.right > window.innerWidth - 8) {
+    pop.style.left = (window.innerWidth - popRect.width - 8) + 'px';
+  }
+
+  syncTpPopup(prefix);
+}
+
+// 팝업 닫기
+function closeTpPopup(prefix) {
+  const pop = document.getElementById('tp-pop-' + prefix);
+  if (pop) pop.classList.remove('open');
+  activeTpPrefix = null;
+}
+
+// 값 선택
+function tpSelect(prefix, role, val, onChange) {
+  if (!tpState[prefix]) tpState[prefix] = { h: '1', m: '00', ap: 'AM' };
+  tpState[prefix][role] = val;
+  syncTpPopup(prefix);
+  updateTpDisplay(prefix);
+  if (onChange) onChange();
+}
+
+// 선택기 렌더링 (디스플레이 버튼 + 팝업)
 function buildTimePicker(containerId, prefix, onChange) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
 
-  // 시 옵션 (1~12)
-  let hOpts = '';
-  for (let i = 1; i <= 12; i++) hOpts += `<option value="${i}">${String(i).padStart(2,'0')}</option>`;
+  // 초기 상태: 1시 00분 AM
+  if (!tpState[prefix]) tpState[prefix] = { h: '1', m: '00', ap: 'AM' };
 
-  // 분 옵션 (00~59)
-  let mOpts = '';
-  for (let i = 0; i < 60; i++) mOpts += `<option value="${String(i).padStart(2,'0')}">${String(i).padStart(2,'0')}</option>`;
+  // 시 버튼 (1~12)
+  let hBtns = '';
+  for (let i = 1; i <= 12; i++) {
+    hBtns += `<button class="tp-btn" data-role="h" data-val="${i}"
+      onclick="tpSelect('${prefix}','h','${i}',${onChange ? `function(){autoSave()}` : 'null'})"
+      >${String(i).padStart(2,'0')}</button>`;
+  }
+
+  // 분 버튼 (0,5,10,...,55 → 주요 단위)
+  const mins = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+  let mBtns = '';
+  mins.forEach(m => {
+    mBtns += `<button class="tp-btn" data-role="m" data-val="${m}"
+      onclick="tpSelect('${prefix}','m','${m}',${onChange ? `function(){autoSave()}` : 'null'})"
+      >${m}</button>`;
+  });
+
+  // AM/PM 버튼
+  const apBtns = ['AM','PM'].map(ap =>
+    `<button class="tp-btn ampm" data-role="ap" data-val="${ap}"
+      onclick="tpSelect('${prefix}','ap','${ap}',${onChange ? `function(){autoSave()}` : 'null'})"
+      >${ap}</button>`
+  ).join('');
 
   wrap.innerHTML = `
-    <select class="tp-hour" id="${prefix}-h">${hOpts}</select>
-    <span class="tp-sep">:</span>
-    <select class="tp-min"  id="${prefix}-m">${mOpts}</select>
-    <select class="tp-ampm" id="${prefix}-ap">
-      <option value="AM">AM</option>
-      <option value="PM">PM</option>
-    </select>`;
+    <div class="tp-display" id="tp-disp-${prefix}" onclick="openTpPopup('${prefix}',this,${onChange})">
+      <span class="tp-val">시간 선택</span>
+      <span class="tp-arrow">▼</span>
+    </div>
+    <div class="tp-popup" id="tp-pop-${prefix}">
+      <div class="tp-section">
+        <div class="tp-section-label">시 (Hour)</div>
+        <div class="tp-grid hour-grid">${hBtns}</div>
+      </div>
+      <div class="tp-section">
+        <div class="tp-section-label">분 (Minute)</div>
+        <div class="tp-grid min-grid">${mBtns}</div>
+      </div>
+      <div class="tp-section">
+        <div class="tp-section-label">AM / PM</div>
+        <div class="tp-grid ampm-grid">${apBtns}</div>
+      </div>
+      <div class="tp-close-row">
+        <button class="tp-close-btn" onclick="closeTpPopup('${prefix}')">확인</button>
+      </div>
+    </div>`;
 
-  if (onChange) {
-    wrap.querySelectorAll('select').forEach(s => s.addEventListener('change', onChange));
-  }
+  updateTpDisplay(prefix);
+  syncTpPopup(prefix);
 }
 
 // 모든 시간 선택기 초기화
 function initTimePickers() {
-  const cb = () => autoSave();
-  buildTimePicker('tp-flight-depart', 'fdep',  cb);
-  buildTimePicker('tp-flight-arrive', 'farr',  cb);
-  buildTimePicker('tp-return-depart', 'rdep',  cb);
-  buildTimePicker('tp-return-arrive', 'rarr',  cb);
-  buildTimePicker('tp-sch-time',      'scht',  null); // 일정은 저장 시 읽음
+  buildTimePicker('tp-flight-depart', 'fdep', true);
+  buildTimePicker('tp-flight-arrive', 'farr', true);
+  buildTimePicker('tp-return-depart', 'rdep', true);
+  buildTimePicker('tp-return-arrive', 'rarr', true);
+  buildTimePicker('tp-sch-time',      'scht', false);
 }
+
+// 팝업 외부 클릭 시 닫기
+document.addEventListener('click', (e) => {
+  if (!activeTpPrefix) return;
+  const pop  = document.getElementById('tp-pop-' + activeTpPrefix);
+  const disp = document.getElementById('tp-disp-' + activeTpPrefix);
+  if (pop && !pop.contains(e.target) && disp && !disp.contains(e.target)) {
+    closeTpPopup(activeTpPrefix);
+  }
+});
+
+
 
 // ── 날짜 min 연동 ─────────────────────────────────────────────
 function initDateMinLink() {
