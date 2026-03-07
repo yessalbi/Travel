@@ -1309,13 +1309,9 @@ function applyTripData(data) {
   }
   updateDuration();
   updateTripSummary();
-  if (data.mapCenter && map) {
-    map.setCenter(data.mapCenter);
-    map.setZoom(data.mapZoom || 12);
-  } else if (data.title) {
-    // 저장된 지도 위치 없으면 제목으로 자동 이동
-    if (map) geocodeAndMoveMap(data.title);
-  }
+  // 초기 로드: 모든 일정 핀을 한눈에 보이게 fitBounds
+  // (저장된 mapCenter는 사용자가 직접 이동한 거라 덮어쓰지 않음 — 핀 기준 우선)
+  fitSchedulePins(data.title);
   updateAirlineLogo();
 }
 
@@ -1546,17 +1542,39 @@ function fetchDirections(from, to, mode, fromIdx) {
   if (bodyEl) bodyEl.classList.add('loading');
 
   const svc = new google.maps.DirectionsService();
-  svc.route({
-    origin: new google.maps.LatLng(from.lat, from.lng),
+  const req = {
+    origin:      new google.maps.LatLng(from.lat, from.lng),
     destination: new google.maps.LatLng(to.lat, to.lng),
-    travelMode: mode.toUpperCase(),
-  }, (result, status) => {
+    travelMode:  mode.toUpperCase(),
+  };
+  // TRANSIT은 출발 시간 필수
+  if (mode === 'transit') {
+    req.transitOptions = { departureTime: new Date() };
+    req.provideRouteAlternatives = true;
+  }
+
+  svc.route(req, (result, status) => {
     if (bodyEl) bodyEl.classList.remove('loading');
     if (status === 'OK') {
-      const leg  = result.routes[0].legs[0];
-      const dist = leg.distance.text;
-      const dur  = leg.duration.text;
       const modeInfo = MODE_LIST.find(m => m.id === mode);
+      let dist, dur;
+
+      if (mode === 'transit' && result.routes.length > 1) {
+        // 여러 루트 → 평균 시간 계산
+        const durations = result.routes.map(r => r.legs[0].duration.value); // 초 단위
+        const avgSec = Math.round(durations.reduce((a,b) => a+b, 0) / durations.length);
+        const avgMin = Math.round(avgSec / 60);
+        dist = result.routes[0].legs[0].distance.text;
+        dur  = avgMin >= 60
+          ? `${Math.floor(avgMin/60)}시간 ${avgMin%60}분`
+          : `${avgMin}분`;
+        dur  += ` (${result.routes.length}개 루트 평균)`;
+      } else {
+        const leg = result.routes[0].legs[0];
+        dist = leg.distance.text;
+        dur  = leg.duration.text;
+      }
+
       if (infoEl) infoEl.innerHTML = `
         <span class="transit-dist">${dist}</span>
         <span class="transit-sep">·</span>
@@ -1987,6 +2005,50 @@ function setupMap() {
   // 저장된 지도 위치가 없으면 여행 제목으로 지오코딩
   const savedCenter = document.getElementById('trip-title').value;
   if (savedCenter) geocodeAndMoveMap(savedCenter);
+}
+
+// 초기 로드 시 모든 일정 핀을 한눈에
+function fitSchedulePins(fallbackTitle) {
+  // 맵이 아직 안 로드됐으면 maps-ready 이후에 실행
+  if (!map) {
+    document.addEventListener('maps-ready', () => fitSchedulePins(fallbackTitle), { once: true });
+    return;
+  }
+
+  // 모든 날짜의 일정에서 좌표 수집
+  const coords = [];
+  Object.values(scheduleData).forEach(dayItems => {
+    (dayItems || []).forEach(item => {
+      if (item.lat && item.lng) coords.push({ lat: item.lat, lng: item.lng });
+    });
+  });
+
+  if (coords.length === 0) {
+    // 핀 없으면 제목으로 지오코딩
+    if (fallbackTitle) geocodeAndMoveMap(fallbackTitle);
+    return;
+  }
+
+  if (coords.length === 1) {
+    map.setCenter(coords[0]);
+    map.setZoom(13);
+    return;
+  }
+
+  // 여러 핀 → fitBounds, 단 너무 멀리 퍼진 핀(출발지 등) 제외
+  // 핀들의 중심 계산
+  const avgLat = coords.reduce((s,c) => s+c.lat, 0) / coords.length;
+  const avgLng = coords.reduce((s,c) => s+c.lng, 0) / coords.length;
+
+  // 중심에서 2도(약 200km) 이상 떨어진 핀은 제외 (인천공항 등 출발지 필터)
+  const nearby = coords.filter(c =>
+    Math.abs(c.lat - avgLat) < 2 && Math.abs(c.lng - avgLng) < 2
+  );
+  const target = nearby.length >= 2 ? nearby : coords;
+
+  const bounds = new google.maps.LatLngBounds();
+  target.forEach(c => bounds.extend(c));
+  map.fitBounds(bounds, { top: 60, bottom: 60, left: 40, right: 40 });
 }
 
 // 여행 제목으로 지도 위치 자동 이동
