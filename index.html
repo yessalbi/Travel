@@ -5,7 +5,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="여행앱">
     
-    <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
+    <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon.png?raw=true">
 </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -591,7 +591,7 @@ html, body {
 
 /* 경로 추가 버튼 */
 #route-controls {
-  position: absolute; top: 16px; left: 16px; z-index: 10;
+  position: absolute; bottom: 24px; left: 16px; z-index: 10;
   display: flex; flex-direction: column; gap: 6px;
 }
 .route-btn {
@@ -604,6 +604,42 @@ html, body {
 }
 .route-btn:hover { background: var(--accent); color: #fff; }
 .route-btn.active { background: var(--accent2); color: #fff; }
+/* 지도 위치 검색창 */
+#map-search-wrap {
+  position: absolute; top: 16px; left: 16px; z-index: 10;
+  display: flex; align-items: center; gap: 0;
+  background: var(--white); border-radius: 10px;
+  box-shadow: var(--shadow2); overflow: hidden;
+  width: 220px;
+}
+#map-search-input {
+  flex: 1; border: none; outline: none;
+  padding: 8px 10px; font-family: inherit;
+  font-size: 12px; color: var(--ink); background: transparent;
+}
+#map-search-input::placeholder { color: var(--ink3); }
+#map-search-btn {
+  border: none; background: none; cursor: pointer;
+  padding: 8px 10px; font-size: 14px; color: var(--ink3);
+  transition: color .14s;
+}
+#map-search-btn:hover { color: var(--accent2); }
+#map-search-results {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--white); border-radius: 10px;
+  box-shadow: var(--shadow2); overflow: hidden;
+  display: none; flex-direction: column;
+}
+#map-search-results.show { display: flex; }
+.map-search-item {
+  padding: 8px 12px; font-size: 12px; color: var(--ink2);
+  cursor: pointer; border-bottom: 1px solid var(--stone);
+  transition: background .12s; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.map-search-item:last-child { border-bottom: none; }
+.map-search-item:hover { background: var(--stone); }
+
 
 /* ── 모바일 ── */
 @media (max-width: 768px) {
@@ -1021,6 +1057,13 @@ html, body {
         <div class="smc-name" id="smc-name"></div>
       </div>
       <button class="smc-close" onclick="hideSchMapCard()">✕</button>
+    </div>
+    <div id="map-search-wrap">
+      <input id="map-search-input" type="text" placeholder="🔍 장소 검색"
+        onkeydown="if(event.key==='Enter')mapSearch()"
+        oninput="mapSearchAutocomplete(this.value)" />
+      <button id="map-search-btn" onclick="mapSearch()">→</button>
+      <div id="map-search-results"></div>
     </div>
     <div id="route-controls">
       <button class="route-btn" id="btn-route-mode" onclick="toggleRouteMode()">🛣️ 경로 추가 모드</button>
@@ -1613,7 +1656,10 @@ function fetchDirections(from, to, mode, fromIdx) {
       const dLat = to.lat - from.lat, dLng = to.lng - from.lng;
       const distKm = Math.sqrt(dLat*dLat + dLng*dLng) * 111;
       if (distKm > 300) {
-        infoEl.innerHTML = `<span style="font-size:12px;color:var(--ink3)">✈️ 비행기 이동 구간</span>`;
+        infoEl.innerHTML = `<span style="font-size:12px;color:var(--ink3)">비행기 이동 구간</span>`;
+        // 수단 선택 버튼 숨기기
+        const modeBtn = bodyEl ? bodyEl.querySelector('.transit-mode-btn') : null;
+        if (modeBtn) { modeBtn.textContent = '✈️'; modeBtn.style.pointerEvents = 'none'; modeBtn.onclick = null; }
       } else {
         infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
       }
@@ -2089,6 +2135,71 @@ function fitSchedulePins(fallbackTitle) {
 }
 
 // 여행 제목으로 지도 위치 자동 이동
+// ── 지도 위치 검색 ────────────────────────────────────────────
+let mapSearchAutocompleteService = null;
+let mapSearchSessionToken = null;
+
+function mapSearch() {
+  const q = document.getElementById('map-search-input').value.trim();
+  if (!q || !map) return;
+  closeMapSearchResults();
+  const geocoder = new google.maps.Geocoder();
+  geocoder.geocode({ address: q, language: 'ko' }, (results, status) => {
+    if (status === 'OK' && results[0]) {
+      map.setCenter(results[0].geometry.location);
+      map.setZoom(15);
+    }
+  });
+}
+
+function mapSearchAutocomplete(val) {
+  const resultsEl = document.getElementById('map-search-results');
+  if (!val || val.length < 2) { closeMapSearchResults(); return; }
+  if (!map) return;
+  if (!mapSearchAutocompleteService) {
+    mapSearchAutocompleteService = new google.maps.places.AutocompleteService();
+  }
+  if (!mapSearchSessionToken) {
+    mapSearchSessionToken = new google.maps.places.AutocompleteSessionToken();
+  }
+  mapSearchAutocompleteService.getPlacePredictions(
+    { input: val, sessionToken: mapSearchSessionToken, language: 'ko' },
+    (predictions, status) => {
+      if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+        closeMapSearchResults(); return;
+      }
+      resultsEl.innerHTML = '';
+      predictions.slice(0, 4).forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'map-search-item';
+        item.textContent = p.description;
+        item.onclick = () => {
+          document.getElementById('map-search-input').value = p.description;
+          closeMapSearchResults();
+          mapSearchSessionToken = null;
+          const geocoder = new google.maps.Geocoder();
+          geocoder.geocode({ placeId: p.place_id, language: 'ko' }, (res, st) => {
+            if (st === 'OK' && res[0]) {
+              map.setCenter(res[0].geometry.location);
+              map.setZoom(16);
+            }
+          });
+        };
+        resultsEl.appendChild(item);
+      });
+      resultsEl.classList.add('show');
+    }
+  );
+}
+
+function closeMapSearchResults() {
+  const el = document.getElementById('map-search-results');
+  if (el) { el.classList.remove('show'); el.innerHTML = ''; }
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#map-search-wrap')) closeMapSearchResults();
+});
+
 function geocodeAndMoveMap(titleText) {
   if (!map || !titleText) return;
   const geocoder = new google.maps.Geocoder();
