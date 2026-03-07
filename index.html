@@ -645,6 +645,9 @@ html, body {
 
 
 /* ── 모바일 ── */
+/* 지도 탭 — 모바일 전용 */
+.map-tab-mobile { display: none; }
+
 @media (max-width: 768px) {
   html, body { overflow: auto; }
   #main { flex-direction: column; height: auto; overflow: visible; }
@@ -658,6 +661,27 @@ html, body {
   #map-wrapper { height: 60vw; min-height: 300px; flex-shrink: 0; }
   #header h1  { font-size: 17px; }
   .popup { padding: 20px; }
+  .map-tab-mobile { display: flex; }
+
+  /* 지도 전체화면 모드 */
+  body.map-fullscreen #left-panel { display: none; }
+  body.map-fullscreen #main { height: 100dvh; overflow: hidden; }
+  body.map-fullscreen #map-wrapper {
+    height: 100dvh; min-height: unset; flex: 1;
+  }
+  /* 지도 탭 뷰일 때 패널 탭 바를 지도 위에 오버레이 */
+  body.map-fullscreen #panel-tabs {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    z-index: 200; background: var(--white);
+    border-top: 1px solid var(--sand);
+    border-bottom: none;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  body.map-fullscreen .map-tab-mobile {
+    color: var(--accent2); font-weight: 600;
+    border-bottom: 2px solid var(--accent2);
+  }
 }
 
 @media (max-width: 480px) {
@@ -934,6 +958,9 @@ html, body {
       </button>
       <button class="panel-tab" onclick="switchPanelTab(2)">
         🎒 챙겨야할 것
+      </button>
+      <button class="panel-tab map-tab-mobile" onclick="switchToMapTab()">
+        🗺️ 지도
       </button>
     </div>
 
@@ -2456,15 +2483,30 @@ function openGoogleMapsPlace() {
 
 // ── 패널 탭 전환 ──────────────────────────────────────────────
 function switchPanelTab(idx) {
+  document.body.classList.remove('map-fullscreen');
   document.querySelectorAll('.panel-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
   sessionStorage.setItem('panelTab', idx);
 }
 
+function switchToMapTab() {
+  document.body.classList.add('map-fullscreen');
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-page').forEach(p => p.classList.remove('active'));
+  sessionStorage.setItem('panelTab', 'map');
+  setTimeout(() => {
+    if (window.google && map) google.maps.event.trigger(map, 'resize');
+  }, 100);
+}
+
 // 새로고침 시 마지막 상태 복원
 function restoreUIState() {
   const tab = sessionStorage.getItem('panelTab');
-  if (tab !== null) switchPanelTab(Number(tab));
+  if (tab === 'map') {
+    switchToMapTab();
+  } else if (tab !== null) {
+    switchPanelTab(Number(tab));
+  }
   const day = sessionStorage.getItem('currentDay');
   if (day !== null) {
     currentDay = Number(day);
