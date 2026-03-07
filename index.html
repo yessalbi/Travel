@@ -648,6 +648,40 @@ html, body {
 /* 지도 탭 — 모바일 전용 */
 .map-tab-mobile { display: none; }
 
+/* 지도 전체화면 오버레이 — iOS/Android 공통 */
+#map-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1000;
+}
+#map-overlay.active { display: block; }
+#map-overlay-map {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  bottom: 52px;
+}
+#map-overlay-tabs {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 52px;
+  display: flex;
+  background: var(--white);
+  border-top: 1.5px solid var(--sand);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  z-index: 10;
+}
+.ov-tab {
+  flex: 1; border: none; background: none;
+  font-family: inherit; font-size: 11px;
+  color: var(--ink3); cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px; padding: 6px 0;
+}
+.ov-tab .ov-ico { font-size: 16px; }
+.ov-tab.active { color: var(--accent2); font-weight: 600; }
+
 @media (max-width: 768px) {
   html, body { overflow: auto; }
   #main { flex-direction: column; height: auto; overflow: visible; }
@@ -662,40 +696,6 @@ html, body {
   #header h1  { font-size: 17px; }
   .popup { padding: 20px; }
   .map-tab-mobile { display: flex; }
-
-  /* 지도 전체화면 모드 — 스크롤 완전 차단, 고정 레이아웃 */
-  body.map-fullscreen {
-    overflow: hidden;
-    position: fixed; width: 100%; height: 100%;
-  }
-  body.map-fullscreen #header { display: none; }
-  body.map-fullscreen #main {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    height: 100dvh; overflow: hidden;
-    flex-direction: column;
-  }
-  body.map-fullscreen #left-panel { display: none; }
-  body.map-fullscreen #map-wrapper {
-    position: absolute; top: 0; left: 0; right: 0;
-    bottom: 52px; /* 탭바 높이만큼 */
-    height: auto; min-height: unset;
-  }
-  /* 탭바 지도 위 하단 고정 */
-  body.map-fullscreen #panel-tabs {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    height: 52px;
-    z-index: 500;
-    background: var(--white);
-    border-top: 1px solid var(--sand);
-    border-bottom: none;
-    box-shadow: 0 -2px 12px rgba(0,0,0,0.10);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  body.map-fullscreen .map-tab-mobile {
-    color: var(--accent2); font-weight: 600;
-    border-bottom: 2px solid var(--accent2);
-  }
 }
 
 @media (max-width: 480px) {
@@ -2504,14 +2504,38 @@ function switchPanelTab(idx) {
   sessionStorage.setItem('panelTab', idx);
 }
 
+let overlayMap = null;
+
 function switchToMapTab() {
-  document.body.classList.add('map-fullscreen');
-  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.panel-page').forEach(p => p.classList.remove('active'));
+  const overlay = document.getElementById('map-overlay');
+  overlay.classList.add('active');
   sessionStorage.setItem('panelTab', 'map');
+
+  // 오버레이에 지도 복사 (실제 map canvas를 overlay로 이동)
+  const mapEl = document.getElementById('map');
+  const overlayMapEl = document.getElementById('map-overlay-map');
+  overlayMapEl.appendChild(mapEl);
+
+  // 지도 리사이즈
   setTimeout(() => {
     if (window.google && map) google.maps.event.trigger(map, 'resize');
-  }, 100);
+  }, 50);
+}
+
+function closeMapOverlay(tabIdx) {
+  const overlay = document.getElementById('map-overlay');
+  overlay.classList.remove('active');
+
+  // 지도 원래 자리로 복구
+  const mapEl = document.getElementById('map');
+  const mapWrapper = document.getElementById('map-wrapper');
+  mapWrapper.appendChild(mapEl);
+
+  setTimeout(() => {
+    if (window.google && map) google.maps.event.trigger(map, 'resize');
+  }, 50);
+
+  switchPanelTab(tabIdx);
 }
 
 // 새로고침 시 마지막 상태 복원
@@ -2662,5 +2686,16 @@ function showToast(msg) {
 // ── 시작 ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', init);
 </script>
+<!-- 모바일 지도 전체화면 오버레이 -->
+<div id="map-overlay">
+  <div id="map-overlay-map"></div>
+  <div id="map-overlay-tabs">
+    <button class="ov-tab" onclick="closeMapOverlay(0)"><span class="ov-ico">✈️</span>여행 정보</button>
+    <button class="ov-tab" onclick="closeMapOverlay(1)"><span class="ov-ico">📅</span>일별 일정</button>
+    <button class="ov-tab" onclick="closeMapOverlay(2)"><span class="ov-ico">🎒</span>챙겨야할 것</button>
+    <button class="ov-tab active" onclick="void(0)"><span class="ov-ico">🗺️</span>지도</button>
+  </div>
+</div>
+
 </body>
 </html>
