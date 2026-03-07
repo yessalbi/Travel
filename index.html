@@ -658,17 +658,17 @@ html, body {
 #map-overlay.active { display: block; }
 #map-overlay-map {
   position: absolute;
-  top: 0; left: 0; right: 0;
-  bottom: 52px;
+  top: 52px; left: 0; right: 0;
+  bottom: 0;
 }
 #map-overlay-tabs {
   position: absolute;
-  bottom: 0; left: 0; right: 0;
+  top: 0; left: 0; right: 0;
   height: 52px;
   display: flex;
   background: var(--white);
-  border-top: 1.5px solid var(--sand);
-  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  border-bottom: 1.5px solid var(--sand);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   z-index: 10;
 }
 .ov-tab {
@@ -2095,6 +2095,7 @@ function setupMap() {
     zoom: 12,
     disableDefaultUI: true,
     zoomControl: false,
+    gestureHandling: 'greedy',
     styles: [
       // POI 전체 숨김 후 필요한 것만 켜기
       { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
@@ -2522,7 +2523,62 @@ function switchToMapTab() {
   }, 50);
 }
 
-function closeMapOverlay(tabIdx) {
+function mapOverlaySearch() {
+  const q = document.getElementById('map-overlay-search-input').value.trim();
+  if (!q || !map) return;
+  // 결과를 오버레이 검색 결과창에 표시
+  const svc = new google.maps.places.PlacesService(map);
+  svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
+    clearMapSearchMarkers();
+    const resultsEl = document.getElementById('map-overlay-search-results');
+    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+      resultsEl.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:#aaa;">결과가 없어요</div>';
+      resultsEl.style.display = 'flex'; return;
+    }
+    resultsEl.innerHTML = '';
+    results.slice(0, 5).forEach((place, i) => {
+      const marker = new google.maps.Marker({
+        map, position: place.geometry.location,
+        label: { text: String(i+1), color: '#fff', fontWeight: '700', fontSize: '11px' },
+        icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 10 },
+        zIndex: 999,
+      });
+      mapSearchMarkers.push(marker);
+      const item = document.createElement('div');
+      item.style.cssText = 'padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0ede8;';
+      item.innerHTML = `<div style="display:flex;gap:8px;align-items:flex-start">
+        <span style="min-width:18px;height:18px;border-radius:50%;background:#4A90E2;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${i+1}</span>
+        <div><div style="font-weight:600;color:#333">${place.name}</div>
+        <div style="font-size:11px;color:#999;margin-top:1px">${place.vicinity||''}</div></div></div>`;
+      item.onmouseenter = () => item.style.background = '#f5f3f0';
+      item.onmouseleave = () => item.style.background = '';
+      item.onclick = () => {
+        map.setCenter(place.geometry.location); map.setZoom(17);
+        document.getElementById('map-overlay-search-input').value = place.name;
+        resultsEl.style.display = 'none'; resultsEl.innerHTML = '';
+        clearMapSearchMarkers();
+        const sel = new google.maps.Marker({ map, position: place.geometry.location,
+          icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#E24A4A', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 11 },
+          zIndex: 999, animation: google.maps.Animation.DROP });
+        mapSearchMarkers.push(sel);
+      };
+      resultsEl.appendChild(item);
+    });
+    if (results.length > 1) {
+      const bounds = new google.maps.LatLngBounds();
+      results.slice(0,5).forEach(p => bounds.extend(p.geometry.location));
+      map.fitBounds(bounds, {top:80, bottom:40, left:20, right:20});
+    } else { map.setCenter(results[0].geometry.location); map.setZoom(16); }
+    resultsEl.style.display = 'flex';
+  });
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#map-overlay-search')) {
+    const r = document.getElementById('map-overlay-search-results');
+    if (r) { r.style.display = 'none'; r.innerHTML = ''; }
+  }
+});
+
   const overlay = document.getElementById('map-overlay');
   overlay.classList.remove('active');
 
@@ -2689,6 +2745,15 @@ window.addEventListener('DOMContentLoaded', init);
 <!-- 모바일 지도 전체화면 오버레이 -->
 <div id="map-overlay">
   <div id="map-overlay-map"></div>
+  <div id="map-overlay-search" style="position:absolute;top:68px;left:16px;z-index:20;display:flex;align-items:center;background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.15);width:220px;overflow:visible">
+    <input id="map-overlay-search-input" type="text" placeholder="🔍 장소 검색"
+      style="flex:1;border:none;outline:none;padding:8px 10px;font-family:inherit;font-size:12px;color:#333;background:transparent;border-radius:10px 0 0 10px;"
+      onkeydown="if(event.key==='Enter')mapOverlaySearch()" />
+    <button onclick="mapOverlaySearch()"
+      style="border:none;background:none;cursor:pointer;padding:8px 10px;font-size:14px;color:#888;border-radius:0 10px 10px 0;flex-shrink:0;">→</button>
+    <div id="map-overlay-search-results"
+      style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.12);display:none;flex-direction:column;max-height:280px;overflow-y:auto;z-index:30;"></div>
+  </div>
   <div id="map-overlay-tabs">
     <button class="ov-tab" onclick="closeMapOverlay(0)"><span class="ov-ico">✈️</span>여행 정보</button>
     <button class="ov-tab" onclick="closeMapOverlay(1)"><span class="ov-ico">📅</span>일별 일정</button>
