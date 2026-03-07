@@ -2677,12 +2677,12 @@ function switchToMapTab() {
   overlay.classList.add('active');
   sessionStorage.setItem('panelTab', 'map');
 
-  // 오버레이에 지도 복사 (실제 map canvas를 overlay로 이동)
-  const mapEl = document.getElementById('map');
   const overlayMapEl = document.getElementById('map-overlay-map');
-  overlayMapEl.appendChild(mapEl);
+  // 지도 + FAB + 경로버튼 같이 이동
+  overlayMapEl.appendChild(document.getElementById('map'));
+  overlayMapEl.appendChild(document.getElementById('map-fab'));
+  overlayMapEl.appendChild(document.getElementById('route-controls'));
 
-  // 지도 리사이즈
   setTimeout(() => {
     if (window.google && map) google.maps.event.trigger(map, 'resize');
   }, 50);
@@ -2748,10 +2748,11 @@ function closeMapOverlay(tabIdx) {
   const overlay = document.getElementById('map-overlay');
   overlay.classList.remove('active');
 
-  // 지도 원래 자리로 복구
-  const mapEl = document.getElementById('map');
+  // 지도 + FAB + 경로버튼 원래 자리로 복구
   const mapWrapper = document.getElementById('map-wrapper');
-  mapWrapper.appendChild(mapEl);
+  mapWrapper.appendChild(document.getElementById('map'));
+  mapWrapper.appendChild(document.getElementById('map-fab'));
+  mapWrapper.appendChild(document.getElementById('route-controls'));
 
   setTimeout(() => {
     if (window.google && map) google.maps.event.trigger(map, 'resize');
