@@ -1262,7 +1262,10 @@ async function init() {
 // ── Firebase 로드 ─────────────────────────────────────────────
 async function loadFromFirebase() {
   const data = await window.fbGetTrip(TRIP_ID);
-  if (data) applyTripData(data);
+  if (data) {
+    applyTripData(data);
+    restoreUIState();
+  }
 
   window.fbWatchPlaces(TRIP_ID, (places) => {
     placesData = places;
@@ -1452,7 +1455,7 @@ function renderDayTabs() {
     const btn = document.createElement('button');
     btn.className = 'day-tab' + (i === currentDay ? ' active' : '');
     btn.textContent = 'Day ' + i;
-    btn.onclick = () => { currentDay = i; renderDayTabs(); renderScheduleList(); };
+    btn.onclick = () => { currentDay = i; sessionStorage.setItem('currentDay', i); renderDayTabs(); renderScheduleList(); };
     c.appendChild(btn);
   }
   renderScheduleList();
@@ -1533,58 +1536,90 @@ function buildTransitCard(from, to, fromIdx) {
 }
 
 // Directions API 호출
-function fetchDirections(from, to, mode, fromIdx) {
-  if (!window.google || !window.google.maps) return;
+async function fetchDirections(from, to, mode, fromIdx) {
   const infoEl = document.getElementById('tc-info-' + fromIdx);
   const bodyEl = document.getElementById('tc-body-' + fromIdx);
   if (!infoEl) return;
   infoEl.innerHTML = '<span class="transit-no-loc">계산 중…</span>';
   if (bodyEl) bodyEl.classList.add('loading');
 
-  const svc = new google.maps.DirectionsService();
-  const req = {
-    origin:      new google.maps.LatLng(from.lat, from.lng),
-    destination: new google.maps.LatLng(to.lat, to.lng),
-    travelMode:  mode.toUpperCase(),
+  // travelMode 매핑 (Routes API 표기)
+  const modeMap = {
+    driving:   'DRIVE',
+    transit:   'TRANSIT',
+    walking:   'WALK',
+    bicycling: 'BICYCLE',
   };
-  // TRANSIT은 출발 시간 필수
+  const routeMode = modeMap[mode] || 'DRIVE';
+  const modeInfo  = MODE_LIST.find(m => m.id === mode);
+  const apiKey    = window.MAPS_API_KEY;
+
+  const body = {
+    origin:      { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
+    destination: { location: { latLng: { latitude: to.lat,   longitude: to.lng   } } },
+    travelMode:  routeMode,
+    computeAlternativeRoutes: mode === 'transit',
+    languageCode: 'ko',
+    units: 'METRIC',
+  };
+
+  // TRANSIT: 현재 시간 출발
   if (mode === 'transit') {
-    req.transitOptions = { departureTime: new Date() };
-    req.provideRouteAlternatives = true;
+    body.transitPreferences = { routingPreference: 'LESS_WALKING' };
+    body.departureTime = new Date().toISOString();
   }
 
-  svc.route(req, (result, status) => {
-    if (bodyEl) bodyEl.classList.remove('loading');
-    if (status === 'OK') {
-      const modeInfo = MODE_LIST.find(m => m.id === mode);
-      let dist, dur;
-
-      if (mode === 'transit' && result.routes.length > 1) {
-        // 여러 루트 → 평균 시간 계산
-        const durations = result.routes.map(r => r.legs[0].duration.value); // 초 단위
-        const avgSec = Math.round(durations.reduce((a,b) => a+b, 0) / durations.length);
-        const avgMin = Math.round(avgSec / 60);
-        dist = result.routes[0].legs[0].distance.text;
-        dur  = avgMin >= 60
-          ? `${Math.floor(avgMin/60)}시간 ${avgMin%60}분`
-          : `${avgMin}분`;
-        dur  += ` (${result.routes.length}개 루트 평균)`;
-      } else {
-        const leg = result.routes[0].legs[0];
-        dist = leg.distance.text;
-        dur  = leg.duration.text;
+  try {
+    const res = await fetch(
+      'https://routes.googleapis.com/directions/v2:computeRoutes',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.legs',
+        },
+        body: JSON.stringify(body),
       }
+    );
 
-      if (infoEl) infoEl.innerHTML = `
-        <span class="transit-dist">${dist}</span>
-        <span class="transit-sep">·</span>
-        <span class="transit-time">약 ${dur}</span>
-        <span class="transit-sep">·</span>
-        <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
-    } else {
-      if (infoEl) infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
+    if (bodyEl) bodyEl.classList.remove('loading');
+    const data = await res.json();
+
+    if (!res.ok || !data.routes || data.routes.length === 0) {
+      console.warn('Routes API error:', data);
+      infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
+      return;
     }
-  });
+
+    // 거리: 첫 번째 루트 기준
+    const distM = data.routes[0].distanceMeters;
+    const distTxt = distM >= 1000
+      ? (distM / 1000).toFixed(1) + ' km'
+      : distM + ' m';
+
+    // 시간: 여러 루트면 평균
+    const durSecs = data.routes.map(r => parseInt(r.duration));
+    const avgSec  = Math.round(durSecs.reduce((a,b) => a+b, 0) / durSecs.length);
+    const avgMin  = Math.round(avgSec / 60);
+    let durTxt = avgMin >= 60
+      ? `${Math.floor(avgMin/60)}시간 ${avgMin%60 > 0 ? avgMin%60+'분' : ''}`
+      : `${avgMin}분`;
+    if (mode === 'transit' && data.routes.length > 1)
+      durTxt += ` (${data.routes.length}개 루트 평균)`;
+
+    infoEl.innerHTML = `
+      <span class="transit-dist">${distTxt}</span>
+      <span class="transit-sep">·</span>
+      <span class="transit-time">약 ${durTxt}</span>
+      <span class="transit-sep">·</span>
+      <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
+
+  } catch(err) {
+    if (bodyEl) bodyEl.classList.remove('loading');
+    console.error('Routes API 오류:', err);
+    infoEl.innerHTML = `<span class="transit-no-loc">오류가 발생했어요</span>`;
+  }
 }
 
 // 이동수단 선택 팝업
@@ -2272,6 +2307,19 @@ function openGoogleMapsPlace() {
 function switchPanelTab(idx) {
   document.querySelectorAll('.panel-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
+  sessionStorage.setItem('panelTab', idx);
+}
+
+// 새로고침 시 마지막 상태 복원
+function restoreUIState() {
+  const tab = sessionStorage.getItem('panelTab');
+  if (tab !== null) switchPanelTab(Number(tab));
+  const day = sessionStorage.getItem('currentDay');
+  if (day !== null) {
+    currentDay = Number(day);
+    renderDayTabs();
+    renderScheduleList();
+  }
 }
 
 // ── 여행 설정 위자드 ──────────────────────────────────────────
