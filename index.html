@@ -1504,6 +1504,11 @@ function renderScheduleList() {
       const next = items[idx + 1];
       const tc = buildTransitCard(item, next, idx);
       list.appendChild(tc);
+      // DOM에 붙은 후에 Directions 호출
+      if (item.lat && item.lng && next.lat && next.lng) {
+        const mode = transitModes[transitKey(currentDay, idx)] || 'driving';
+        fetchDirections(item, next, mode, idx);
+      }
     }
   });
 }
@@ -1528,11 +1533,6 @@ function buildTransitCard(from, to, fromIdx) {
       </div>
     </div>`;
   list_appendTransitCard(wrap);
-
-  // 위치 있으면 Directions API 호출
-  if (from.lat && from.lng && to.lat && to.lng) {
-    fetchDirections(from, to, mode, fromIdx);
-  }
   return wrap;
 }
 
