@@ -1554,7 +1554,12 @@ function fetchDirections(from, to, mode, fromIdx) {
     provideRouteAlternatives: mode === 'transit',
   };
   if (mode === 'transit') {
-    req.transitOptions = { departureTime: new Date() };
+    // 일본 현지 오전 10시 기준으로 조회 (심야엔 노선 없어 ZERO_RESULTS 나오는 문제 방지)
+    const jstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    const dep = new Date(jstNow);
+    dep.setHours(10, 0, 0, 0);
+    if (dep < jstNow) dep.setDate(dep.getDate() + 1); // 이미 오전 10시 지났으면 내일
+    req.transitOptions = { departureTime: dep };
   }
 
   svc.route(req, (result, status) => {
@@ -1582,6 +1587,36 @@ function fetchDirections(from, to, mode, fromIdx) {
         <span class="transit-time">약 ${durTxt}</span>
         <span class="transit-sep">·</span>
         <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
+
+    } else if (status === google.maps.DirectionsStatus.ZERO_RESULTS && mode === 'transit') {
+      // 대중교통 정보 없는 지역 → 자동차 기준으로 폴백
+      const fallbackSvc = new google.maps.DirectionsService();
+      fallbackSvc.route({
+        origin:      new google.maps.LatLng(from.lat, from.lng),
+        destination: new google.maps.LatLng(to.lat, to.lng),
+        travelMode:  google.maps.TravelMode.DRIVING,
+      }, (r2, s2) => {
+        if (s2 === google.maps.DirectionsStatus.OK) {
+          const leg = r2.routes[0].legs[0];
+          infoEl.innerHTML = `
+            <span class="transit-dist">${leg.distance.text}</span>
+            <span class="transit-sep">·</span>
+            <span class="transit-time">약 ${leg.duration.text}</span>
+            <span class="transit-sep">·</span>
+            <span style="font-size:11px;color:var(--red)">🚌 이 구간 대중교통 정보 없음 (자동차 기준)</span>`;
+        } else {
+          infoEl.innerHTML = `<span class="transit-no-loc">🚌 이 구간 대중교통 정보가 없어요</span>`;
+        }
+      });
+    } else if (status === google.maps.DirectionsStatus.ZERO_RESULTS) {
+      // 렌트카/도보 등도 ZERO_RESULTS → 국제 구간(비행기) 가능성
+      const dLat = to.lat - from.lat, dLng = to.lng - from.lng;
+      const distKm = Math.sqrt(dLat*dLat + dLng*dLng) * 111;
+      if (distKm > 300) {
+        infoEl.innerHTML = `<span style="font-size:12px;color:var(--ink3)">✈️ 비행기 이동 구간</span>`;
+      } else {
+        infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
+      }
     } else {
       console.warn('Directions status:', status, mode, from, to);
       infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
