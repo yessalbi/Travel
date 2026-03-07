@@ -371,6 +371,56 @@ html, body {
   margin-top: 3px;
 }
 
+/* ── 이동 카드 ── */
+.transit-card {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px 7px 20px;
+  position: relative;
+}
+.transit-line {
+  position: absolute; left: 28px; top: 0; bottom: 0;
+  width: 2px; background: var(--sand);
+}
+.transit-body {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--white); border: 1.5px solid var(--sand);
+  border-radius: 20px; padding: 5px 12px 5px 8px;
+  font-size: 12px; color: var(--ink3); flex: 1;
+  min-width: 0; position: relative; z-index: 1;
+  cursor: default;
+}
+.transit-body.loading { opacity: .6; }
+.transit-mode-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 14px; padding: 0; flex-shrink: 0;
+  transition: transform .15s;
+}
+.transit-mode-btn:hover { transform: scale(1.2); }
+.transit-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.transit-dist { font-weight: 600; color: var(--ink2); }
+.transit-time { color: var(--ink3); }
+.transit-sep  { color: var(--sand); }
+.transit-no-loc { color: var(--sand); font-style: italic; font-size: 11px; }
+
+/* 이동수단 선택 팝업 */
+.mode-picker {
+  position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--white); border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  padding: 8px; display: flex; gap: 4px;
+  z-index: 100; white-space: nowrap;
+}
+.mode-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  border: 1.5px solid transparent; transition: all .13s;
+  font-size: 10px; color: var(--ink3);
+}
+.mode-opt:hover { background: var(--stone); }
+.mode-opt.active { border-color: var(--accent2); background: #EBF3FE; color: var(--accent2); font-weight: 600; }
+.mode-opt .mode-ico { font-size: 18px; }
+
 /* 지도 위 일정 팝오버 */
 #sch-map-card {
   position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
@@ -1249,7 +1299,8 @@ function applyTripData(data) {
   timeToTp('farr', data.flightArrive);
   timeToTp('rdep', data.returnDepart);
   timeToTp('rarr', data.returnArrive);
-  if (data.schedule)  scheduleData  = data.schedule;
+  if (data.schedule)     scheduleData  = data.schedule;
+  if (data.transitModes) transitModes  = data.transitModes;
   if (data.checklist) { checklistData = data.checklist; renderChecklist(); }
   if (data.vouchers)  { voucherData   = data.vouchers;  renderVouchers(); }
   if (data.routePoints) {
@@ -1352,6 +1403,7 @@ async function saveAll() {
     returnArrive:  tpToTime('rarr'),
     returnTo:      document.getElementById('return-to').value,
     schedule:      scheduleData,
+    transitModes,
     routePoints,
     checklist:     checklistData,
     vouchers:      voucherData,
@@ -1411,12 +1463,25 @@ function renderDayTabs() {
 }
 
 // ── 일정 렌더링 ───────────────────────────────────────────────
+// ── 이동 수단 설정 저장 { "day_fromIdx": 'driving'|'transit'|'walking'|'bicycling' }
+let transitModes = {};
+function transitKey(day, idx) { return day + '_' + idx; }
+
+const MODE_LIST = [
+  { id: 'driving',   icon: '🚗', label: '렌트카' },
+  { id: 'transit',   icon: '🚆', label: '대중교통' },
+  { id: 'walking',   icon: '🚶', label: '도보' },
+  { id: 'bicycling', icon: '🚲', label: '자전거' },
+];
+
 function renderScheduleList() {
   const list = document.getElementById('schedule-list');
   const items = scheduleData[currentDay] || [];
   list.innerHTML = '';
   const typeIcon = { food:'🍜', sight:'🏛️', hotel:'🏨', move:'🚆' };
+
   items.forEach((item, idx) => {
+    // ── 일정 카드
     const div = document.createElement('div');
     div.className = 'schedule-item type-' + item.type;
     const hasLoc = item.lat && item.lng;
@@ -1433,8 +1498,116 @@ function renderScheduleList() {
         <button class="item-act-btn item-del"  onclick="deleteScheduleItem(${idx})">✕</button>
       </div>`;
     list.appendChild(div);
+
+    // ── 이동 카드 (마지막 카드 뒤엔 없음)
+    if (idx < items.length - 1) {
+      const next = items[idx + 1];
+      const tc = buildTransitCard(item, next, idx);
+      list.appendChild(tc);
+    }
   });
 }
+
+function buildTransitCard(from, to, fromIdx) {
+  const key  = transitKey(currentDay, fromIdx);
+  const mode = transitModes[key] || 'driving';
+  const modeInfo = MODE_LIST.find(m => m.id === mode);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'transit-card';
+  wrap.dataset.fromIdx = fromIdx;
+
+  wrap.innerHTML = `
+    <div class="transit-line"></div>
+    <div class="transit-body" id="tc-body-${fromIdx}">
+      <button class="transit-mode-btn" onclick="openModePicker(event,${fromIdx})" title="이동수단 선택">
+        ${modeInfo.icon}
+      </button>
+      <div class="transit-info" id="tc-info-${fromIdx}">
+        <span class="transit-no-loc">위치 핀을 찍으면 거리가 표시돼요</span>
+      </div>
+    </div>`;
+  list_appendTransitCard(wrap);
+
+  // 위치 있으면 Directions API 호출
+  if (from.lat && from.lng && to.lat && to.lng) {
+    fetchDirections(from, to, mode, fromIdx);
+  }
+  return wrap;
+}
+
+// Directions API 호출
+function fetchDirections(from, to, mode, fromIdx) {
+  if (!window.google || !window.google.maps) return;
+  const infoEl = document.getElementById('tc-info-' + fromIdx);
+  const bodyEl = document.getElementById('tc-body-' + fromIdx);
+  if (!infoEl) return;
+  infoEl.innerHTML = '<span class="transit-no-loc">계산 중…</span>';
+  if (bodyEl) bodyEl.classList.add('loading');
+
+  const svc = new google.maps.DirectionsService();
+  svc.route({
+    origin: new google.maps.LatLng(from.lat, from.lng),
+    destination: new google.maps.LatLng(to.lat, to.lng),
+    travelMode: mode.toUpperCase(),
+  }, (result, status) => {
+    if (bodyEl) bodyEl.classList.remove('loading');
+    if (status === 'OK') {
+      const leg  = result.routes[0].legs[0];
+      const dist = leg.distance.text;
+      const dur  = leg.duration.text;
+      const modeInfo = MODE_LIST.find(m => m.id === mode);
+      if (infoEl) infoEl.innerHTML = `
+        <span class="transit-dist">${dist}</span>
+        <span class="transit-sep">·</span>
+        <span class="transit-time">약 ${dur}</span>
+        <span class="transit-sep">·</span>
+        <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
+    } else {
+      if (infoEl) infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
+    }
+  });
+}
+
+// 이동수단 선택 팝업
+let openModePickerEl = null;
+function openModePicker(e, fromIdx) {
+  e.stopPropagation();
+  // 이미 열려있으면 닫기
+  if (openModePickerEl) { openModePickerEl.remove(); openModePickerEl = null; return; }
+
+  const key  = transitKey(currentDay, fromIdx);
+  const cur  = transitModes[key] || 'driving';
+  const bodyEl = document.getElementById('tc-body-' + fromIdx);
+  if (!bodyEl) return;
+
+  const picker = document.createElement('div');
+  picker.className = 'mode-picker';
+  MODE_LIST.forEach(m => {
+    const opt = document.createElement('div');
+    opt.className = 'mode-opt' + (m.id === cur ? ' active' : '');
+    opt.innerHTML = `<span class="mode-ico">${m.icon}</span>${m.label}`;
+    opt.onclick = (ev) => {
+      ev.stopPropagation();
+      transitModes[key] = m.id;
+      autoSave();
+      picker.remove(); openModePickerEl = null;
+      renderScheduleList();
+    };
+    picker.appendChild(opt);
+  });
+
+  bodyEl.style.position = 'relative';
+  bodyEl.appendChild(picker);
+  openModePickerEl = picker;
+}
+// 바깥 클릭 시 팝업 닫기
+document.addEventListener('click', () => {
+  if (openModePickerEl) { openModePickerEl.remove(); openModePickerEl = null; }
+});
+
+function list_appendTransitCard(el) { /* unused */ }
+
 
 // 시간 표시 포맷 (HH:MM → 12시간제)
 function fmtTime(t) {
