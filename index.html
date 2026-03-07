@@ -500,7 +500,28 @@ html, body {
   display: flex; align-items: center; justify-content: center;
 }
 .fab-btn:hover { background: var(--stone); }
-.fab-btn.active { background: var(--accent); }
+.fab-btn.active { background: var(--accent); color: #fff; }
+.fab-btn.loc-tracking { background: #e8f4ff; }
+.fab-btn.loc-heading  { background: #4A90E2; color: #fff; }
+
+/* 현재위치 마커 */
+.my-location-dot {
+  width: 16px; height: 16px;
+  background: #4A90E2;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(74,144,226,0.4);
+}
+/* 방향 화살표 오버레이 */
+#loc-heading-arrow {
+  width: 0; height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 18px solid rgba(74,144,226,0.75);
+  position: absolute;
+  top: -20px; left: 50%; transform: translateX(-50%);
+  transform-origin: bottom center;
+}
 
 /* ── 팝업 공통 ── */
 .overlay {
@@ -1116,6 +1137,7 @@ html, body {
       <button class="fab-btn" onclick="mapZoom(1)" title="확대">＋</button>
       <button class="fab-btn" onclick="mapZoom(-1)" title="축소">－</button>
       <button class="fab-btn" onclick="mapFitRoute()" title="경로 맞춤">⊞</button>
+      <button class="fab-btn" id="btn-my-location" onclick="toggleMyLocation()" title="현재 위치">◎</button>
     </div>
   </div>
 
@@ -2300,6 +2322,149 @@ function mapFitRoute() {
   routePoints.forEach(p => bounds.extend(p));
   map.fitBounds(bounds, 60);
 }
+
+// ── 현재 위치 + 나침반 ────────────────────────────────────────
+// 모드: 0=off, 1=위치만, 2=위치+방향(나침반)
+let locMode       = 0;
+let locWatchId    = null;
+let locMarker     = null;
+let locHeadingOL  = null;   // 방향 화살표 오버레이
+let lastHeading   = null;
+
+function toggleMyLocation() {
+  if (!navigator.geolocation) {
+    alert('이 브라우저는 위치 서비스를 지원하지 않아요.'); return;
+  }
+  locMode = (locMode + 1) % 3;   // 0→1→2→0
+  const btn = document.getElementById('btn-my-location');
+
+  if (locMode === 0) {
+    // 끄기
+    stopLocationWatch();
+    btn.textContent = '◎';
+    btn.className = 'fab-btn';
+    if (map) map.setHeading(0);
+    return;
+  }
+
+  if (locMode === 1) {
+    // 위치 추적 시작
+    btn.textContent = '⊙';
+    btn.className = 'fab-btn loc-tracking';
+    startLocationWatch();
+    return;
+  }
+
+  if (locMode === 2) {
+    // 방향 모드
+    btn.textContent = '🧭';
+    btn.className = 'fab-btn loc-heading';
+    startHeadingWatch();
+    return;
+  }
+}
+
+function startLocationWatch() {
+  if (locWatchId !== null) navigator.geolocation.clearWatch(locWatchId);
+  locWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      updateLocMarker(latlng, pos.coords.heading);
+      if (locMode === 1) map.panTo(latlng);
+    },
+    (err) => console.warn('위치 오류:', err),
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+  );
+}
+
+function startHeadingWatch() {
+  // 위치 watch는 이미 켜져 있음 — 방향은 DeviceOrientation으로
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+ 권한 요청
+    DeviceOrientationEvent.requestPermission()
+      .then(state => {
+        if (state === 'granted') listenOrientation();
+        else { locMode = 1; } // 권한 거부 시 위치 모드로 폴백
+      }).catch(() => { locMode = 1; });
+  } else {
+    listenOrientation();
+  }
+}
+
+function listenOrientation() {
+  window.addEventListener('deviceorientationabsolute', onOrientation, true);
+  window.addEventListener('deviceorientation', onOrientation, true);
+}
+
+function onOrientation(e) {
+  if (locMode !== 2) return;
+  // alpha: 나침반 방향 (0=북, 시계반대방향)
+  let heading = e.webkitCompassHeading ?? (e.alpha != null ? (360 - e.alpha) % 360 : null);
+  if (heading == null) return;
+  lastHeading = heading;
+  if (map) map.setHeading(heading);
+  updateLocMarkerHeading(heading);
+}
+
+function updateLocMarker(latlng, gpsHeading) {
+  if (!map) return;
+  if (!locMarker) {
+    // 파란 점 마커
+    const dotEl = document.createElement('div');
+    dotEl.className = 'my-location-dot';
+    dotEl.style.position = 'relative';
+    const arrowEl = document.createElement('div');
+    arrowEl.id = 'loc-heading-arrow';
+    arrowEl.style.display = 'none';
+    dotEl.appendChild(arrowEl);
+
+    locHeadingOL = new google.maps.OverlayView();
+    locHeadingOL.onAdd = function() {
+      this.getPanes().overlayMouseTarget.appendChild(dotEl);
+    };
+    locHeadingOL.draw = function() {
+      const proj = this.getProjection();
+      if (!proj || !locMarker) return;
+      const pos = proj.fromLatLngToDivPixel(locMarker.getPosition());
+      dotEl.style.left = (pos.x - 8) + 'px';
+      dotEl.style.top  = (pos.y - 8) + 'px';
+      dotEl.style.position = 'absolute';
+    };
+    locHeadingOL.onRemove = function() { dotEl.remove(); };
+    locHeadingOL.setMap(map);
+
+    locMarker = new google.maps.Marker({
+      position: latlng, map,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 }, // 투명 (dot으로 대체)
+      zIndex: 1000,
+    });
+  }
+  locMarker.setPosition(latlng);
+  if (locHeadingOL) locHeadingOL.draw();
+}
+
+function updateLocMarkerHeading(heading) {
+  const arrow = document.getElementById('loc-heading-arrow');
+  if (arrow) {
+    arrow.style.display = 'block';
+    arrow.style.transform = `translateX(-50%) rotate(0deg)`;
+    // 지도가 heading으로 회전하므로 화살표는 항상 위쪽 고정
+  }
+}
+
+function stopLocationWatch() {
+  if (locWatchId !== null) {
+    navigator.geolocation.clearWatch(locWatchId);
+    locWatchId = null;
+  }
+  window.removeEventListener('deviceorientationabsolute', onOrientation, true);
+  window.removeEventListener('deviceorientation', onOrientation, true);
+  if (locMarker)    { locMarker.setMap(null);    locMarker = null; }
+  if (locHeadingOL) { locHeadingOL.setMap(null); locHeadingOL = null; }
+  lastHeading = null;
+}
+
 
 // ── 경로 ─────────────────────────────────────────────────────
 function toggleRouteMode() {
