@@ -5,7 +5,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="여행앱">
     
-    <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon.png?raw=true">
+    <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
 </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -627,15 +627,16 @@ html, body {
 #map-search-results {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0;
   background: var(--white); border-radius: 10px;
-  box-shadow: var(--shadow2); overflow: hidden;
+  box-shadow: var(--shadow2); overflow-y: auto;
+  max-height: 280px;
   display: none; flex-direction: column;
+  z-index: 20;
 }
 #map-search-results.show { display: flex; }
 .map-search-item {
   padding: 8px 12px; font-size: 12px; color: var(--ink2);
   cursor: pointer; border-bottom: 1px solid var(--stone);
-  transition: background .12s; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
+  transition: background .12s;
 }
 .map-search-item:last-child { border-bottom: none; }
 .map-search-item:hover { background: var(--stone); }
@@ -2136,60 +2137,102 @@ function fitSchedulePins(fallbackTitle) {
 
 // 여행 제목으로 지도 위치 자동 이동
 // ── 지도 위치 검색 ────────────────────────────────────────────
-let mapSearchAutocompleteService = null;
-let mapSearchSessionToken = null;
+let mapSearchMarker = null;   // 검색 결과 임시 마커
+let mapSearchMarkers = [];    // 여러 결과 마커들
 
 function mapSearch() {
   const q = document.getElementById('map-search-input').value.trim();
   if (!q || !map) return;
-  closeMapSearchResults();
-  const geocoder = new google.maps.Geocoder();
-  geocoder.geocode({ address: q, language: 'ko' }, (results, status) => {
-    if (status === 'OK' && results[0]) {
-      map.setCenter(results[0].geometry.location);
-      map.setZoom(15);
-    }
-  });
+  runPlacesTextSearch(q);
 }
 
 function mapSearchAutocomplete(val) {
-  const resultsEl = document.getElementById('map-search-results');
+  // 2글자 미만이면 닫기
   if (!val || val.length < 2) { closeMapSearchResults(); return; }
-  if (!map) return;
-  if (!mapSearchAutocompleteService) {
-    mapSearchAutocompleteService = new google.maps.places.AutocompleteService();
-  }
-  if (!mapSearchSessionToken) {
-    mapSearchSessionToken = new google.maps.places.AutocompleteSessionToken();
-  }
-  mapSearchAutocompleteService.getPlacePredictions(
-    { input: val, sessionToken: mapSearchSessionToken, language: 'ko' },
-    (predictions, status) => {
-      if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
-        closeMapSearchResults(); return;
-      }
-      resultsEl.innerHTML = '';
-      predictions.slice(0, 4).forEach(p => {
-        const item = document.createElement('div');
-        item.className = 'map-search-item';
-        item.textContent = p.description;
-        item.onclick = () => {
-          document.getElementById('map-search-input').value = p.description;
-          closeMapSearchResults();
-          mapSearchSessionToken = null;
-          const geocoder = new google.maps.Geocoder();
-          geocoder.geocode({ placeId: p.place_id, language: 'ko' }, (res, st) => {
-            if (st === 'OK' && res[0]) {
-              map.setCenter(res[0].geometry.location);
-              map.setZoom(16);
-            }
-          });
-        };
-        resultsEl.appendChild(item);
-      });
+  // 타이핑 중엔 바로 textSearch 실행 (300ms 디바운스)
+  clearTimeout(window._mapSearchTimer);
+  window._mapSearchTimer = setTimeout(() => runPlacesTextSearch(val), 300);
+}
+
+function runPlacesTextSearch(q) {
+  if (!map || !window.google) return;
+  const svc = new google.maps.places.PlacesService(map);
+  svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
+    clearMapSearchMarkers();
+    const resultsEl = document.getElementById('map-search-results');
+    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+      resultsEl.innerHTML = '<div class="map-search-item" style="color:var(--ink3);cursor:default">결과가 없어요</div>';
       resultsEl.classList.add('show');
+      return;
     }
-  );
+    resultsEl.innerHTML = '';
+    results.slice(0, 5).forEach((place, i) => {
+      // 결과 마커 표시
+      const marker = new google.maps.Marker({
+        map,
+        position: place.geometry.location,
+        label: { text: String(i+1), color: '#fff', fontWeight: '700', fontSize: '11px' },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#4A90E2', fillOpacity: 1,
+          strokeColor: '#fff', strokeWeight: 2, scale: 10,
+        },
+        title: place.name,
+        zIndex: 999,
+      });
+      mapSearchMarkers.push(marker);
+
+      // 결과 목록 아이템
+      const item = document.createElement('div');
+      item.className = 'map-search-item';
+      item.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <span style="min-width:18px;height:18px;border-radius:50%;background:#4A90E2;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;flex-shrink:0">${i+1}</span>
+          <div style="min-width:0">
+            <div style="font-weight:600;color:var(--ink);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${place.name}</div>
+            <div style="font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${place.formatted_address || place.vicinity || ''}</div>
+          </div>
+        </div>`;
+      item.onclick = () => {
+        map.setCenter(place.geometry.location);
+        map.setZoom(17);
+        document.getElementById('map-search-input').value = place.name;
+        closeMapSearchResults();
+        clearMapSearchMarkers();
+        // 선택된 장소만 마커 남기기
+        const sel = new google.maps.Marker({
+          map,
+          position: place.geometry.location,
+          title: place.name,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: '#E24A4A', fillOpacity: 1,
+            strokeColor: '#fff', strokeWeight: 2, scale: 11,
+          },
+          zIndex: 999,
+          animation: google.maps.Animation.DROP,
+        });
+        mapSearchMarkers.push(sel);
+      };
+      resultsEl.appendChild(item);
+    });
+
+    // 결과 전체가 보이게 지도 맞춤
+    if (results.length > 1) {
+      const bounds = new google.maps.LatLngBounds();
+      results.slice(0, 5).forEach(p => bounds.extend(p.geometry.location));
+      map.fitBounds(bounds, { top: 80, bottom: 40, left: 20, right: 20 });
+    } else {
+      map.setCenter(results[0].geometry.location);
+      map.setZoom(16);
+    }
+    resultsEl.classList.add('show');
+  });
+}
+
+function clearMapSearchMarkers() {
+  mapSearchMarkers.forEach(m => m.setMap(null));
+  mapSearchMarkers = [];
 }
 
 function closeMapSearchResults() {
