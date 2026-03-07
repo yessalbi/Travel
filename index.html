@@ -1536,90 +1536,57 @@ function buildTransitCard(from, to, fromIdx) {
 }
 
 // Directions API 호출
-async function fetchDirections(from, to, mode, fromIdx) {
+function fetchDirections(from, to, mode, fromIdx) {
+  if (!window.google || !window.google.maps) return;
   const infoEl = document.getElementById('tc-info-' + fromIdx);
   const bodyEl = document.getElementById('tc-body-' + fromIdx);
   if (!infoEl) return;
   infoEl.innerHTML = '<span class="transit-no-loc">계산 중…</span>';
   if (bodyEl) bodyEl.classList.add('loading');
 
-  // travelMode 매핑 (Routes API 표기)
-  const modeMap = {
-    driving:   'DRIVE',
-    transit:   'TRANSIT',
-    walking:   'WALK',
-    bicycling: 'BICYCLE',
+  const modeInfo = MODE_LIST.find(m => m.id === mode);
+  // eslint-disable-next-line no-undef
+  const svc = new google.maps.DirectionsService();
+  const req = {
+    origin:      new google.maps.LatLng(from.lat, from.lng),
+    destination: new google.maps.LatLng(to.lat, to.lng),
+    travelMode:  google.maps.TravelMode[mode.toUpperCase()] || google.maps.TravelMode.DRIVING,
+    provideRouteAlternatives: mode === 'transit',
   };
-  const routeMode = modeMap[mode] || 'DRIVE';
-  const modeInfo  = MODE_LIST.find(m => m.id === mode);
-  const apiKey    = window.MAPS_API_KEY;
-
-  const body = {
-    origin:      { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
-    destination: { location: { latLng: { latitude: to.lat,   longitude: to.lng   } } },
-    travelMode:  routeMode,
-    computeAlternativeRoutes: mode === 'transit',
-    languageCode: 'ko',
-    units: 'METRIC',
-  };
-
-  // TRANSIT: 현재 시간 출발
   if (mode === 'transit') {
-    body.transitPreferences = { routingPreference: 'LESS_WALKING' };
-    body.departureTime = new Date().toISOString();
+    req.transitOptions = { departureTime: new Date() };
   }
 
-  try {
-    const res = await fetch(
-      'https://routes.googleapis.com/directions/v2:computeRoutes',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.legs',
-        },
-        body: JSON.stringify(body),
+  svc.route(req, (result, status) => {
+    if (bodyEl) bodyEl.classList.remove('loading');
+    if (status === google.maps.DirectionsStatus.OK) {
+      let distTxt, durTxt;
+      if (mode === 'transit' && result.routes.length > 1) {
+        const avgSec = Math.round(
+          result.routes.reduce((s,r) => s + r.legs[0].duration.value, 0) / result.routes.length
+        );
+        const avgMin = Math.round(avgSec / 60);
+        distTxt = result.routes[0].legs[0].distance.text;
+        durTxt  = avgMin >= 60
+          ? `${Math.floor(avgMin/60)}시간 ${avgMin%60 > 0 ? avgMin%60+'분' : ''}`
+          : `${avgMin}분`;
+        durTxt += ` (${result.routes.length}개 루트 평균)`;
+      } else {
+        const leg = result.routes[0].legs[0];
+        distTxt = leg.distance.text;
+        durTxt  = leg.duration.text;
       }
-    );
-
-    if (bodyEl) bodyEl.classList.remove('loading');
-    const data = await res.json();
-
-    if (!res.ok || !data.routes || data.routes.length === 0) {
-      console.warn('Routes API error:', data);
+      infoEl.innerHTML = `
+        <span class="transit-dist">${distTxt}</span>
+        <span class="transit-sep">·</span>
+        <span class="transit-time">약 ${durTxt}</span>
+        <span class="transit-sep">·</span>
+        <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
+    } else {
+      console.warn('Directions status:', status, mode, from, to);
       infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
-      return;
     }
-
-    // 거리: 첫 번째 루트 기준
-    const distM = data.routes[0].distanceMeters;
-    const distTxt = distM >= 1000
-      ? (distM / 1000).toFixed(1) + ' km'
-      : distM + ' m';
-
-    // 시간: 여러 루트면 평균
-    const durSecs = data.routes.map(r => parseInt(r.duration));
-    const avgSec  = Math.round(durSecs.reduce((a,b) => a+b, 0) / durSecs.length);
-    const avgMin  = Math.round(avgSec / 60);
-    let durTxt = avgMin >= 60
-      ? `${Math.floor(avgMin/60)}시간 ${avgMin%60 > 0 ? avgMin%60+'분' : ''}`
-      : `${avgMin}분`;
-    if (mode === 'transit' && data.routes.length > 1)
-      durTxt += ` (${data.routes.length}개 루트 평균)`;
-
-    infoEl.innerHTML = `
-      <span class="transit-dist">${distTxt}</span>
-      <span class="transit-sep">·</span>
-      <span class="transit-time">약 ${durTxt}</span>
-      <span class="transit-sep">·</span>
-      <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
-
-  } catch(err) {
-    if (bodyEl) bodyEl.classList.remove('loading');
-    console.error('Routes API 오류:', err);
-    infoEl.innerHTML = `<span class="transit-no-loc">오류가 발생했어요</span>`;
-  }
+  });
 }
 
 // 이동수단 선택 팝업
