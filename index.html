@@ -663,19 +663,33 @@ html, body {
   .popup { padding: 20px; }
   .map-tab-mobile { display: flex; }
 
-  /* 지도 전체화면 모드 */
-  body.map-fullscreen #left-panel { display: none; }
-  body.map-fullscreen #main { height: 100dvh; overflow: hidden; }
-  body.map-fullscreen #map-wrapper {
-    height: 100dvh; min-height: unset; flex: 1;
+  /* 지도 전체화면 모드 — 스크롤 완전 차단, 고정 레이아웃 */
+  body.map-fullscreen {
+    overflow: hidden;
+    position: fixed; width: 100%; height: 100%;
   }
-  /* 지도 탭 뷰일 때 패널 탭 바를 지도 위에 오버레이 */
+  body.map-fullscreen #header { display: none; }
+  body.map-fullscreen #main {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    height: 100dvh; overflow: hidden;
+    flex-direction: column;
+  }
+  body.map-fullscreen #left-panel { display: none; }
+  body.map-fullscreen #map-wrapper {
+    position: absolute; top: 0; left: 0; right: 0;
+    bottom: 52px; /* 탭바 높이만큼 */
+    height: auto; min-height: unset;
+  }
+  /* 탭바 지도 위 하단 고정 */
   body.map-fullscreen #panel-tabs {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    z-index: 200; background: var(--white);
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 52px;
+    z-index: 500;
+    background: var(--white);
     border-top: 1px solid var(--sand);
     border-bottom: none;
-    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.10);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   body.map-fullscreen .map-tab-mobile {
@@ -2484,6 +2498,7 @@ function openGoogleMapsPlace() {
 // ── 패널 탭 전환 ──────────────────────────────────────────────
 function switchPanelTab(idx) {
   document.body.classList.remove('map-fullscreen');
+  document.getElementById('header').style.display = '';
   document.querySelectorAll('.panel-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
   sessionStorage.setItem('panelTab', idx);
