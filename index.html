@@ -609,19 +609,21 @@ html, body {
   position: absolute; top: 16px; left: 16px; z-index: 10;
   display: flex; align-items: center; gap: 0;
   background: var(--white); border-radius: 10px;
-  box-shadow: var(--shadow2); overflow: hidden;
+  box-shadow: var(--shadow2);
   width: 220px;
 }
 #map-search-input {
   flex: 1; border: none; outline: none;
   padding: 8px 10px; font-family: inherit;
   font-size: 12px; color: var(--ink); background: transparent;
+  border-radius: 10px 0 0 10px;
 }
 #map-search-input::placeholder { color: var(--ink3); }
 #map-search-btn {
   border: none; background: none; cursor: pointer;
   padding: 8px 10px; font-size: 14px; color: var(--ink3);
-  transition: color .14s;
+  transition: color .14s; border-radius: 0 10px 10px 0;
+  flex-shrink: 0;
 }
 #map-search-btn:hover { color: var(--accent2); }
 #map-search-results {
@@ -1061,8 +1063,7 @@ html, body {
     </div>
     <div id="map-search-wrap">
       <input id="map-search-input" type="text" placeholder="🔍 장소 검색"
-        onkeydown="if(event.key==='Enter')mapSearch()"
-        oninput="mapSearchAutocomplete(this.value)" />
+        onkeydown="if(event.key==='Enter')mapSearch()" />
       <button id="map-search-btn" onclick="mapSearch()">→</button>
       <div id="map-search-results"></div>
     </div>
@@ -2146,13 +2147,7 @@ function mapSearch() {
   runPlacesTextSearch(q);
 }
 
-function mapSearchAutocomplete(val) {
-  // 2글자 미만이면 닫기
-  if (!val || val.length < 2) { closeMapSearchResults(); return; }
-  // 타이핑 중엔 바로 textSearch 실행 (300ms 디바운스)
-  clearTimeout(window._mapSearchTimer);
-  window._mapSearchTimer = setTimeout(() => runPlacesTextSearch(val), 300);
-}
+function mapSearchAutocomplete(val) { /* 미사용 */ }
 
 function runPlacesTextSearch(q) {
   if (!map || !window.google) return;
