@@ -2921,6 +2921,8 @@ function updateTripSummary() {
   const title = document.getElementById('trip-title').value;
   const note  = document.getElementById('trip-note').value;
   const summary = document.getElementById('trip-summary');
+  // 브라우저 탭 제목 업데이트
+  document.title = title ? `${getTitleEmoji(title)}${title} 계획판` : '여행 계획판';
   if (title) {
     document.getElementById('summary-title').textContent = title;
     document.getElementById('summary-note').textContent  = note || '';
@@ -2961,6 +2963,89 @@ function updateAirlineLogo() {
 }
 
 // ── 국내/해외 여행 자동 감지 ─────────────────────────────────
+// ── 지역별 이모티콘 ───────────────────────────────────────────
+const LOCATION_EMOJI_MAP = [
+  // 국내 바다·항구
+  { keys: ['묵호','동해','삼척','속초','양양','강릉','고성','주문진'], emoji: '🌊' },
+  { keys: ['여수','통영','거제','남해','하동','고흥','완도','진도'], emoji: '⛵' },
+  { keys: ['부산','해운대','광안리'], emoji: '🌉' },
+  { keys: ['목포','무안','신안'], emoji: '🐟' },
+  { keys: ['포항','울릉','독도'], emoji: '🦞' },
+  { keys: ['태안','보령','서산','안면도'], emoji: '🏖️' },
+  // 국내 산·자연
+  { keys: ['제주','서귀포','성산'], emoji: '🌺' },
+  { keys: ['한라산'], emoji: '🏔️' },
+  { keys: ['설악산','오색'], emoji: '🍂' },
+  { keys: ['지리산'], emoji: '🌿' },
+  { keys: ['평창','정선','태백','영월'], emoji: '⛷️' },
+  { keys: ['춘천','가평','남이섬'], emoji: '🛶' },
+  { keys: ['전주'], emoji: '🏯' },
+  { keys: ['경주'], emoji: '🏛️' },
+  { keys: ['안동'], emoji: '🎎' },
+  // 국내 도시
+  { keys: ['서울','종로','명동','홍대','강남'], emoji: '🗼' },
+  { keys: ['인천'], emoji: '✈️' },
+  { keys: ['대전'], emoji: '🚄' },
+  { keys: ['대구'], emoji: '🍎' },
+  { keys: ['광주'], emoji: '🎨' },
+  // 일본
+  { keys: ['도쿄','tokyo'], emoji: '🗼' },
+  { keys: ['시즈오카','후지산','富士'], emoji: '🗻' },
+  { keys: ['교토','京都','기온'], emoji: '⛩️' },
+  { keys: ['오사카','大阪','난바','도톤보리'], emoji: '🦀' },
+  { keys: ['삿포로','홋카이도','北海道'], emoji: '🦀' },
+  { keys: ['나라','奈良'], emoji: '🦌' },
+  { keys: ['히로시마','広島'], emoji: '🕊️' },
+  { keys: ['오키나와','沖縄'], emoji: '🌴' },
+  { keys: ['후쿠오카','福岡','하카타'], emoji: '🍜' },
+  { keys: ['나고야','名古屋'], emoji: '🏯' },
+  { keys: ['센다이','仙台'], emoji: '🌿' },
+  { keys: ['가마쿠라','鎌倉'], emoji: '🛕' },
+  { keys: ['닛코','日光'], emoji: '🌳' },
+  { keys: ['하코네','箱根'], emoji: '♨️' },
+  { keys: ['일본','japan','japan'], emoji: '🎌' },
+  // 동남아
+  { keys: ['방콕','태국','thailand','파타야','치앙마이'], emoji: '🐘' },
+  { keys: ['발리','인도네시아','bali'], emoji: '🌺' },
+  { keys: ['싱가포르','singapore'], emoji: '🦁' },
+  { keys: ['베트남','다낭','하노이','호치민','나트랑'], emoji: '🌿' },
+  { keys: ['필리핀','세부','보라카이','manila'], emoji: '🏝️' },
+  { keys: ['말레이시아','쿠알라룸푸르','코타키나발루'], emoji: '🌴' },
+  // 유럽
+  { keys: ['파리','france','에펠'], emoji: '🗼' },
+  { keys: ['로마','이탈리아','italy','피렌체','베네치아','나폴리'], emoji: '🍕' },
+  { keys: ['바르셀로나','스페인','spain','마드리드'], emoji: '💃' },
+  { keys: ['런던','영국','uk','england'], emoji: '🎡' },
+  { keys: ['암스테르담','네덜란드','netherlands'], emoji: '🌷' },
+  { keys: ['프라하','체코','czech'], emoji: '🏰' },
+  { keys: ['비엔나','오스트리아','austria'], emoji: '🎼' },
+  { keys: ['그리스','산토리니','아테네'], emoji: '🏛️' },
+  { keys: ['스위스','인터라켄','취리히'], emoji: '🏔️' },
+  { keys: ['포르투갈','리스본','포르투'], emoji: '🐟' },
+  { keys: ['터키','이스탄불','turkey'], emoji: '🕌' },
+  // 미주
+  { keys: ['뉴욕','new york','맨해튼'], emoji: '🗽' },
+  { keys: ['라스베가스','las vegas'], emoji: '🎰' },
+  { keys: ['하와이','hawaii','호놀룰루'], emoji: '🌺' },
+  { keys: ['캐나다','밴쿠버','토론토','canada'], emoji: '🍁' },
+  { keys: ['멕시코','칸쿤','mexico'], emoji: '🌵' },
+  // 기타
+  { keys: ['두바이','아랍','uae'], emoji: '🏙️' },
+  { keys: ['호주','시드니','멜버른','australia'], emoji: '🦘' },
+  { keys: ['뉴질랜드','new zealand'], emoji: '🥝' },
+  { keys: ['이집트','카이로','피라미드'], emoji: '🐪' },
+  { keys: ['인도','뭄바이','델리','india'], emoji: '🕌' },
+];
+
+function getTitleEmoji(title) {
+  if (!title) return '';
+  const t = title.toLowerCase();
+  for (const { keys, emoji } of LOCATION_EMOJI_MAP) {
+    if (keys.some(k => t.includes(k.toLowerCase()))) return emoji + ' ';
+  }
+  return '✈️ ';  // 기본값
+}
+
 const DOMESTIC_KEYWORDS = [
   '서울','부산','제주','강릉','속초','묵호','춘천','인천','수원','대전','대구','광주','울산','전주',
   '경주','여수','통영','거제','포항','목포','순천','안동','청주','충주','원주','강화','가평','양평',
