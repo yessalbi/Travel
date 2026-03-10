@@ -2046,11 +2046,17 @@ function openTpPopup(prefix, anchorEl, onChange) {
   const rect = anchorEl.getBoundingClientRect();
   pop.style.top  = (rect.bottom + 6) + 'px';
   pop.style.left = rect.left + 'px';
+  pop.style.bottom = 'auto';
   // 화면 오른쪽 넘침 방지
   pop.classList.add('open');
   const popRect = pop.getBoundingClientRect();
   if (popRect.right > window.innerWidth - 8) {
     pop.style.left = (window.innerWidth - popRect.width - 8) + 'px';
+  }
+  // 화면 아래 넘침 → 위로 열기
+  if (popRect.bottom > window.innerHeight - 8) {
+    pop.style.top = 'auto';
+    pop.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
   }
 
   syncTpPopup(prefix);
