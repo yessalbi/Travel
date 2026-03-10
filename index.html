@@ -275,6 +275,34 @@ html, body {
   padding: 16px 20px;
   border-bottom: 1px solid var(--stone);
 }
+/* 국내여행 카드 */
+.domestic-card {
+  background: var(--stone);
+  border-radius: var(--r2);
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.domestic-row {
+  display: flex; flex-direction: column; gap: 5px;
+}
+.domestic-row .lbl {
+  font-size: 11px; color: var(--ink3); font-weight: 500;
+}
+.domestic-row input {
+  flex: 1; border: 1.5px solid var(--sand); border-radius: 7px;
+  padding: 7px 10px; font-family: inherit; font-size: 13px;
+  background: var(--white); outline: none; transition: border-color .18s; width: 100%; box-sizing: border-box;
+}
+.domestic-row input:focus { border-color: var(--accent2); }
+.domestic-divider {
+  border: none; border-top: 1px solid var(--sand); margin: 2px 0;
+}
+.domestic-row-h {
+  display: flex; align-items: center; gap: 8px;
+}
+.domestic-row-h .lbl {
+  font-size: 11px; color: var(--ink3); font-weight: 500; width: 60px; flex-shrink: 0;
+}
 .flight-card {
   background: var(--stone);
   border-radius: var(--r2);
@@ -1399,17 +1427,36 @@ function applyTripData(data) {
   setVal('trip-start',    data.startDate);
   setVal('trip-end',      data.endDate);
   setVal('trip-note',     data.note);
-  setVal('flight-airline',data.flightAirline);
-  setVal('flight-from',   data.flightFrom);
-  setVal('flight-to',     data.flightTo);
-  setVal('return-airline',data.returnAirline);
-  setVal('return-from',   data.returnFrom);
-  setVal('return-to',     data.returnTo);
-  // 커스텀 시간 선택기 복원
-  timeToTp('fdep', data.flightDepart);
-  timeToTp('farr', data.flightArrive);
-  timeToTp('rdep', data.returnDepart);
-  timeToTp('rarr', data.returnArrive);
+
+  // 국내/해외 카드 전환 먼저
+  const domestic = data.isDomestic ?? detectDomestic(data.title || '');
+  switchFlightSection(domestic);
+
+  if (domestic) {
+    // 국내 데이터 복원
+    window._domesticData = { hotelName: data.domHotelName, hotelAddr: data.domHotelAddr };
+    if (data.domHotelLat && data.domHotelLng) {
+      domHotelLatLng = { lat: data.domHotelLat, lng: data.domHotelLng };
+    }
+    setVal('dom-hotel-name', data.domHotelName);
+    setVal('dom-hotel-addr', data.domHotelAddr);
+    timeToTp('dom-dep', data.domDepart);
+    timeToTp('dom-ret', data.domReturn);
+    renderDomHotelPin();
+  } else {
+    // 해외 항공편 복원
+    setVal('flight-airline', data.flightAirline);
+    setVal('flight-from',    data.flightFrom);
+    setVal('flight-to',      data.flightTo);
+    setVal('return-airline', data.returnAirline);
+    setVal('return-from',    data.returnFrom);
+    setVal('return-to',      data.returnTo);
+    timeToTp('fdep', data.flightDepart);
+    timeToTp('farr', data.flightArrive);
+    timeToTp('rdep', data.returnDepart);
+    timeToTp('rarr', data.returnArrive);
+    updateAirlineLogo();
+  }
   if (data.schedule)     scheduleData  = data.schedule;
   if (data.transitModes) transitModes  = data.transitModes;
   if (data.checklist) { checklistData = data.checklist; renderChecklist(); }
@@ -1494,21 +1541,31 @@ function toggleVoucher(id) {
 
 // ── 저장 ─────────────────────────────────────────────────────
 async function saveAll() {
+  const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
   const payload = {
-    title:         document.getElementById('trip-title').value,
-    startDate:     document.getElementById('trip-start').value,
-    endDate:       document.getElementById('trip-end').value,
-    note:          document.getElementById('trip-note').value,
-    flightAirline: document.getElementById('flight-airline').value,
+    title:         getVal('trip-title'),
+    startDate:     getVal('trip-start'),
+    endDate:       getVal('trip-end'),
+    note:          getVal('trip-note'),
+    isDomestic,
+    // 해외 항공편
+    flightAirline: getVal('flight-airline'),
     flightDepart:  tpToTime('fdep'),
-    flightFrom:    document.getElementById('flight-from').value,
+    flightFrom:    getVal('flight-from'),
     flightArrive:  tpToTime('farr'),
-    flightTo:      document.getElementById('flight-to').value,
-    returnAirline: document.getElementById('return-airline').value,
+    flightTo:      getVal('flight-to'),
+    returnAirline: getVal('return-airline'),
     returnDepart:  tpToTime('rdep'),
-    returnFrom:    document.getElementById('return-from').value,
+    returnFrom:    getVal('return-from'),
     returnArrive:  tpToTime('rarr'),
-    returnTo:      document.getElementById('return-to').value,
+    returnTo:      getVal('return-to'),
+    // 국내 여행
+    domDepart:     tpToTime('dom-dep'),
+    domHotelName:  getVal('dom-hotel-name'),
+    domHotelAddr:  getVal('dom-hotel-addr'),
+    domHotelLat:   domHotelLatLng ? domHotelLatLng.lat : null,
+    domHotelLng:   domHotelLatLng ? domHotelLatLng.lng : null,
+    domReturn:     tpToTime('dom-ret'),
     schedule:      scheduleData,
     transitModes,
     routePoints,
@@ -2141,6 +2198,8 @@ function setupMap() {
   map.addListener('click', (e) => {
     if (routeMode) {
       addRoutePoint(e.latLng);
+    } else if (domPinMode) {
+      confirmDomHotelPin(e.latLng);
     } else if (schPinMode) {
       confirmSchPinLocation(e.latLng);
     } else if (pinMode) {
@@ -2624,6 +2683,7 @@ function renderMapMarkers() {
   markers.forEach(m => m.setMap(null));
   markers = [];
   if (!map) return;
+  renderDomHotelPin();
   placesData.forEach(p => {
     const marker = new google.maps.Marker({
       position: { lat: p.lat, lng: p.lng },
@@ -2842,6 +2902,8 @@ function setupFinish() {
   closeOverlay('trip-setup-overlay');
   updateDuration();
   updateTripSummary();
+  // 국내/해외 자동 감지 → 카드 전환
+  switchFlightSection(detectDomestic(title));
   autoSave();
   showToast('여행 정보가 저장되었습니다 ✓');
   // 여행 제목으로 지도 자동 이동
@@ -2886,10 +2948,198 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function updateAirlineLogo() {
+  const el = document.getElementById('airline-logo');
+  if (!el) return;
   const v = document.getElementById('flight-airline').value;
-  const logo = document.getElementById('airline-logo');
-  logo.textContent = v ? v.slice(0,2).toUpperCase() : '✈';
+  el.textContent = v ? v.slice(0,2).toUpperCase() : '✈';
 }
+
+// ── 국내/해외 여행 자동 감지 ─────────────────────────────────
+const DOMESTIC_KEYWORDS = [
+  '서울','부산','제주','강릉','속초','묵호','춘천','인천','수원','대전','대구','광주','울산','전주',
+  '경주','여수','통영','거제','포항','목포','순천','안동','청주','충주','원주','강화','가평','양평',
+  '남해','하동','보령','태안','군산','익산','진주','창원','김해','양산','울진','삼척','동해','태백',
+  '평창','정선','영월','홍천','화천','양구','인제','고성','양양','임실','완주','고창','부안','장흥',
+  '해남','완도','진도','신안','함평','영광','무안','나주','담양','곡성','구례','화순','보성','고흥',
+  '국내','Korea','korea','한국',
+];
+
+let isDomestic = false;
+let domHotelLatLng = null;   // { lat, lng }
+let domPinMode = false;
+let domHotelMarker = null;
+
+function startDomHotelPin() {
+  if (!map) { showToast('지도가 아직 준비되지 않았어요'); return; }
+  domPinMode = true;
+  document.getElementById('map').style.cursor = 'crosshair';
+  showToast('지도에서 숙소 위치를 클릭하세요 📍');
+  const btn = document.getElementById('dom-pin-btn');
+  if (btn) { btn.textContent = '✕ 취소'; btn.onclick = cancelDomHotelPin; }
+}
+
+function cancelDomHotelPin() {
+  domPinMode = false;
+  document.getElementById('map').style.cursor = '';
+  const btn = document.getElementById('dom-pin-btn');
+  if (btn) { btn.textContent = '📍 지도에서 위치 찍기'; btn.onclick = startDomHotelPin; }
+}
+
+function confirmDomHotelPin(latLng) {
+  domPinMode = false;
+  document.getElementById('map').style.cursor = '';
+  domHotelLatLng = { lat: latLng.lat(), lng: latLng.lng() };
+  renderDomHotelPin();
+  // 카드 UI 업데이트
+  switchFlightSection(true);
+  autoSave();
+  showToast('숙소 위치가 등록됐어요 ✓');
+}
+
+function moveToDomHotel() {
+  if (!map || !domHotelLatLng) return;
+  map.panTo(domHotelLatLng);
+  map.setZoom(16);
+}
+
+function renderDomHotelPin() {
+  if (domHotelMarker) { domHotelMarker.setMap(null); domHotelMarker = null; }
+  if (!map || !domHotelLatLng) return;
+  const name = (document.getElementById('dom-hotel-name') || {}).value || '숙소';
+  domHotelMarker = new google.maps.Marker({
+    position: domHotelLatLng,
+    map,
+    title: name,
+    icon: {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+          <ellipse cx="18" cy="41" rx="7" ry="3" fill="rgba(0,0,0,0.15)"/>
+          <path d="M18 2 C9.16 2 2 9.16 2 18 C2 28.5 18 42 18 42 C18 42 34 28.5 34 18 C34 9.16 26.84 2 18 2Z"
+                fill="#4A90E2" stroke="#fff" stroke-width="2"/>
+          <text x="18" y="23" text-anchor="middle" font-size="14">🏨</text>
+        </svg>`),
+      scaledSize: new google.maps.Size(36, 44),
+      anchor: new google.maps.Point(18, 44),
+    },
+    zIndex: 900,
+  });
+  domHotelMarker.addListener('click', () => {
+    map.panTo(domHotelLatLng);
+    map.setZoom(16);
+  });
+}
+
+
+
+function detectDomestic(title) {
+  if (!title) return false;
+  return DOMESTIC_KEYWORDS.some(kw => title.includes(kw));
+}
+
+function switchFlightSection(domestic) {
+  isDomestic = domestic;
+  const section = document.getElementById('flight-section');
+  if (!section) return;
+
+  if (domestic) {
+    section.innerHTML = `
+      <div class="section-label">🚗 국내 여행</div>
+      <div class="domestic-card">
+        <div class="domestic-row-h">
+          <span class="lbl">출발</span>
+          <div class="time-picker" id="tp-dom-depart"></div>
+        </div>
+        <hr class="domestic-divider">
+        <div class="domestic-row">
+          <span class="lbl">숙소 이름</span>
+          <input type="text" id="dom-hotel-name" placeholder="예: 강릉 씨마크 호텔" />
+        </div>
+        <div class="domestic-row">
+          <span class="lbl">숙소 주소 / 위치</span>
+          <input type="text" id="dom-hotel-addr" placeholder="예: 강원도 강릉시 창해로..." />
+        </div>
+        <div style="display:flex;gap:8px;margin-top:2px;">
+          <button class="item-act-btn item-edit" id="dom-pin-btn"
+            onclick="startDomHotelPin()" style="flex:1;padding:8px;">
+            📍 지도에서 위치 찍기
+          </button>
+          <button class="item-act-btn" id="dom-map-btn"
+            onclick="moveToDomHotel()"
+            style="flex:1;padding:8px;background:var(--stone);color:var(--ink2);"
+            ${domHotelLatLng ? '' : 'disabled'}>
+            🗺️ 지도에서 보기
+          </button>
+        </div>
+        ${domHotelLatLng ? '<div style="font-size:11px;color:var(--green);margin-top:2px;">📍 위치 등록됨</div>' : ''}
+        <hr class="domestic-divider">
+        <div class="domestic-row-h">
+          <span class="lbl">귀가 출발</span>
+          <div class="time-picker" id="tp-dom-return"></div>
+        </div>
+      </div>`;
+    // 타임피커 초기화
+    if (window.buildTimePicker) {
+      buildTimePicker('tp-dom-depart', 'dom-dep', true);
+      buildTimePicker('tp-dom-return', 'dom-ret', true);
+    }
+    // 자동저장 연결
+    ['dom-hotel-name','dom-hotel-addr'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', autoSave);
+    });
+    // 저장된 값 복원
+    const d = window._domesticData || {};
+    if (d.hotelName) document.getElementById('dom-hotel-name').value = d.hotelName;
+    if (d.hotelAddr) document.getElementById('dom-hotel-addr').value = d.hotelAddr;
+
+  } else {
+    section.innerHTML = `
+      <div class="section-label">항공편</div>
+      <div class="flight-card">
+        <div class="flight-row">
+          <span class="lbl">항공사</span>
+          <div class="airline-logo" id="airline-logo">✈</div>
+          <input type="text" id="flight-airline" placeholder="예: 대한항공 KE701" oninput="updateAirlineLogo()" />
+        </div>
+        <div class="flight-row">
+          <span class="lbl">출발</span>
+          <div class="time-picker" id="tp-flight-depart"></div>
+          <input type="text" id="flight-from" placeholder="ICN" style="width:70px;flex:none;" />
+        </div>
+        <div class="flight-row">
+          <span class="lbl">도착</span>
+          <div class="time-picker" id="tp-flight-arrive"></div>
+          <input type="text" id="flight-to" placeholder="NRT" style="width:70px;flex:none;" />
+        </div>
+        <div style="border-top:1px solid var(--sand);margin:4px 0;padding-top:8px;">
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">귀국편</div>
+        </div>
+        <div class="flight-row">
+          <span class="lbl">항공사</span>
+          <input type="text" id="return-airline" placeholder="예: 아시아나 OZ102" />
+        </div>
+        <div class="flight-row">
+          <span class="lbl">출발</span>
+          <div class="time-picker" id="tp-return-depart"></div>
+          <input type="text" id="return-from" placeholder="NRT" style="width:70px;flex:none;" />
+        </div>
+        <div class="flight-row">
+          <span class="lbl">도착</span>
+          <div class="time-picker" id="tp-return-arrive"></div>
+          <input type="text" id="return-to" placeholder="ICN" style="width:70px;flex:none;" />
+        </div>
+      </div>`;
+    // 타임피커 재초기화
+    if (window.buildTimePicker) {
+      buildTimePicker('tp-flight-depart', 'fdep', true);
+      buildTimePicker('tp-flight-arrive', 'farr', true);
+      buildTimePicker('tp-return-depart', 'rdep', true);
+      buildTimePicker('tp-return-arrive', 'rarr', true);
+    }
+    updateAirlineLogo();
+  }
+}
+
 
 // ── 오버레이 유틸 ─────────────────────────────────────────────
 function openOverlay(id)  { document.getElementById(id).classList.add('show'); }
