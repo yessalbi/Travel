@@ -1353,6 +1353,8 @@ let voucherData   = {};   // { "flight-out": "base64...", ... }
 let currentDay    = 1;
 let totalDays     = 1;
 let selectedType  = 'food';
+let dayPolylines  = [];   // 일별 경로 폴리라인 목록
+let daySchMarkers = [];   // 일별 일정 마커 목록
 let pendingLatLng = null;
 let currentPlaceForMaps = null;
 
@@ -1620,10 +1622,18 @@ function renderDayTabs() {
     const btn = document.createElement('button');
     btn.className = 'day-tab' + (i === currentDay ? ' active' : '');
     btn.textContent = 'Day ' + i;
-    btn.onclick = () => { currentDay = i; sessionStorage.setItem('currentDay', i); renderDayTabs(); renderScheduleList(); };
+    btn.onclick = () => {
+      currentDay = i;
+      sessionStorage.setItem('currentDay', i);
+      renderDayTabs();
+      renderScheduleList();
+      drawDayRoutes();
+      fitDayBounds(i);
+    };
     c.appendChild(btn);
   }
   renderScheduleList();
+  if (map) { drawDayRoutes(); fitDayBounds(currentDay); }
 }
 
 // ── 일정 렌더링 ───────────────────────────────────────────────
@@ -1675,6 +1685,7 @@ function renderScheduleList() {
       }
     }
   });
+  drawDayRoutes();
 }
 
 function buildTransitCard(from, to, fromIdx) {
@@ -1816,6 +1827,7 @@ function openModePicker(e, fromIdx) {
       autoSave();
       picker.remove(); openModePickerEl = null;
       renderScheduleList();
+      drawDayRoutes();
     };
     picker.appendChild(opt);
   });
@@ -2215,7 +2227,7 @@ function setupMap() {
 
   renderMapMarkers();
   if (routePoints.length) drawRoute();
-
+  drawDayRoutes();
   // 저장된 지도 위치가 없으면 여행 제목으로 지오코딩
   const savedCenter = document.getElementById('trip-title').value;
   if (savedCenter) geocodeAndMoveMap(savedCenter);
@@ -2576,6 +2588,169 @@ function clearRoute() {
   renderMapMarkers();
   autoSave();
   showToast('경로가 삭제되었습니다');
+}
+
+// ── 일별 색연필 경로 ──────────────────────────────────────────
+// 이동수단별 색 (색연필 느낌)
+const MODE_COLORS = {
+  driving:   { stroke: '#FF6B35', fill: '#FF6B35' },  // 주황
+  transit:   { stroke: '#4A90E2', fill: '#4A90E2' },  // 파랑
+  walking:   { stroke: '#27AE60', fill: '#27AE60' },  // 초록
+  bicycling: { stroke: '#F1C40F', fill: '#F1C40F' },  // 노랑
+};
+
+// 인천공항 좌표 (반경 3km 이내면 필터)
+const ICN_LAT = 37.4602, ICN_LNG = 126.4407;
+function isIncheonAirport(lat, lng) {
+  const d = Math.sqrt(Math.pow(lat - ICN_LAT, 2) + Math.pow(lng - ICN_LNG, 2));
+  return d < 0.03; // 약 3km
+}
+
+function clearDayRoutes() {
+  dayPolylines.forEach(p => p.setMap(null));
+  dayPolylines = [];
+  daySchMarkers.forEach(m => m.setMap(null));
+  daySchMarkers = [];
+}
+
+function drawDayRoutes() {
+  if (!map) return;
+  clearDayRoutes();
+  const items = scheduleData[currentDay] || [];
+  const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
+  if (locItems.length === 0) return;
+
+  // 일정 마커 (번호 원형)
+  locItems.forEach((item, i) => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="38" viewBox="0 0 32 38">
+        <ellipse cx="16" cy="35" rx="6" ry="2.5" fill="rgba(0,0,0,0.18)"/>
+        <path d="M16 2 C8.27 2 2 8.27 2 16 C2 25.5 16 36 16 36 C16 36 30 25.5 30 16 C30 8.27 23.73 2 16 2Z"
+              fill="#5B4CF5" stroke="#fff" stroke-width="2"/>
+        <text x="16" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">${i + 1}</text>
+      </svg>`;
+    const marker = new google.maps.Marker({
+      position: { lat: item.lat, lng: item.lng },
+      map,
+      title: item.name,
+      icon: {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+        scaledSize: new google.maps.Size(32, 38),
+        anchor: new google.maps.Point(16, 38),
+      },
+      zIndex: 800,
+    });
+    marker.addListener('click', () => {
+      map.panTo({ lat: item.lat, lng: item.lng });
+      map.setZoom(16);
+    });
+    daySchMarkers.push(marker);
+  });
+
+  // 구간별 경로 폴리라인
+  locItems.forEach((item, i) => {
+    if (i >= locItems.length - 1) return;
+    const next = locItems[i + 1];
+    // 원본 items 기준 인덱스 찾기
+    const origIdx = items.indexOf(item);
+    const mode = transitModes[transitKey(currentDay, origIdx)] || 'driving';
+    drawSegmentRoute(item, next, mode);
+  });
+}
+
+function drawSegmentRoute(from, to, mode) {
+  if (!window.google || !map) return;
+  const color = (MODE_COLORS[mode] || MODE_COLORS.driving).stroke;
+
+  if (mode === 'walking') {
+    // 도보는 직선 점선으로 (색연필 느낌)
+    const poly = new google.maps.Polyline({
+      path: [
+        { lat: from.lat, lng: from.lng },
+        { lat: to.lat,   lng: to.lng   },
+      ],
+      geodesic: true,
+      strokeColor: color,
+      strokeOpacity: 0,
+      strokeWeight: 0,
+      icons: [{
+        icon: {
+          path: 'M 0,-1 0,1',
+          strokeOpacity: 0.9,
+          strokeWeight: 3,
+          strokeColor: color,
+          scale: 4,
+        },
+        offset: '0',
+        repeat: '14px',
+      }],
+      map,
+    });
+    dayPolylines.push(poly);
+    return;
+  }
+
+  // 나머지는 Directions API로 실제 경로
+  const svc = new google.maps.DirectionsService();
+  const req = {
+    origin:      new google.maps.LatLng(from.lat, from.lng),
+    destination: new google.maps.LatLng(to.lat,   to.lng),
+    travelMode:  google.maps.TravelMode[mode.toUpperCase()] || google.maps.TravelMode.DRIVING,
+  };
+  if (mode === 'transit') {
+    const dep = new Date();
+    dep.setHours(dep.getHours() < 10 ? 10 : dep.getHours(), 0, 0, 0);
+    req.transitOptions = { departureTime: dep };
+  }
+  svc.route(req, (result, status) => {
+    if (status !== google.maps.DirectionsStatus.OK) {
+      // 폴백: 직선
+      const poly = new google.maps.Polyline({
+        path: [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }],
+        geodesic: true, strokeColor: color, strokeOpacity: 0.5, strokeWeight: 3, map,
+      });
+      dayPolylines.push(poly);
+      return;
+    }
+    // 실제 경로 점들 추출
+    const path = result.routes[0].overview_path;
+    const poly = new google.maps.Polyline({
+      path,
+      geodesic: true,
+      strokeColor: color,
+      strokeOpacity: 0.85,
+      strokeWeight: 5,
+      // 색연필 느낌 — 테두리 효과
+      map,
+    });
+    // 아래에 흰 테두리선
+    const shadow = new google.maps.Polyline({
+      path,
+      geodesic: true,
+      strokeColor: '#ffffff',
+      strokeOpacity: 0.45,
+      strokeWeight: 8,
+      map,
+      zIndex: -1,
+    });
+    dayPolylines.push(shadow, poly);
+  });
+}
+
+// Day 전환 시 해당 날 장소들이 보이도록 fitBounds
+function fitDayBounds(day) {
+  if (!map) return;
+  const items = scheduleData[day] || [];
+  const locs = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
+  if (locs.length === 0) return;
+  if (locs.length === 1) {
+    map.panTo({ lat: locs[0].lat, lng: locs[0].lng });
+    map.setZoom(15);
+    return;
+  }
+  const bounds = new google.maps.LatLngBounds();
+  locs.forEach(it => bounds.extend({ lat: it.lat, lng: it.lng }));
+  map.fitBounds(bounds, 60);
 }
 
 // ── 맛집 핀 ───────────────────────────────────────────────────
