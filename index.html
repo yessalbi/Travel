@@ -1,15 +1,22 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="여행앱">
-    
-    <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>여행 계획판</title>
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="여행앱">
+  <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
+
+  <!-- Android PWA (갤럭시 Chrome / 삼성 인터넷 홈화면 추가) -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
+  <link rel="manifest" href="https://yessalbi.github.io/Travel/manifest.json">
 </head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>여행 계획판</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -2382,8 +2389,10 @@ function saveScheduleItem() {
     scheduleData[currentDay].push(item);
   }
   scheduleData[currentDay].sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  closeSchPlacePanel();
   closeOverlay('schedule-overlay');
   renderScheduleList();
+  drawDayRoutes();
   autoSave();
 }
 
@@ -2966,20 +2975,31 @@ function renderMapPlaceCard(d, fb) {
 function closeMapPlaceCard() {
   document.getElementById('map-place-card')?.classList.remove('show');
   mapCurrentPlace = null;
-  mapSearchMarkers.forEach(m => m.setIcon({
-    path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1,
-    strokeColor: '#fff', strokeWeight: 2, scale: 13 }));
+  if (window.google) {
+    mapSearchMarkers.forEach(m => {
+      try { m.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 12 }); } catch(e) {}
+    });
+  }
   const q = document.getElementById('map-search-input')?.value.trim();
   if (q && mapSearchMarkers.length) document.getElementById('map-search-results')?.classList.add('show');
 }
-function clearMapSearchMarkers() { mapSearchMarkers.forEach(m => m.setMap(null)); mapSearchMarkers = []; }
+function clearMapSearchMarkers() { mapSearchMarkers.forEach(m => { try { m.setMap(null); } catch(e) {} }); mapSearchMarkers = []; }
 function closeMapSearchResults() {
   document.getElementById('map-search-results')?.classList.remove('show');
 }
+// 외부 클릭 시 닫기 — 버튼 클릭은 제외
 document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('map-search-wrap');
+  const card = document.getElementById('map-place-card');
+  const btn  = document.getElementById('map-search-btn');
+  // 검색 버튼 자체 클릭은 무시 (mapSearch()가 이미 처리)
+  if (e.target === btn || btn?.contains(e.target)) return;
   if (!e.target.closest('#map-search-wrap') && !e.target.closest('#map-place-card')) {
     closeMapSearchResults();
-    closeMapPlaceCard();
+    if (card && !card.contains(e.target)) {
+      document.getElementById('map-place-card')?.classList.remove('show');
+      mapCurrentPlace = null;
+    }
   }
 });
 
@@ -4202,23 +4222,31 @@ function runSchPlaceSearch() {
 
 function selectSchPlace(place, idx) {
   schPlaceSelected = place;
+
   // 이름 자동 입력
   const nameInput = document.getElementById('sch-name');
   if (nameInput) nameInput.value = place.name;
+
   // 위치 자동 저장
   schPendingLatLng = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
   document.getElementById('sch-latlng').value = JSON.stringify(schPendingLatLng);
   const pb = document.getElementById('sch-pick-btn');
   if (pb) { pb.textContent = '✅ 위치 등록됨'; pb.classList.add('picked'); }
-  // 선택 표시
+
+  // 선택된 항목 강조 표시
   document.querySelectorAll('.sch-place-result-item').forEach((el, i) => {
     el.classList.toggle('selected', i === idx);
   });
-  // 지도 중심 이동
-  schPlaceMap.panTo(place.geometry.location);
-  schPlaceMap.setZoom(16);
-  // 패널 닫고 팝업으로 복귀
-  setTimeout(() => closeSchPlacePanel(), 600);
+
+  // 미니 지도 해당 위치로 이동
+  if (schPlaceMap) {
+    schPlaceMap.panTo(place.geometry.location);
+    schPlaceMap.setZoom(16);
+  }
+
+  // ✅ 패널은 닫지 않음 — 추가 버튼을 눌러야 팝업+패널 모두 닫힘
+  // 선택 완료 토스트만 표시
+  showToast(`"${place.name}" 선택됨 — 추가 버튼을 눌러 완료하세요 ✓`);
 }
 
 function openOverlay(id)  { document.getElementById(id).classList.add('show'); }
