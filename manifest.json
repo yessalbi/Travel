@@ -1,0 +1,20 @@
+{
+  "name": "여행 계획판",
+  "short_name": "여행앱",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "icon_new.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon_new.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
