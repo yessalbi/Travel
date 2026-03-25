@@ -1340,9 +1340,10 @@ html, body {
 <!-- 헤더 -->
 <div id="header">
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
-  <span id="build-badge" style="font-size:10px;color:var(--ink3);font-family:monospace;
-    letter-spacing:-0.3px;align-self:flex-end;padding-bottom:6px;">Build : fa509cd</span>
-  <span id="trip-id-badge">ID 로드 중…</span>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+    <span id="trip-id-badge">ID 로드 중…</span>
+    <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : fa509cd</span>
+  </div>
   <button class="header-btn ghost" id="share-btn">🔗 공유</button>
   <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
 </div>
