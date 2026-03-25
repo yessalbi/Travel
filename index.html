@@ -62,7 +62,66 @@
   };
 </script>
 
-<!-- Google Maps API -->
+<!-- ── 오프라인 스냅샷 (IndexedDB) ── -->
+<script>
+(function() {
+  const DB_NAME = 'travel-offline', DB_VER = 1, STORE = 'snapshots';
+
+  function openDB() {
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: 'tripId' });
+      req.onsuccess = e => res(e.target.result);
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  // 저장
+  window.offlineSave = async (tripId, data) => {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put({ tripId, data, savedAt: new Date().toISOString() });
+      tx.oncomplete = () => res(true);
+      tx.onerror    = e => rej(e.target.error);
+    });
+  };
+
+  // 불러오기
+  window.offlineLoad = async (tripId) => {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(tripId);
+      req.onsuccess = e => res(e.target.result || null);
+      req.onerror   = e => rej(e.target.error);
+    });
+  };
+
+  // 저장된 목록
+  window.offlineList = async () => {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = e => res(e.target.result || []);
+      req.onerror   = e => rej(e.target.error);
+    });
+  };
+
+  // 삭제
+  window.offlineDelete = async (tripId) => {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(tripId);
+      tx.oncomplete = () => res(true);
+      tx.onerror    = e => rej(e.target.error);
+    });
+  };
+})();
+</script>
+
 <script>
   window.MAPS_API_KEY = "AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo";
   window.initMap = function() {
@@ -1701,17 +1760,34 @@ async function init() {
 
 // ── Firebase 로드 ─────────────────────────────────────────────
 async function loadFromFirebase() {
-  const data = await window.fbGetTrip(TRIP_ID);
-  if (data) {
-    applyTripData(data);
-    restoreUIState();
+  const isOnline = navigator.onLine;
+
+  if (isOnline) {
+    try {
+      const data = await window.fbGetTrip(TRIP_ID);
+      if (data) {
+        applyTripData(data);
+        restoreUIState();
+        // Firebase 로드 성공 시 로컬에도 자동 스냅샷 저장
+        await window.offlineSave(TRIP_ID, data);
+      }
+    } catch(e) {
+      console.warn('Firebase 로드 실패, 로컬 스냅샷으로 폴백:', e);
+      await loadFromLocalSnapshot();
+    }
+  } else {
+    // 오프라인 — 로컬 스냅샷에서 복원
+    await loadFromLocalSnapshot();
   }
 
-  window.fbWatchPlaces(TRIP_ID, (places) => {
-    placesData = places;
-    renderPlaceChips();
-    renderMapMarkers();
-  });
+  // 온라인일 때만 실시간 감시
+  if (isOnline) {
+    window.fbWatchPlaces(TRIP_ID, (places) => {
+      placesData = places;
+      renderPlaceChips();
+      renderMapMarkers();
+    });
+  }
 
   // 자동저장 감시 (항공편 필드들)
   const watchedFields = [
@@ -2034,6 +2110,8 @@ async function saveAll() {
     updatedAt:     new Date().toISOString(),
   };
   await window.fbSaveTrip(TRIP_ID, payload);
+  // 로컬 스냅샷도 동시 저장 (오프라인 대비)
+  window.offlineSave(TRIP_ID, payload).catch(() => {});
   showToast('저장되었습니다 ✓');
   updateTripSummary();
 }
@@ -2043,6 +2121,65 @@ function autoSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveAll, 1500);
 }
+
+// ── 오프라인 스냅샷 복원 ──────────────────────────────────────
+async function loadFromLocalSnapshot() {
+  try {
+    const snap = await window.offlineLoad(TRIP_ID);
+    if (snap && snap.data) {
+      applyTripData(snap.data);
+      restoreUIState();
+      const t = new Date(snap.savedAt).toLocaleString('ko-KR', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      showOfflineBanner(`📴 오프라인 모드 — 마지막 저장: ${t}`);
+    } else {
+      showOfflineBanner('📴 오프라인 모드 — 저장된 데이터 없음');
+    }
+  } catch(e) {
+    showOfflineBanner('📴 오프라인 모드');
+  }
+}
+
+function showOfflineBanner(msg) {
+  let banner = document.getElementById('offline-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'offline-banner';
+    banner.style.cssText = `
+      position:fixed; bottom:0; left:0; right:0; z-index:9999;
+      background:#1a1a2e; color:#fff; font-size:12px;
+      padding:10px 16px; display:flex; align-items:center; gap:10px;
+      box-shadow:0 -2px 12px rgba(0,0,0,0.2);`;
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = `
+    <span style="flex:1">${msg}</span>
+    <button onclick="document.getElementById('offline-banner').style.display='none'"
+      style="background:rgba(255,255,255,0.15);border:none;color:#fff;
+             border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;">닫기</button>`;
+}
+
+function hideOfflineBanner() {
+  const b = document.getElementById('offline-banner');
+  if (b) b.style.display = 'none';
+}
+
+// 온라인 복귀 시 Firebase에서 최신 데이터 다시 로드
+window.addEventListener('online', async () => {
+  hideOfflineBanner();
+  showToast('🌐 온라인 연결됨 — 최신 데이터 불러오는 중…');
+  try {
+    const data = await window.fbGetTrip(TRIP_ID);
+    if (data) {
+      applyTripData(data);
+      await window.offlineSave(TRIP_ID, data);
+      showToast('✅ 최신 데이터로 업데이트됐어요');
+    }
+  } catch(e) { console.warn('온라인 복귀 로드 실패:', e); }
+});
+
+window.addEventListener('offline', () => {
+  showOfflineBanner('📴 오프라인 모드 — 저장된 데이터로 표시 중');
+});
 
 document.getElementById('save-btn').onclick = saveAll;
 
