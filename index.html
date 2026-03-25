@@ -2957,6 +2957,19 @@ function renderSearchResults(top, resultsEl, activeMap) {
     item.addEventListener('click', () => openMapPlaceCard(place, i));
     resultsEl.appendChild(item);
   });
+
+  // 하단 닫기 버튼
+  const closeRow = document.createElement('div');
+  closeRow.style.cssText = 'display:flex;justify-content:center;padding:10px 0 8px;border-top:1px solid var(--stone);';
+  closeRow.innerHTML = `
+    <button onclick="closeMapSearchResults()" title="검색 결과 닫기"
+      style="width:32px;height:32px;border-radius:50%;border:2px solid var(--sand);
+             background:var(--white);cursor:pointer;font-size:14px;font-weight:700;
+             color:var(--ink3);display:flex;align-items:center;justify-content:center;
+             transition:all .14s;"
+      onmouseover="this.style.background='var(--stone)';this.style.color='var(--ink)'"
+      onmouseout="this.style.background='var(--white)';this.style.color='var(--ink3)'">✕</button>`;
+  resultsEl.appendChild(closeRow);
 }
 
 // 장소 상세 카드
@@ -3013,13 +3026,14 @@ function clearMapSearchMarkers() { mapSearchMarkers.forEach(m => { try { m.setMa
 function closeMapSearchResults() {
   document.getElementById('map-search-results')?.classList.remove('show');
 }
-// 외부 클릭 시 닫기 — 버튼 클릭은 제외
+// 외부 클릭 시 닫기 — 지도·버튼 클릭은 제외
 document.addEventListener('click', (e) => {
-  const wrap = document.getElementById('map-search-wrap');
-  const card = document.getElementById('map-place-card');
   const btn  = document.getElementById('map-search-btn');
-  // 검색 버튼 자체 클릭은 무시 (mapSearch()가 이미 처리)
+  const card = document.getElementById('map-place-card');
+  // 검색 버튼 클릭은 무시
   if (e.target === btn || btn?.contains(e.target)) return;
+  // 지도 영역 클릭은 결과 닫지 않음
+  if (e.target.closest('#map') || e.target.closest('#map-overlay-map')) return;
   if (!e.target.closest('#map-search-wrap') && !e.target.closest('#map-place-card')) {
     closeMapSearchResults();
     if (card && !card.contains(e.target)) {
