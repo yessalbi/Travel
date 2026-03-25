@@ -5,7 +5,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="여행앱">
     
-    <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
+    <link rel="apple-touch-icon" href="https://github.com/yessalbi/Travel/blob/main/icon.png?raw=true">
 </head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -919,7 +919,82 @@ html, body {
   font-size: 12px; cursor: pointer;
 }
 
-/* 체크박스 리스트 */
+/* 체크 일괄 삭제 버튼 */
+.btn-check-clear {
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px 11px; border-radius: 20px;
+  border: 1.5px solid var(--red); background: none;
+  color: var(--red); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.btn-check-clear:hover { background: var(--red); color: #fff; }
+
+/* 일정 추가 팝업 — 장소 검색 슬라이드 모드 */
+#schedule-overlay.place-search-mode { background: rgba(0,0,0,0.0); }
+#schedule-overlay.place-search-mode .popup {
+  transform: translateX(calc(-50vw + 10px));
+  box-shadow: 4px 0 32px rgba(0,0,0,0.18);
+}
+#schedule-overlay .popup {
+  transition: transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s;
+}
+
+/* 장소 검색 버튼 */
+.sch-name-wrap {
+  display: flex; gap: 6px; align-items: center;
+}
+.sch-name-wrap input { flex: 1; }
+.btn-place-search {
+  padding: 8px 12px; border-radius: 8px; white-space: nowrap;
+  border: 1.5px solid var(--accent2); background: none;
+  color: var(--accent2); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s; flex-shrink: 0;
+}
+.btn-place-search:hover { background: var(--accent2); color: #fff; }
+.btn-place-search.active { background: var(--accent2); color: #fff; }
+
+/* 팝업 위에 뜨는 지도 검색 패널 */
+#sch-place-panel {
+  position: fixed; top: 0; right: 0; width: calc(50vw - 10px);
+  height: 100vh; z-index: 201; display: none;
+  flex-direction: column;
+  background: var(--white);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+}
+#sch-place-panel.open { display: flex; }
+#sch-place-panel-header {
+  padding: 16px 16px 10px;
+  border-bottom: 1px solid var(--stone);
+  display: flex; flex-direction: column; gap: 8px;
+}
+#sch-place-search-bar {
+  display: flex; gap: 6px;
+}
+#sch-place-input {
+  flex: 1; border: 1.5px solid var(--sand); border-radius: 8px;
+  padding: 8px 12px; font-family: inherit; font-size: 13px;
+  outline: none;
+}
+#sch-place-input:focus { border-color: var(--accent2); }
+#sch-place-search-btn {
+  padding: 8px 14px; border-radius: 8px;
+  border: none; background: var(--accent2); color: #fff;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+#sch-place-results {
+  overflow-y: auto; flex: 1;
+}
+.sch-place-result-item {
+  padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--stone);
+  display: flex; flex-direction: column; gap: 3px;
+  transition: background .13s;
+}
+.sch-place-result-item:hover { background: var(--stone); }
+.sch-place-result-name { font-size: 13px; font-weight: 600; color: var(--ink1); }
+.sch-place-result-addr { font-size: 11px; color: var(--ink3); }
+.sch-place-result-item.selected { background: #EBF3FE; border-left: 3px solid var(--accent2); }
+#sch-place-map { flex: 1; min-height: 0; }
+
 .check-group { display: flex; flex-direction: column; gap: 6px; }
 .check-item {
   display: flex; align-items: center; gap: 10px;
@@ -1183,7 +1258,10 @@ html, body {
         <div>
           <div class="check-section-header">
             <div class="section-label">여행 준비물</div>
-            <button class="btn-check-add" onclick="showCheckInlineForm('check-group','checklist')">＋ 추가</button>
+            <div style="display:flex;gap:6px;">
+              <button class="btn-check-clear" onclick="clearCheckedItems('checklist')">✓ 완료 삭제</button>
+              <button class="btn-check-add" onclick="showCheckInlineForm('check-group','checklist')">＋ 추가</button>
+            </div>
           </div>
           <div class="check-group" id="check-group"></div>
         </div>
@@ -1192,7 +1270,10 @@ html, body {
         <div>
           <div class="check-section-header">
             <div class="section-label">바우처 / 티켓</div>
-            <button class="btn-check-add" onclick="showCheckInlineForm('voucher-group','voucher')">＋ 추가</button>
+            <div style="display:flex;gap:6px;">
+              <button class="btn-check-clear" onclick="clearCheckedItems('voucher')">✓ 완료 삭제</button>
+              <button class="btn-check-add" onclick="showCheckInlineForm('voucher-group','voucher')">＋ 추가</button>
+            </div>
           </div>
           <div class="check-group" id="voucher-group"></div>
         </div>
@@ -1257,7 +1338,10 @@ html, body {
     </div>
     <div class="popup-field">
       <label>이름</label>
-      <input type="text" id="sch-name" placeholder="장소 또는 일정 이름" />
+      <div class="sch-name-wrap">
+        <input type="text" id="sch-name" placeholder="장소 또는 일정 이름" />
+        <button class="btn-place-search" id="btn-place-search" onclick="toggleSchPlacePanel()">🔍 장소 검색</button>
+      </div>
     </div>
     <div class="popup-field">
       <label>시간</label>
@@ -1275,7 +1359,7 @@ html, body {
       <input type="hidden" id="sch-latlng" />
     </div>
     <div class="popup-actions">
-      <button class="btn-cancel" onclick="closeOverlay('schedule-overlay')">취소</button>
+      <button class="btn-cancel" onclick="closeSchPlacePanel();closeOverlay('schedule-overlay')">취소</button>
       <button class="btn-save"   onclick="saveScheduleItem()">추가</button>
     </div>
   </div>
@@ -1691,6 +1775,28 @@ function deleteCustomCheckItem(id, type) {
   autoSave();
 }
 
+function clearCheckedItems(type) {
+  if (type === 'checklist') {
+    // 기본 항목 중 체크된 것 → checklistData에서 제거
+    CHECKLIST_ITEMS.forEach(item => { if (checklistData[item.id]) delete checklistData[item.id]; });
+    // 커스텀 항목 중 체크된 것 → 목록에서도 제거
+    customCheckItems = customCheckItems.filter(item => {
+      if (checklistData[item.id]) { delete checklistData[item.id]; return false; }
+      return true;
+    });
+    renderChecklist();
+  } else {
+    VOUCHER_ITEMS.forEach(item => { if (voucherData[item.id]) delete voucherData[item.id]; });
+    customVoucherItems = customVoucherItems.filter(item => {
+      if (voucherData[item.id]) { delete voucherData[item.id]; return false; }
+      return true;
+    });
+    renderVouchers();
+  }
+  autoSave();
+  showToast('완료된 항목을 삭제했어요 ✓');
+}
+
 
 function toggleVoucher(id) {
   voucherData[id] = !voucherData[id];
@@ -2060,6 +2166,7 @@ function openSchedulePopup() {
   selectTypeByValue('food');
   document.querySelector('#schedule-overlay .popup-title').textContent = '일정 추가';
   document.querySelector('#schedule-overlay .btn-save').textContent = '추가';
+  closeSchPlacePanel();
   openOverlay('schedule-overlay');
 }
 
@@ -3622,6 +3729,140 @@ function switchFlightSection(domestic) {
 
 
 // ── 오버레이 유틸 ─────────────────────────────────────────────
+// ── 일정 추가 — 장소 검색 패널 ──────────────────────────────
+let schPlaceMap = null;
+let schPlaceMarkers = [];
+let schPlaceSelected = null;
+
+function toggleSchPlacePanel() {
+  const panel = document.getElementById('sch-place-panel');
+  if (panel.classList.contains('open')) {
+    closeSchPlacePanel();
+  } else {
+    openSchPlacePanel();
+  }
+}
+
+function openSchPlacePanel() {
+  const panel   = document.getElementById('sch-place-panel');
+  const overlay = document.getElementById('schedule-overlay');
+  panel.classList.add('open');
+  overlay.classList.add('place-search-mode');
+  document.getElementById('btn-place-search').classList.add('active');
+
+  // 패널 내 미니 지도 초기화 (한 번만)
+  if (!schPlaceMap && window.google) {
+    const center = map ? map.getCenter() : { lat: 35.6895, lng: 139.6917 };
+    schPlaceMap = new google.maps.Map(document.getElementById('sch-place-map'), {
+      center, zoom: 13,
+      disableDefaultUI: true,
+      gestureHandling: 'greedy',
+      styles: [{ featureType:'poi', elementType:'labels', stylers:[{visibility:'off'}] }],
+    });
+  } else if (schPlaceMap && map) {
+    schPlaceMap.setCenter(map.getCenter());
+    schPlaceMap.setZoom(map.getZoom());
+  }
+
+  // 검색창에 포커스
+  setTimeout(() => {
+    const inp = document.getElementById('sch-place-input');
+    if (inp) inp.focus();
+  }, 320);
+}
+
+function closeSchPlacePanel() {
+  const panel   = document.getElementById('sch-place-panel');
+  const overlay = document.getElementById('schedule-overlay');
+  if (!panel) return;
+  panel.classList.remove('open');
+  overlay.classList.remove('place-search-mode');
+  const btn = document.getElementById('btn-place-search');
+  if (btn) btn.classList.remove('active');
+  schPlaceMarkers.forEach(m => m.setMap(null));
+  schPlaceMarkers = [];
+  schPlaceSelected = null;
+  const results = document.getElementById('sch-place-results');
+  if (results) results.innerHTML = '';
+}
+
+function runSchPlaceSearch() {
+  const q = document.getElementById('sch-place-input').value.trim();
+  if (!q || !schPlaceMap) return;
+  const resultsEl = document.getElementById('sch-place-results');
+  resultsEl.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--ink3);">검색 중…</div>';
+  schPlaceMarkers.forEach(m => m.setMap(null));
+  schPlaceMarkers = [];
+
+  const svc = new google.maps.places.PlacesService(schPlaceMap);
+  svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
+    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+      resultsEl.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--ink3);">검색 결과가 없어요</div>';
+      return;
+    }
+    resultsEl.innerHTML = '';
+    const top = results.slice(0, 6);
+
+    // 지도에 마커 + fitBounds
+    const bounds = new google.maps.LatLngBounds();
+    top.forEach((place, i) => {
+      bounds.extend(place.geometry.location);
+      const marker = new google.maps.Marker({
+        position: place.geometry.location,
+        map: schPlaceMap,
+        label: { text: String(i + 1), color: '#fff', fontWeight: '700', fontSize: '11px' },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#5B4CF5', fillOpacity: 1,
+          strokeColor: '#fff', strokeWeight: 2, scale: 13,
+        },
+        title: place.name,
+      });
+      marker.addListener('click', () => selectSchPlace(place, i));
+      schPlaceMarkers.push(marker);
+    });
+    schPlaceMap.fitBounds(bounds, 40);
+
+    // 결과 리스트
+    top.forEach((place, i) => {
+      const item = document.createElement('div');
+      item.className = 'sch-place-result-item';
+      item.id = 'sch-result-' + i;
+      item.innerHTML = `
+        <div class="sch-place-result-name">
+          <span style="display:inline-block;width:18px;height:18px;border-radius:50%;
+            background:#5B4CF5;color:#fff;font-size:10px;font-weight:700;
+            text-align:center;line-height:18px;margin-right:6px;">${i + 1}</span>
+          ${place.name}
+        </div>
+        <div class="sch-place-result-addr">${place.formatted_address || place.vicinity || ''}</div>`;
+      item.onclick = () => selectSchPlace(place, i);
+      resultsEl.appendChild(item);
+    });
+  });
+}
+
+function selectSchPlace(place, idx) {
+  schPlaceSelected = place;
+  // 이름 자동 입력
+  const nameInput = document.getElementById('sch-name');
+  if (nameInput) nameInput.value = place.name;
+  // 위치 자동 저장
+  schPendingLatLng = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
+  document.getElementById('sch-latlng').value = JSON.stringify(schPendingLatLng);
+  const pb = document.getElementById('sch-pick-btn');
+  if (pb) { pb.textContent = '✅ 위치 등록됨'; pb.classList.add('picked'); }
+  // 선택 표시
+  document.querySelectorAll('.sch-place-result-item').forEach((el, i) => {
+    el.classList.toggle('selected', i === idx);
+  });
+  // 지도 중심 이동
+  schPlaceMap.panTo(place.geometry.location);
+  schPlaceMap.setZoom(16);
+  // 패널 닫고 팝업으로 복귀
+  setTimeout(() => closeSchPlacePanel(), 600);
+}
+
 function openOverlay(id)  { document.getElementById(id).classList.add('show'); }
 function closeOverlay(id) { document.getElementById(id).classList.remove('show'); }
 function closeIfBg(e, id) { if (e.target === document.getElementById(id)) closeOverlay(id); }
@@ -3657,6 +3898,20 @@ window.addEventListener('DOMContentLoaded', init);
     <button class="ov-tab" onclick="closeMapOverlay(2)"><span class="ov-ico">🎒</span>챙겨야할 것</button>
     <button class="ov-tab active" onclick="void(0)"><span class="ov-ico">🗺️</span>지도</button>
   </div>
+</div>
+
+<!-- 일정 추가 — 장소 검색 패널 -->
+<div id="sch-place-panel">
+  <div id="sch-place-panel-header">
+    <div style="font-size:13px;font-weight:700;color:var(--ink1);">🔍 장소 검색</div>
+    <div id="sch-place-search-bar">
+      <input id="sch-place-input" type="text" placeholder="장소명 입력 후 Enter"
+        onkeydown="if(event.key==='Enter')runSchPlaceSearch()" />
+      <button id="sch-place-search-btn" onclick="runSchPlaceSearch()">검색</button>
+    </div>
+  </div>
+  <div id="sch-place-results"></div>
+  <div id="sch-place-map"></div>
 </div>
 
 </body>
