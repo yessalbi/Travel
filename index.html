@@ -1254,6 +1254,75 @@ html, body {
 }
 .check-item:hover .check-del-btn { opacity: 1; pointer-events: all; }
 .check-del-btn:hover { background: #b71c1c; }
+
+/* 바우처 보기 버튼 */
+.voucher-view-btn {
+  flex-shrink: 0; padding: 4px 10px; border-radius: 6px;
+  border: 1.5px solid var(--accent2); background: none;
+  color: var(--accent2); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all .13s;
+  opacity: 0; pointer-events: none; white-space: nowrap;
+}
+.check-item:hover .voucher-view-btn { opacity: 1; pointer-events: all; }
+.voucher-view-btn:hover { background: var(--accent2); color: #fff; }
+.voucher-view-btn.has-pdf { opacity: 1; pointer-events: all; background: var(--accent2); color: #fff; }
+
+/* PDF 뷰어 팝업 */
+#pdf-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+#pdf-overlay.show { opacity: 1; pointer-events: all; }
+#pdf-popup {
+  background: var(--white); border-radius: 20px;
+  width: min(640px, calc(100vw - 32px)); max-height: 92vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25); overflow: hidden;
+  transform: translateY(16px); transition: transform .2s;
+}
+#pdf-overlay.show #pdf-popup { transform: none; }
+#pdf-popup-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px; border-bottom: 1px solid var(--stone); flex-shrink: 0;
+}
+#pdf-popup-title { flex: 1; font-size: 15px; font-weight: 700; color: var(--ink); }
+#pdf-popup-close {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; background: var(--stone); cursor: pointer;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+  color: var(--ink2); transition: background .13s;
+}
+#pdf-popup-close:hover { background: var(--sand); }
+#pdf-popup-body {
+  flex: 1; overflow-y: auto; padding: 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  min-height: 300px;
+}
+#pdf-upload-area {
+  width: 100%; border: 2px dashed var(--sand); border-radius: 16px;
+  padding: 60px 24px; display: flex; flex-direction: column;
+  align-items: center; gap: 14px; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+#pdf-upload-area:hover { border-color: var(--accent2); background: #EBF3FE; }
+.upload-icon { font-size: 52px; }
+.upload-text { font-size: 16px; font-weight: 600; color: var(--ink2); }
+.upload-sub  { font-size: 12px; color: var(--ink3); }
+#pdf-preview-wrap { width: 100%; display: none; flex-direction: column; gap: 12px; }
+#pdf-preview-wrap.show { display: flex; }
+#pdf-frame { width: 100%; height: 62vh; border: none; border-radius: 10px; background: var(--stone); }
+.pdf-action-row { display: flex; gap: 8px; justify-content: center; }
+.pdf-action-btn {
+  padding: 8px 20px; border-radius: 10px; font-family: inherit;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all .14s;
+}
+.pdf-btn-replace { border: 1.5px solid var(--accent2); background: none; color: var(--accent2); }
+.pdf-btn-replace:hover { background: var(--accent2); color: #fff; }
+.pdf-btn-delete  { border: 1.5px solid #E53935; background: none; color: #E53935; }
+.pdf-btn-delete:hover  { background: #E53935; color: #fff; }
+
 /* 바우처 그리드 */
 .voucher-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
@@ -1784,6 +1853,8 @@ async function init() {
   initDateMinLink();
   renderChecklist();
   renderVouchers();
+  // 기기에 저장된 PDF 로드
+  loadAllPdfs();
 
   // Maps 초기화 (별도 async 로드)
   if (window.mapsReady) setupMap();
@@ -1949,6 +2020,7 @@ function renderVouchers() {
   [...visibleDefaults, ...customVoucherItems].forEach(item => {
     const isCustom = customVoucherItems.includes(item);
     const checked  = !!voucherData[item.id];
+    const hasPdf   = !!pdfData[item.id];
     const div = document.createElement('div');
     div.className = 'check-item' + (checked ? ' checked' : '');
     div.innerHTML = `
@@ -1957,16 +2029,112 @@ function renderVouchers() {
         <span class="check-emoji">${item.emoji}</span>
         <span class="check-label">${item.label}</span>
       </div>
+      <button class="voucher-view-btn ${hasPdf ? 'has-pdf' : ''}" title="${hasPdf ? 'PDF 보기' : 'PDF 추가'}">
+        ${hasPdf ? '📄 보기' : '보기'}
+      </button>
       <div class="check-del-sep"></div>
       <button class="check-del-btn" title="삭제">✕</button>`;
     div.querySelector('.check-box').addEventListener('click', () => toggleVoucher(item.id));
     div.querySelector('.check-item-body').addEventListener('click', () => toggleVoucher(item.id));
+    div.querySelector('.voucher-view-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPdfPopup(item.id, item.label);
+    });
     div.querySelector('.check-del-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       deleteCheckItem(item.id, 'voucher', isCustom);
     });
     group.appendChild(div);
   });
+}
+
+// ── PDF 기기 내 저장 (IndexedDB) ──────────────────────────────
+let pdfData = {};           // { itemId: base64String }
+let currentPdfItemId = null;
+
+// IndexedDB PDF 저장/로드 (offlineSave 재사용, 키 prefix 'pdf-')
+async function savePdfToLocal(itemId, base64) {
+  pdfData[itemId] = base64;
+  try { await window.offlineSave('pdf-' + itemId, { base64 }); } catch(e) {}
+}
+async function loadPdfFromLocal(itemId) {
+  try {
+    const snap = await window.offlineLoad('pdf-' + itemId);
+    return snap?.data?.base64 || null;
+  } catch(e) { return null; }
+}
+async function deletePdfFromLocal(itemId) {
+  delete pdfData[itemId];
+  try { await window.offlineDelete('pdf-' + itemId); } catch(e) {}
+}
+
+// 앱 시작 시 저장된 PDF 목록 로드
+async function loadAllPdfs() {
+  const allItems = [...VOUCHER_ITEMS, ...customVoucherItems];
+  await Promise.all(allItems.map(async item => {
+    const b64 = await loadPdfFromLocal(item.id);
+    if (b64) pdfData[item.id] = b64;
+  }));
+  renderVouchers();
+}
+
+function openPdfPopup(itemId, label) {
+  currentPdfItemId = itemId;
+  document.getElementById('pdf-popup-title').textContent = label;
+  const b64 = pdfData[itemId];
+  const uploadArea   = document.getElementById('pdf-upload-area');
+  const previewWrap  = document.getElementById('pdf-preview-wrap');
+  const frame        = document.getElementById('pdf-frame');
+  if (b64) {
+    uploadArea.style.display = 'none';
+    previewWrap.classList.add('show');
+    frame.src = b64;
+  } else {
+    uploadArea.style.display = 'flex';
+    previewWrap.classList.remove('show');
+    frame.src = '';
+  }
+  document.getElementById('pdf-overlay').classList.add('show');
+}
+
+function closePdfPopup(e) {
+  if (e && e.target !== document.getElementById('pdf-overlay') && e.type !== 'click') return;
+  if (e && e.currentTarget === document.getElementById('pdf-overlay') && e.target !== e.currentTarget) return;
+  document.getElementById('pdf-overlay').classList.remove('show');
+  document.getElementById('pdf-frame').src = '';
+  document.getElementById('pdf-file-input').value = '';
+  currentPdfItemId = null;
+}
+
+function onPdfFileSelected(input) {
+  if (!input.files.length || !currentPdfItemId) return;
+  const file = input.files[0];
+  if (file.type !== 'application/pdf') { showToast('PDF 파일만 추가할 수 있어요'); return; }
+  if (file.size > 20 * 1024 * 1024) { showToast('20MB 이하 파일만 가능해요'); return; }
+  showToast('PDF 저장 중…');
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const b64 = e.target.result;
+    await savePdfToLocal(currentPdfItemId, b64);
+    // 팝업 미리보기 업데이트
+    document.getElementById('pdf-upload-area').style.display = 'none';
+    document.getElementById('pdf-preview-wrap').classList.add('show');
+    document.getElementById('pdf-frame').src = b64;
+    renderVouchers();
+    showToast('PDF가 이 기기에 저장됐어요 📄');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function deletePdfFile() {
+  if (!currentPdfItemId) return;
+  await deletePdfFromLocal(currentPdfItemId);
+  document.getElementById('pdf-upload-area').style.display = 'flex';
+  document.getElementById('pdf-preview-wrap').classList.remove('show');
+  document.getElementById('pdf-frame').src = '';
+  document.getElementById('pdf-file-input').value = '';
+  renderVouchers();
+  showToast('PDF를 삭제했어요');
 }
 
 function toggleCheck(id) {
@@ -4694,6 +4862,33 @@ window.addEventListener('DOMContentLoaded', init);
   </div>
   <div id="sch-place-results"></div>
   <div id="sch-place-map"></div>
+</div>
+
+<!-- PDF 뷰어 팝업 -->
+<div id="pdf-overlay" onclick="closePdfPopup(event)">
+  <div id="pdf-popup">
+    <div id="pdf-popup-header">
+      <span id="pdf-popup-title">바우처</span>
+      <button id="pdf-popup-close" onclick="closePdfPopup()">✕</button>
+    </div>
+    <div id="pdf-popup-body">
+      <!-- PDF 없을 때: 업로드 영역 -->
+      <div id="pdf-upload-area" onclick="document.getElementById('pdf-file-input').click()">
+        <div class="upload-icon">📄</div>
+        <div class="upload-text">＋ PDF 추가하기</div>
+        <div class="upload-sub">탭하면 파일을 선택할 수 있어요</div>
+      </div>
+      <!-- PDF 있을 때: 미리보기 -->
+      <div id="pdf-preview-wrap">
+        <iframe id="pdf-frame"></iframe>
+        <div class="pdf-action-row">
+          <button class="pdf-action-btn pdf-btn-replace" onclick="document.getElementById('pdf-file-input').click()">🔄 교체하기</button>
+          <button class="pdf-action-btn pdf-btn-delete" onclick="deletePdfFile()">🗑️ 삭제하기</button>
+        </div>
+      </div>
+      <input type="file" id="pdf-file-input" accept="application/pdf" style="display:none" onchange="onPdfFileSelected(this)">
+    </div>
+  </div>
 </div>
 
 </body>
