@@ -994,8 +994,12 @@ html, body {
   /* 헤더 높이만큼 패딩 조정 */
   #main { padding-top: 110px; }
 
-  /* 토스트 — 상단으로 이동 (하단 배너와 안 겹치도록) */
-  #toast { bottom: auto; top: 120px; }
+  /* 토스트 — 헤더 아래쪽으로 */
+  #toast { bottom: auto; top: 130px; transform: translateX(-50%) translateY(-20px); }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* 제목 살짝 키우기 */
+  #header h1 { font-size: 20px; }
 }
 
 @media (max-width: 480px) {
@@ -1533,10 +1537,11 @@ html, body {
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
   <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
     <button onclick="location.reload()" title="새로고침"
-      style="border:none;background:none;cursor:pointer;font-size:18px;
-             padding:4px 6px;border-radius:8px;transition:background .14s;color:var(--ink3);"
-      onmouseover="this.style.background='var(--stone)'"
-      onmouseout="this.style.background='none'">↺</button>
+      style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
+             font-size:15px;padding:5px 9px;border-radius:8px;
+             transition:all .14s;color:var(--ink3);line-height:1;flex-shrink:0;"
+      onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
+      onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">↺</button>
     <div id="header-badge-group" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
       <span id="trip-id-badge">ID 로드 중…</span>
       <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
