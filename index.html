@@ -706,6 +706,20 @@ html, body {
 }
 #map-search-results.show { display: flex; }
 
+/* 검색결과 닫기 버튼 — 결과창 아래 중앙에 고정 부유 */
+#map-search-close-btn {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  z-index: 21; display: none;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--sand); background: var(--white);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink3);
+  align-items: center; justify-content: center;
+  transition: background .14s, color .14s;
+}
+#map-search-close-btn:hover { background: var(--stone); color: var(--ink); }
+#map-search-close-btn.show { display: flex; }
+
 /* 섹션 헤더 */
 .msr-section-title {
   padding: 10px 16px 4px;
@@ -1434,6 +1448,7 @@ html, body {
         <button id="map-search-btn" onclick="mapSearch()" title="검색">🔍</button>
       </div>
       <div id="map-search-results"></div>
+      <button id="map-search-close-btn" onclick="closeMapSearchResults()" title="검색 결과 닫기">✕</button>
     </div>
     <div id="map-place-card"></div>
     <div id="route-controls">
@@ -2794,7 +2809,11 @@ function deleteMapRecentSearch(q, e) {
 function showMapRecentSearches() {
   const el = document.getElementById('map-search-results');
   if (!el) return;
-  if (!mapRecentSearches.length) { el.classList.remove('show'); return; }
+  if (!mapRecentSearches.length) {
+    el.classList.remove('show');
+    document.getElementById('map-search-close-btn')?.classList.remove('show');
+    return;
+  }
   el.innerHTML = `<div class="msr-section-title">최근 검색</div>`;
   mapRecentSearches.forEach(q => {
     const item = document.createElement('div');
@@ -2958,18 +2977,18 @@ function renderSearchResults(top, resultsEl, activeMap) {
     resultsEl.appendChild(item);
   });
 
-  // 하단 닫기 버튼
-  const closeRow = document.createElement('div');
-  closeRow.style.cssText = 'display:flex;justify-content:center;padding:10px 0 8px;border-top:1px solid var(--stone);';
-  closeRow.innerHTML = `
-    <button onclick="closeMapSearchResults()" title="검색 결과 닫기"
-      style="width:32px;height:32px;border-radius:50%;border:2px solid var(--sand);
-             background:var(--white);cursor:pointer;font-size:14px;font-weight:700;
-             color:var(--ink3);display:flex;align-items:center;justify-content:center;
-             transition:all .14s;"
-      onmouseover="this.style.background='var(--stone)';this.style.color='var(--ink)'"
-      onmouseout="this.style.background='var(--white)';this.style.color='var(--ink3)'">✕</button>`;
-  resultsEl.appendChild(closeRow);
+  // 닫기 버튼을 결과창 바로 아래에 띄움
+  requestAnimationFrame(() => {
+    const closeBtn = document.getElementById('map-search-close-btn');
+    if (!closeBtn) return;
+    const resultsRect = resultsEl.getBoundingClientRect();
+    const wrapRect = resultsEl.closest('#map-search-wrap')?.getBoundingClientRect();
+    if (wrapRect) {
+      const bottom = resultsRect.bottom - wrapRect.top + 8;
+      closeBtn.style.top = bottom + 'px';
+    }
+    closeBtn.classList.add('show');
+  });
 }
 
 // 장소 상세 카드
@@ -3025,6 +3044,7 @@ function closeMapPlaceCard() {
 function clearMapSearchMarkers() { mapSearchMarkers.forEach(m => { try { m.setMap(null); } catch(e) {} }); mapSearchMarkers = []; }
 function closeMapSearchResults() {
   document.getElementById('map-search-results')?.classList.remove('show');
+  document.getElementById('map-search-close-btn')?.classList.remove('show');
 }
 // 외부 클릭 시 닫기 — 지도·버튼 클릭은 제외
 document.addEventListener('click', (e) => {
