@@ -132,6 +132,7 @@
 <script async defer
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo&libraries=places&callback=initMap&language=ko">
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
 :root {
@@ -1340,6 +1341,11 @@ html, body {
 <!-- 헤더 -->
 <div id="header">
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
+  <button onclick="location.reload()" title="새로고침"
+    style="border:none;background:none;cursor:pointer;font-size:18px;
+           padding:4px 6px;border-radius:8px;transition:background .14s;color:var(--ink3);"
+    onmouseover="this.style.background='var(--stone)'"
+    onmouseout="this.style.background='none'">↺</button>
   <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
     <span id="trip-id-badge">ID 로드 중…</span>
     <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
@@ -2134,58 +2140,36 @@ function autoSave() {
 }
 
 // ── 오프라인 스냅샷 복원 ──────────────────────────────────────
-// ── 오프라인 지도 스냅샷 ──────────────────────────────────────
-const MAPS_KEY = 'AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo';
-
-// Static Maps 이미지를 base64로 변환 후 IndexedDB 저장
-// key: 'map-snap-{TRIP_ID}-day{N}'  (day=0 이면 여행정보 탭 전체뷰)
+// ── 오프라인 지도 스냅샷 (html2canvas) ───────────────────────
 async function captureStaticMap(dayNum) {
   if (!map || !navigator.onLine) return;
   const day = (dayNum !== undefined) ? dayNum : currentDay;
   const snapKey = `map-snap-${TRIP_ID}-day${day}`;
   try {
-    const center  = map.getCenter();
-    const zoom    = Math.min(map.getZoom(), 15);
-    const wrapper = document.getElementById('map-wrapper');
-    const w = Math.min(wrapper?.offsetWidth  || 640, 640);
-    const h = Math.min(wrapper?.offsetHeight || 480, 480);
-    const scale = window.devicePixelRatio >= 2 ? 2 : 1;
+    // html2canvas가 로드됐는지 확인
+    if (typeof html2canvas === 'undefined') {
+      console.warn('[오프라인 지도] html2canvas 미로드');
+      return;
+    }
+    const mapEl = document.getElementById('map');
+    if (!mapEl) return;
 
-    // 해당 day 일정 핀
-    const ICN_LAT = 37.4602, ICN_LNG = 126.4407;
-    const items = (scheduleData[day] || [])
-      .filter(it => it.lat && it.lng &&
-        Math.sqrt((it.lat-ICN_LAT)**2+(it.lng-ICN_LNG)**2) > 0.03)
-      .slice(0, 10);
+    showToast('지도 캡처 중… 잠깐 기다려주세요 📸');
 
-    const pinParams = items
-      .map((it, i) => `markers=color:0x5B4CF5%7Clabel:${i+1}%7C${it.lat},${it.lng}`)
-      .join('&');
-
-    const url = `https://maps.googleapis.com/maps/api/staticmap?`
-      + `center=${center.lat()},${center.lng()}`
-      + `&zoom=${zoom}&size=${w}x${h}&scale=${scale}&language=ko`
-      + (pinParams ? `&${pinParams}` : '')
-      + `&key=${MAPS_KEY}`;
-
-    const res  = await fetch(url);
-    if (!res.ok) throw new Error('Static Maps HTTP ' + res.status);
-    const blob = await res.blob();
-    const imageB64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error('FileReader 실패'));
-      reader.readAsDataURL(blob);
+    const canvas = await html2canvas(mapEl, {
+      useCORS: true,
+      allowTaint: true,
+      scale: 1,
+      logging: false,
     });
+    const imageB64 = canvas.toDataURL('image/jpeg', 0.75);
 
-    // offlineSave 구조: { tripId: key, data: {...}, savedAt }
     await window.offlineSave(snapKey, {
       imageB64,
-      center: { lat: center.lat(), lng: center.lng() },
-      zoom, day,
+      day,
       savedAt: new Date().toISOString(),
     });
-    console.log(`[오프라인 지도] Day${day} 스냅샷 저장 완료`);
+    console.log(`[오프라인 지도] Day${day} 스냅샷 저장 완료 (${Math.round(imageB64.length/1024)}KB)`);
   } catch(e) {
     console.warn('[오프라인 지도] 저장 실패:', e);
   }
