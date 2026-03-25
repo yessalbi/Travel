@@ -157,6 +157,13 @@
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo&libraries=places&callback=initMap&language=ko">
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
 
 <style>
 :root {
@@ -1317,33 +1324,50 @@ html, body {
   background: var(--stone); cursor: zoom-in;
 }
 
-/* PDF 전체화면 뷰어 */
+/* PDF 전체화면 뷰어 — 오버레이 모달 */
 #pdf-fullscreen {
   position: fixed; inset: 0; z-index: 600;
-  background: #1a1a1a;
-  display: none; flex-direction: column;
+  background: rgba(0,0,0,0.75);
+  display: none; align-items: center; justify-content: center;
+  padding: 24px;
 }
 #pdf-fullscreen.show { display: flex; }
+#pdf-fullscreen-box {
+  background: #fff; border-radius: 20px;
+  width: min(780px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
 #pdf-fullscreen-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px; background: rgba(0,0,0,0.6);
-  position: absolute; top: 0; left: 0; right: 0; z-index: 1;
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px; border-bottom: 1px solid #eee; flex-shrink: 0;
 }
 #pdf-fullscreen-title {
-  font-size: 14px; font-weight: 600; color: #fff;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+  flex: 1; font-size: 14px; font-weight: 700; color: #1a1a18;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #pdf-fullscreen-close {
-  width: 36px; height: 36px; border-radius: 50%;
-  border: none; background: rgba(255,255,255,0.15);
-  color: #fff; font-size: 16px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .13s; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: #f2f0eb; cursor: pointer;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+  color: #555; transition: background .13s; flex-shrink: 0;
 }
-#pdf-fullscreen-close:hover { background: rgba(255,255,255,0.3); }
-#pdf-fullscreen-frame {
-  width: 100%; flex: 1; border: none;
-  margin-top: 60px; /* 헤더 높이만큼 */
+#pdf-fullscreen-close:hover { background: #e0ddd6; }
+/* PDF 캔버스 스크롤 영역 */
+#pdf-canvas-wrap {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 16px; display: flex; flex-direction: column;
+  align-items: center; gap: 12px; background: #525659;
+  -webkit-overflow-scrolling: touch;
+}
+#pdf-canvas-wrap canvas {
+  border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  max-width: 100%; height: auto;
+}
+#pdf-loading {
+  color: #ccc; font-size: 14px; padding: 40px;
 }
 .pdf-action-row { display: flex; gap: 8px; justify-content: center; }
 .pdf-action-btn {
@@ -2130,18 +2154,48 @@ function openPdfPopup(itemId, label) {
   document.getElementById('pdf-overlay').classList.add('show');
 }
 
-function openPdfFullscreen() {
+async function openPdfFullscreen() {
   const b64   = pdfData[currentPdfItemId];
   const label = document.getElementById('pdf-popup-title').textContent;
   if (!b64) return;
+
   document.getElementById('pdf-fullscreen-title').textContent = label;
-  document.getElementById('pdf-fullscreen-frame').src = b64;
   document.getElementById('pdf-fullscreen').classList.add('show');
+
+  const wrap = document.getElementById('pdf-canvas-wrap');
+  wrap.innerHTML = '<div id="pdf-loading">PDF 불러오는 중…</div>';
+
+  try {
+    // base64 → Uint8Array
+    const base64 = b64.split(',')[1];
+    const binary  = atob(base64);
+    const bytes   = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+    wrap.innerHTML = '';
+
+    // 페이지별 canvas 렌더링
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page     = await pdf.getPage(p);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas   = document.createElement('canvas');
+      canvas.width   = viewport.width;
+      canvas.height  = viewport.height;
+      canvas.style.width  = '100%';
+      canvas.style.height = 'auto';
+      wrap.appendChild(canvas);
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    }
+  } catch(e) {
+    wrap.innerHTML = '<div id="pdf-loading" style="color:#f88">PDF를 불러올 수 없어요</div>';
+    console.warn('PDF.js 렌더링 실패:', e);
+  }
 }
 
 function closePdfFullscreen() {
   document.getElementById('pdf-fullscreen').classList.remove('show');
-  document.getElementById('pdf-fullscreen-frame').src = '';
+  document.getElementById('pdf-canvas-wrap').innerHTML = '<div id="pdf-loading">PDF 불러오는 중…</div>';
 }
 
 function closePdfPopup(e) {
@@ -4911,13 +4965,17 @@ window.addEventListener('DOMContentLoaded', init);
   <div id="sch-place-map"></div>
 </div>
 
-<!-- PDF 전체화면 뷰어 -->
-<div id="pdf-fullscreen">
-  <div id="pdf-fullscreen-header">
-    <span id="pdf-fullscreen-title"></span>
-    <button id="pdf-fullscreen-close" onclick="closePdfFullscreen()">✕</button>
+<!-- PDF 전체화면 뷰어 (PDF.js canvas 렌더링) -->
+<div id="pdf-fullscreen" onclick="if(event.target===this)closePdfFullscreen()">
+  <div id="pdf-fullscreen-box">
+    <div id="pdf-fullscreen-header">
+      <span id="pdf-fullscreen-title"></span>
+      <button id="pdf-fullscreen-close" onclick="closePdfFullscreen()">✕</button>
+    </div>
+    <div id="pdf-canvas-wrap">
+      <div id="pdf-loading">PDF 불러오는 중…</div>
+    </div>
   </div>
-  <iframe id="pdf-fullscreen-frame"></iframe>
 </div>
 
 <!-- PDF 뷰어 팝업 -->
