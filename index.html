@@ -4232,6 +4232,45 @@ function switchPanelTab(idx) {
   document.querySelectorAll('.panel-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
   sessionStorage.setItem('panelTab', idx);
+  // 여행 정보 탭(0) → 맛집&장소 + 모든 일정 핀 전체 보이게
+  if (idx === 0 && map) fitAllPins();
+}
+
+// 맛집&장소 + 전체 일정 핀을 한눈에 보이게 fitBounds
+function fitAllPins() {
+  if (!map) return;
+  const ICN_LAT = 37.4602, ICN_LNG = 126.4407;
+  const coords = [];
+
+  // 맛집&장소 핀
+  (placesData || []).forEach(p => {
+    if (p.lat && p.lng) coords.push({ lat: p.lat, lng: p.lng });
+  });
+
+  // 모든 날짜 일정 핀 (인천공항 제외)
+  Object.values(scheduleData).forEach(dayItems => {
+    (dayItems || []).forEach(item => {
+      if (item.lat && item.lng &&
+        Math.sqrt((item.lat - ICN_LAT)**2 + (item.lng - ICN_LNG)**2) > 0.03) {
+        coords.push({ lat: item.lat, lng: item.lng });
+      }
+    });
+  });
+
+  if (coords.length === 0) return;
+  if (coords.length === 1) { map.setCenter(coords[0]); map.setZoom(14); return; }
+
+  // 중심 계산 후 너무 멀리 떨어진 핀 제외
+  const avgLat = coords.reduce((s,c) => s + c.lat, 0) / coords.length;
+  const avgLng = coords.reduce((s,c) => s + c.lng, 0) / coords.length;
+  const nearby = coords.filter(c =>
+    Math.abs(c.lat - avgLat) < 2 && Math.abs(c.lng - avgLng) < 2
+  );
+  const target = nearby.length >= 2 ? nearby : coords;
+
+  const bounds = new google.maps.LatLngBounds();
+  target.forEach(c => bounds.extend(c));
+  map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
 }
 
 let overlayMap = null;
