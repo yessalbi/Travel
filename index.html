@@ -1341,10 +1341,10 @@ html, body {
 <div id="header">
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
   <span id="build-badge" style="font-size:10px;color:var(--ink3);font-family:monospace;
-    letter-spacing:-0.3px;align-self:flex-end;margin-bottom:10px;">Build : fa509cd</span>
+    letter-spacing:-0.3px;align-self:flex-end;padding-bottom:6px;">Build : fa509cd</span>
   <span id="trip-id-badge">ID 로드 중…</span>
   <button class="header-btn ghost" id="share-btn">🔗 공유</button>
-  <button class="header-btn primary" id="save-btn">저장</button>
+  <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
 </div>
 
 <!-- 메인 -->
@@ -2071,15 +2071,14 @@ const VOUCHER_ITEMS = [
 ];
 
 // ── 저장 ─────────────────────────────────────────────────────
-async function saveAll() {
+function buildPayload() {
   const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
-  const payload = {
+  return {
     title:         getVal('trip-title'),
     startDate:     getVal('trip-start'),
     endDate:       getVal('trip-end'),
     note:          getVal('trip-note'),
     isDomestic,
-    // 해외 항공편
     flightAirline: getVal('flight-airline'),
     flightDepart:  tpToTime('fdep'),
     flightFrom:    getVal('flight-from'),
@@ -2090,7 +2089,6 @@ async function saveAll() {
     returnFrom:    getVal('return-from'),
     returnArrive:  tpToTime('rarr'),
     returnTo:      getVal('return-to'),
-    // 국내 여행
     domDepart:     tpToTime('dom-dep'),
     domHotelName:  getVal('dom-hotel-name'),
     domHotelAddr:  getVal('dom-hotel-addr'),
@@ -2110,8 +2108,11 @@ async function saveAll() {
     mapZoom:       map ? map.getZoom() : 12,
     updatedAt:     new Date().toISOString(),
   };
+}
+
+async function saveAll() {
+  const payload = buildPayload();
   await window.fbSaveTrip(TRIP_ID, payload);
-  // 로컬 스냅샷도 동시 저장 (오프라인 대비)
   window.offlineSave(TRIP_ID, payload).catch(() => {});
   showToast('저장되었습니다 ✓');
   updateTripSummary();
@@ -2182,7 +2183,19 @@ window.addEventListener('offline', () => {
   showOfflineBanner('📴 오프라인 모드 — 저장된 데이터로 표시 중');
 });
 
-document.getElementById('save-btn').onclick = saveAll;
+document.getElementById('save-btn').onclick = async () => {
+  try {
+    // saveAll 통해 현재 상태 payload 수집 후 IndexedDB 저장
+    const payload = buildPayload();
+    await window.offlineSave(TRIP_ID, payload);
+    const btn = document.getElementById('save-btn');
+    btn.textContent = '✅ 저장됨';
+    setTimeout(() => { btn.innerHTML = '📥 오프라인 저장'; }, 1800);
+    showToast('이 기기에 오프라인으로 저장됐어요 📥');
+  } catch(e) {
+    showToast('저장 실패: ' + e.message);
+  }
+};
 
 // ── 공유 ─────────────────────────────────────────────────────
 document.getElementById('share-btn').onclick = () => {
