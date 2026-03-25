@@ -15,7 +15,31 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1a1a2e">
   <link rel="icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
-  <link rel="manifest" href="https://yessalbi.github.io/Travel/manifest.json">
+  <link id="dynamic-manifest" rel="manifest">
+  <script>
+    // 현재 URL의 trip ID를 포함한 manifest를 동적으로 생성
+    // → 홈화면 추가 시 각자의 trip ID로 고정됨
+    (function() {
+      const tripId = new URLSearchParams(location.search).get('trip') || '';
+      const startUrl = location.pathname + (tripId ? '?trip=' + tripId : '');
+      const manifest = {
+        name: '여행 계획판',
+        short_name: '여행앱',
+        start_url: startUrl,
+        display: 'standalone',
+        background_color: '#ffffff',
+        theme_color: '#1a1a2e',
+        icons: [{
+          src: 'https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true',
+          sizes: '192x192',
+          type: 'image/png'
+        }]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      document.getElementById('dynamic-manifest').href = url;
+    })();
+  </script>
 </head>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
