@@ -1312,7 +1312,39 @@ html, body {
 .upload-sub  { font-size: 12px; color: var(--ink3); }
 #pdf-preview-wrap { width: 100%; display: none; flex-direction: column; gap: 12px; }
 #pdf-preview-wrap.show { display: flex; }
-#pdf-frame { width: 100%; height: 62vh; border: none; border-radius: 10px; background: var(--stone); }
+#pdf-frame {
+  width: 100%; height: 62vh; border: none; border-radius: 10px;
+  background: var(--stone); cursor: zoom-in;
+}
+
+/* PDF 전체화면 뷰어 */
+#pdf-fullscreen {
+  position: fixed; inset: 0; z-index: 600;
+  background: #1a1a1a;
+  display: none; flex-direction: column;
+}
+#pdf-fullscreen.show { display: flex; }
+#pdf-fullscreen-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; background: rgba(0,0,0,0.6);
+  position: absolute; top: 0; left: 0; right: 0; z-index: 1;
+}
+#pdf-fullscreen-title {
+  font-size: 14px; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+}
+#pdf-fullscreen-close {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: none; background: rgba(255,255,255,0.15);
+  color: #fff; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .13s; flex-shrink: 0;
+}
+#pdf-fullscreen-close:hover { background: rgba(255,255,255,0.3); }
+#pdf-fullscreen-frame {
+  width: 100%; flex: 1; border: none;
+  margin-top: 60px; /* 헤더 높이만큼 */
+}
 .pdf-action-row { display: flex; gap: 8px; justify-content: center; }
 .pdf-action-btn {
   padding: 8px 20px; border-radius: 10px; font-family: inherit;
@@ -2089,12 +2121,27 @@ function openPdfPopup(itemId, label) {
     uploadArea.style.display = 'none';
     previewWrap.classList.add('show');
     frame.src = b64;
+    frame.title = label;
   } else {
     uploadArea.style.display = 'flex';
     previewWrap.classList.remove('show');
     frame.src = '';
   }
   document.getElementById('pdf-overlay').classList.add('show');
+}
+
+function openPdfFullscreen() {
+  const b64   = pdfData[currentPdfItemId];
+  const label = document.getElementById('pdf-popup-title').textContent;
+  if (!b64) return;
+  document.getElementById('pdf-fullscreen-title').textContent = label;
+  document.getElementById('pdf-fullscreen-frame').src = b64;
+  document.getElementById('pdf-fullscreen').classList.add('show');
+}
+
+function closePdfFullscreen() {
+  document.getElementById('pdf-fullscreen').classList.remove('show');
+  document.getElementById('pdf-fullscreen-frame').src = '';
 }
 
 function closePdfPopup(e) {
@@ -4864,6 +4911,15 @@ window.addEventListener('DOMContentLoaded', init);
   <div id="sch-place-map"></div>
 </div>
 
+<!-- PDF 전체화면 뷰어 -->
+<div id="pdf-fullscreen">
+  <div id="pdf-fullscreen-header">
+    <span id="pdf-fullscreen-title"></span>
+    <button id="pdf-fullscreen-close" onclick="closePdfFullscreen()">✕</button>
+  </div>
+  <iframe id="pdf-fullscreen-frame"></iframe>
+</div>
+
 <!-- PDF 뷰어 팝업 -->
 <div id="pdf-overlay" onclick="closePdfPopup(event)">
   <div id="pdf-popup">
@@ -4880,7 +4936,14 @@ window.addEventListener('DOMContentLoaded', init);
       </div>
       <!-- PDF 있을 때: 미리보기 -->
       <div id="pdf-preview-wrap">
-        <iframe id="pdf-frame"></iframe>
+        <div style="position:relative;cursor:zoom-in;" onclick="openPdfFullscreen()">
+          <iframe id="pdf-frame" style="pointer-events:none;"></iframe>
+          <div style="position:absolute;inset:0;display:flex;align-items:flex-end;
+            justify-content:center;padding-bottom:10px;pointer-events:none;">
+            <span style="background:rgba(0,0,0,0.45);color:#fff;font-size:11px;
+              border-radius:20px;padding:4px 12px;">🔍 탭하면 전체화면으로 볼 수 있어요</span>
+          </div>
+        </div>
         <div class="pdf-action-row">
           <button class="pdf-action-btn pdf-btn-replace" onclick="document.getElementById('pdf-file-input').click()">🔄 교체하기</button>
           <button class="pdf-action-btn pdf-btn-delete" onclick="deletePdfFile()">🗑️ 삭제하기</button>
