@@ -2141,9 +2141,9 @@ function createNewTrip() {
 }
 
 function goToTripList() {
-  const url = new URL(location.href);
-  url.searchParams.delete('trip');
-  location.href = url.toString();
+  // trip 파라미터 없는 순수 URL로 이동
+  const base = location.origin + location.pathname;
+  location.href = base;
 }
 
 function getTripIdFromUrl() {
