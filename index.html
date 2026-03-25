@@ -731,10 +731,10 @@ html, body {
   background: var(--ink); color: #fff;
   padding: 10px 20px; border-radius: 30px;
   font-size: 13px; z-index: 999;
-  transition: transform .3s cubic-bezier(.34,1.56,.64,1);
-  pointer-events: none;
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s;
+  pointer-events: none; opacity: 0;
 }
-#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
 /* 경로 추가 버튼 */
 #route-controls {
@@ -995,8 +995,8 @@ html, body {
   #main { padding-top: 110px; }
 
   /* 토스트 — 헤더 아래쪽으로 */
-  #toast { bottom: auto; top: 130px; transform: translateX(-50%) translateY(-20px); }
-  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast { bottom: auto; top: 130px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
   /* 제목 살짝 키우기 */
   #header h1 { font-size: 20px; }
