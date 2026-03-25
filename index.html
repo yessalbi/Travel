@@ -1491,6 +1491,14 @@ html, body {
   <!-- 지도 -->
   <div id="map-wrapper">
     <div id="map"></div>
+    <!-- 오프라인 지도 대체 레이어 -->
+    <div id="offline-map-layer" style="display:none;position:absolute;inset:0;z-index:5;">
+      <img id="offline-map-img" style="width:100%;height:100%;object-fit:cover;" />
+      <svg id="offline-map-pins" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></svg>
+      <div id="offline-map-label" style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+        background:rgba(0,0,0,0.55);color:#fff;font-size:11px;border-radius:20px;
+        padding:4px 12px;white-space:nowrap;">📴 오프라인 — 저장된 지도</div>
+    </div>
     <!-- 일정 카드 클릭 시 지도 위 표시 -->
     <div id="sch-map-card">
       <span class="smc-icon" id="smc-icon">📌</span>
@@ -2126,6 +2134,77 @@ function autoSave() {
 }
 
 // ── 오프라인 스냅샷 복원 ──────────────────────────────────────
+// ── 오프라인 지도 스냅샷 ──────────────────────────────────────
+const MAPS_KEY = 'AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo';
+const OFFLINE_MAP_IDB_KEY = 'offline-map-snapshot';
+
+// Static Maps 이미지를 base64로 변환해 IndexedDB에 저장
+async function captureStaticMap() {
+  if (!map || !navigator.onLine) return;
+  try {
+    const center  = map.getCenter();
+    const zoom    = Math.min(map.getZoom(), 14); // Static Maps 최대 줌 제한
+    const wrapper = document.getElementById('map-wrapper');
+    const w = wrapper?.offsetWidth  || 800;
+    const h = wrapper?.offsetHeight || 500;
+    const scale = window.devicePixelRatio >= 2 ? 2 : 1;
+
+    // 현재 날 일정 핀 마커 파라미터 생성
+    const items = scheduleData[currentDay] || [];
+    const ICN_LAT = 37.4602, ICN_LNG = 126.4407;
+    const pinParams = items
+      .filter(it => it.lat && it.lng && Math.sqrt((it.lat-ICN_LAT)**2+(it.lng-ICN_LNG)**2) > 0.03)
+      .slice(0, 10)
+      .map((it, i) => `markers=color:0x5B4CF5%7Clabel:${i+1}%7C${it.lat},${it.lng}`)
+      .join('&');
+
+    const url = `https://maps.googleapis.com/maps/api/staticmap?`
+      + `center=${center.lat()},${center.lng()}`
+      + `&zoom=${zoom}&size=${Math.min(w,640)}x${Math.min(h,400)}`
+      + `&scale=${scale}&language=ko`
+      + (pinParams ? `&${pinParams}` : '')
+      + `&key=${MAPS_KEY}`;
+
+    // fetch → blob → base64
+    const res  = await fetch(url);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const b64  = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+
+    // IndexedDB에 저장 (지도 중심·줌·핀 정보 포함)
+    await window.offlineSave(OFFLINE_MAP_IDB_KEY, {
+      tripId: OFFLINE_MAP_IDB_KEY,
+      imageB64: b64,
+      center: { lat: center.lat(), lng: center.lng() },
+      zoom, day: currentDay,
+      pins: items
+        .filter(it => it.lat && it.lng && Math.sqrt((it.lat-ICN_LAT)**2+(it.lng-ICN_LNG)**2) > 0.03)
+        .slice(0, 10)
+        .map((it, i) => ({ name: it.name, lat: it.lat, lng: it.lng, idx: i+1 })),
+      savedAt: new Date().toISOString(),
+    });
+  } catch(e) { console.warn('Static map 저장 실패:', e); }
+}
+
+// 오프라인 지도 레이어 표시
+async function showOfflineMap() {
+  try {
+    const snap = await window.offlineLoad(OFFLINE_MAP_IDB_KEY);
+    if (!snap || !snap.data || !snap.data.imageB64) return;
+    const d = snap.data;
+    document.getElementById('offline-map-img').src = d.imageB64;
+    document.getElementById('offline-map-layer').style.display = 'block';
+    document.getElementById('map').style.display = 'none';
+    // 레이블에 날짜 표시
+    const t = new Date(d.savedAt).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    document.getElementById('offline-map-label').textContent = `📴 오프라인 — Day${d.day} 저장: ${t}`;
+  } catch(e) { console.warn('오프라인 지도 복원 실패:', e); }
+}
+
 async function loadFromLocalSnapshot() {
   try {
     const snap = await window.offlineLoad(TRIP_ID);
@@ -2137,8 +2216,11 @@ async function loadFromLocalSnapshot() {
     } else {
       showOfflineBanner('📴 오프라인 모드 — 저장된 데이터 없음');
     }
+    // 오프라인 지도 이미지 표시
+    await showOfflineMap();
   } catch(e) {
     showOfflineBanner('📴 오프라인 모드');
+    await showOfflineMap();
   }
 }
 
@@ -2169,6 +2251,10 @@ function hideOfflineBanner() {
 // 온라인 복귀 시 Firebase에서 최신 데이터 다시 로드
 window.addEventListener('online', async () => {
   hideOfflineBanner();
+  // 오프라인 지도 레이어 숨기고 실제 지도 복원
+  document.getElementById('offline-map-layer').style.display = 'none';
+  document.getElementById('map').style.display = '';
+  if (window.google && map) google.maps.event.trigger(map, 'resize');
   showToast('🌐 온라인 연결됨 — 최신 데이터 불러오는 중…');
   try {
     const data = await window.fbGetTrip(TRIP_ID);
@@ -2180,19 +2266,20 @@ window.addEventListener('online', async () => {
   } catch(e) { console.warn('온라인 복귀 로드 실패:', e); }
 });
 
-window.addEventListener('offline', () => {
-  showOfflineBanner('📴 오프라인 모드 — 저장된 데이터로 표시 중');
+window.addEventListener('offline', async () => {
+  showOfflineBanner('📴 오프라인 모드 — 저장된 지도로 표시 중');
+  await showOfflineMap();
 });
-
 document.getElementById('save-btn').onclick = async () => {
   try {
-    // saveAll 통해 현재 상태 payload 수집 후 IndexedDB 저장
     const payload = buildPayload();
     await window.offlineSave(TRIP_ID, payload);
+    // 지도 스냅샷도 함께 저장
+    await captureStaticMap();
     const btn = document.getElementById('save-btn');
     btn.textContent = '✅ 저장됨';
     setTimeout(() => { btn.innerHTML = '📥 오프라인 저장'; }, 1800);
-    showToast('이 기기에 오프라인으로 저장됐어요 📥');
+    showToast('데이터 + 지도를 이 기기에 저장했어요 📥');
   } catch(e) {
     showToast('저장 실패: ' + e.message);
   }
