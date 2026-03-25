@@ -656,41 +656,134 @@ html, body {
 /* 지도 위치 검색창 */
 #map-search-wrap {
   position: absolute; top: 16px; left: 16px; z-index: 10;
-  display: flex; align-items: center; gap: 0;
-  background: var(--white); border-radius: 10px;
-  box-shadow: var(--shadow2);
-  width: 220px;
+  width: 300px;
+}
+#map-search-bar {
+  display: flex; align-items: center;
+  background: var(--white); border-radius: 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  padding: 0 4px 0 14px; height: 46px; gap: 4px;
 }
 #map-search-input {
   flex: 1; border: none; outline: none;
-  padding: 8px 10px; font-family: inherit;
-  font-size: 12px; color: var(--ink); background: transparent;
-  border-radius: 10px 0 0 10px;
+  font-family: inherit; font-size: 14px;
+  color: var(--ink); background: transparent;
 }
 #map-search-input::placeholder { color: var(--ink3); }
 #map-search-btn {
   border: none; background: none; cursor: pointer;
-  padding: 8px 10px; font-size: 14px; color: var(--ink3);
-  transition: color .14s; border-radius: 0 10px 10px 0;
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--ink3); transition: background .14s;
   flex-shrink: 0;
 }
-#map-search-btn:hover { color: var(--accent2); }
+#map-search-btn:hover { background: var(--stone); color: var(--accent2); }
+#map-search-clear {
+  border: none; background: none; cursor: pointer;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: none; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--ink3); transition: background .14s;
+  flex-shrink: 0;
+}
+#map-search-clear.show { display: flex; }
+#map-search-clear:hover { background: var(--stone); }
+
+/* 드롭다운 패널 */
 #map-search-results {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-  background: var(--white); border-radius: 10px;
-  box-shadow: var(--shadow2); overflow-y: auto;
-  max-height: 280px;
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--white); border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.16);
   display: none; flex-direction: column;
-  z-index: 20;
+  overflow: hidden; z-index: 20;
 }
 #map-search-results.show { display: flex; }
-.map-search-item {
-  padding: 8px 12px; font-size: 12px; color: var(--ink2);
-  cursor: pointer; border-bottom: 1px solid var(--stone);
-  transition: background .12s;
+
+/* 섹션 헤더 */
+.msr-section-title {
+  padding: 10px 16px 4px;
+  font-size: 11px; font-weight: 600; color: var(--ink3);
+  letter-spacing: 0.5px; text-transform: uppercase;
 }
-.map-search-item:last-child { border-bottom: none; }
-.map-search-item:hover { background: var(--stone); }
+/* 최근 검색 아이템 */
+.msr-recent-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; cursor: pointer;
+  transition: background .12s; border-radius: 0;
+}
+.msr-recent-item:hover { background: var(--stone); }
+.msr-recent-icon {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--stone); display: flex; align-items: center;
+  justify-content: center; font-size: 14px; flex-shrink: 0; color: var(--ink3);
+}
+.msr-recent-text { font-size: 13px; color: var(--ink2); flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msr-recent-del {
+  width: 24px; height: 24px; border-radius: 50%; border: none;
+  background: none; cursor: pointer; font-size: 12px; color: var(--ink3);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .13s, background .13s; flex-shrink: 0;
+}
+.msr-recent-item:hover .msr-recent-del { opacity: 1; }
+.msr-recent-del:hover { background: var(--sand); }
+
+/* 검색 결과 아이템 */
+.msr-result-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 16px; cursor: pointer; transition: background .12s;
+  border-top: 1px solid var(--stone);
+}
+.msr-result-item:first-of-type { border-top: none; }
+.msr-result-item:hover { background: var(--stone); }
+.msr-result-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #4A90E2; color: #fff;
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.msr-result-body { flex: 1; min-width: 0; }
+.msr-result-name { font-size: 13px; font-weight: 600; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msr-result-addr { font-size: 11px; color: var(--ink3); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msr-result-rating { font-size: 11px; color: #f5a623; margin-top: 2px; }
+
+/* 장소 상세 카드 */
+#map-place-card {
+  position: absolute; top: 16px; left: 16px; z-index: 10;
+  width: 300px; background: var(--white); border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  display: none; flex-direction: column; overflow: hidden;
+}
+#map-place-card.show { display: flex; }
+.mpc-back {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px 8px; cursor: pointer;
+  border: none; background: none; font-family: inherit;
+  font-size: 13px; color: var(--accent2); font-weight: 600;
+}
+.mpc-back:hover { color: var(--ink); }
+.mpc-name { font-size: 18px; font-weight: 700; padding: 0 16px 4px; color: var(--ink); }
+.mpc-category { font-size: 12px; color: var(--ink3); padding: 0 16px 8px; }
+.mpc-divider { height: 1px; background: var(--stone); margin: 0 16px; }
+.mpc-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 16px; font-size: 12px; color: var(--ink2);
+}
+.mpc-row-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.mpc-row-text { flex: 1; line-height: 1.4; }
+.mpc-actions {
+  display: flex; gap: 8px; padding: 10px 16px 14px;
+}
+.mpc-action-btn {
+  flex: 1; padding: 8px; border-radius: 10px;
+  border: 1.5px solid var(--sand); background: none;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .14s; color: var(--accent2);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.mpc-action-btn:hover { background: var(--stone); }
+.mpc-action-icon { font-size: 18px; }
 
 
 /* ── 모바일 ── */
@@ -1324,11 +1417,17 @@ html, body {
       <button class="smc-close" onclick="hideSchMapCard()">✕</button>
     </div>
     <div id="map-search-wrap">
-      <input id="map-search-input" type="text" placeholder="🔍 장소 검색"
-        onkeydown="if(event.key==='Enter')mapSearch()" />
-      <button id="map-search-btn" onclick="mapSearch()">→</button>
+      <div id="map-search-bar">
+        <input id="map-search-input" type="text" placeholder="Google 지도 검색"
+          oninput="onMapSearchInput(this.value)"
+          onkeydown="if(event.key==='Enter')mapSearch()"
+          onfocus="onMapSearchFocus()" />
+        <button id="map-search-clear" onclick="clearMapSearch()" title="지우기">✕</button>
+        <button id="map-search-btn" onclick="mapSearch()" title="검색">🔍</button>
+      </div>
       <div id="map-search-results"></div>
     </div>
+    <div id="map-place-card"></div>
     <div id="route-controls">
       <button class="route-btn" id="btn-route-mode" onclick="toggleRouteMode()">🛣️ 경로 추가 모드</button>
       <button class="route-btn" id="btn-clear-route" onclick="clearRoute()">🗑️ 경로 삭제</button>
@@ -2624,104 +2723,227 @@ function fitSchedulePins(fallbackTitle) {
 
 // 여행 제목으로 지도 위치 자동 이동
 // ── 지도 위치 검색 ────────────────────────────────────────────
-let mapSearchMarker = null;   // 검색 결과 임시 마커
-let mapSearchMarkers = [];    // 여러 결과 마커들
 
-function mapSearch() {
-  const q = document.getElementById('map-search-input').value.trim();
-  if (!q || !map) return;
-  runPlacesTextSearch(q);
+// ── 구글맵 스타일 검색 ────────────────────────────────────────
+let mapSearchMarker  = null;
+let mapSearchMarkers = [];
+let mapCurrentPlace  = null;
+// 최근 검색: [{ name, address, lat, lng, placeId, type }]
+let mapRecentSearches = [];
+try { mapRecentSearches = JSON.parse(localStorage.getItem('mapRecentSearches2') || '[]'); } catch(e) {}
+
+function placeTypeEmoji(types) {
+  if (!types || !types.length) return '🕐';
+  const t = types.join(',');
+  if (t.includes('restaurant') || t.includes('food')) return '🍽️';
+  if (t.includes('cafe')) return '☕';
+  if (t.includes('lodging') || t.includes('hotel')) return '🏨';
+  if (t.includes('convenience_store')) return '🏪';
+  if (t.includes('store') || t.includes('shop')) return '🛍️';
+  if (t.includes('park')) return '🌿';
+  if (t.includes('museum')) return '🏛️';
+  if (t.includes('station') || t.includes('transit')) return '🚉';
+  if (t.includes('hospital') || t.includes('pharmacy')) return '🏥';
+  if (t.includes('bank') || t.includes('atm')) return '🏦';
+  return '📍';
 }
 
-function mapSearchAutocomplete(val) { /* 미사용 */ }
+function onMapSearchInput(val) {
+  const clearBtn = document.getElementById('map-search-clear');
+  if (clearBtn) clearBtn.classList.toggle('show', val.length > 0);
+  if (!val.trim()) showMapRecentSearches();
+}
+function onMapSearchFocus() {
+  const val = (document.getElementById('map-search-input')?.value || '').trim();
+  if (!val) showMapRecentSearches();
+}
+function clearMapSearch() {
+  const inp = document.getElementById('map-search-input');
+  if (inp) inp.value = '';
+  document.getElementById('map-search-clear')?.classList.remove('show');
+  closeMapPlaceCard();
+  clearMapSearchMarkers();
+  showMapRecentSearches();
+  inp?.focus();
+}
 
+// 최근 검색 — 장소 객체 저장
+function saveMapRecentSearch(place) {
+  const entry = {
+    name: place.name,
+    address: place.formatted_address || place.vicinity || '',
+    lat: place.geometry.location.lat(),
+    lng: place.geometry.location.lng(),
+    placeId: place.place_id,
+    types: place.types || [],
+  };
+  mapRecentSearches = [entry, ...mapRecentSearches.filter(r => r.placeId !== entry.placeId)].slice(0, 8);
+  try { localStorage.setItem('mapRecentSearches2', JSON.stringify(mapRecentSearches)); } catch(e) {}
+}
+function deleteMapRecentSearch(placeId, e) {
+  e.stopPropagation();
+  mapRecentSearches = mapRecentSearches.filter(r => r.placeId !== placeId);
+  try { localStorage.setItem('mapRecentSearches2', JSON.stringify(mapRecentSearches)); } catch(e) {}
+  showMapRecentSearches();
+}
+function showMapRecentSearches() {
+  const el = document.getElementById('map-search-results');
+  if (!el) return;
+  if (!mapRecentSearches.length) { el.classList.remove('show'); return; }
+  el.innerHTML = `<div class="msr-section-title">최근 검색</div>`;
+  mapRecentSearches.forEach(h => {
+    const item = document.createElement('div');
+    item.className = 'msr-recent-item';
+    item.innerHTML = `
+      <div class="msr-recent-icon">${placeTypeEmoji(h.types)}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="msr-recent-text" style="font-weight:500;color:var(--ink)">${h.name}</div>
+        <div class="msr-recent-text" style="font-size:11px;color:var(--ink3);margin-top:1px">${h.address}</div>
+      </div>
+      <button class="msr-recent-del" title="삭제">✕</button>`;
+    item.querySelector('.msr-recent-del').addEventListener('click', (e) => deleteMapRecentSearch(h.placeId, e));
+    item.addEventListener('click', () => {
+      const inp = document.getElementById('map-search-input');
+      inp.value = h.name;
+      document.getElementById('map-search-clear')?.classList.add('show');
+      closeMapSearchResults();
+      map.panTo({ lat: h.lat, lng: h.lng });
+      map.setZoom(16);
+      clearMapSearchMarkers();
+      // 빨간 핀
+      const m = new google.maps.Marker({
+        map, position: { lat: h.lat, lng: h.lng }, title: h.name, zIndex: 1000,
+        animation: google.maps.Animation.DROP,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44"><ellipse cx="18" cy="41" rx="7" ry="3" fill="rgba(0,0,0,0.15)"/><path d="M18 2 C9.16 2 2 9.16 2 18 C2 28.5 18 42 18 42 C18 42 34 28.5 34 18 C34 9.16 26.84 2 18 2Z" fill="#EA4335" stroke="#fff" stroke-width="2"/><circle cx="18" cy="18" r="7" fill="#fff" opacity=".9"/></svg>`),
+          scaledSize: new google.maps.Size(36, 44), anchor: new google.maps.Point(18, 44),
+        },
+      });
+      mapSearchMarkers.push(m);
+      if (h.placeId) {
+        const svc = new google.maps.places.PlacesService(map);
+        svc.getDetails({ placeId: h.placeId,
+          fields: ['name','formatted_address','formatted_phone_number','rating','user_ratings_total','opening_hours','website','types','place_id','geometry'],
+          language: 'ko' }, (d, s) => {
+          if (s === google.maps.places.PlacesServiceStatus.OK) renderMapPlaceCard(d, d);
+        });
+      }
+    });
+    el.appendChild(item);
+  });
+  el.classList.add('show');
+}
+
+// 검색 실행
+function mapSearch() {
+  const q = (document.getElementById('map-search-input')?.value || '').trim();
+  if (!q || !map) return;
+  saveMapRecentSearch(q);
+  runPlacesTextSearch(q);
+}
 function runPlacesTextSearch(q) {
   if (!map || !window.google) return;
+  const resultsEl = document.getElementById('map-search-results');
+  resultsEl.innerHTML = `<div class="msr-section-title">검색 중…</div>`;
+  resultsEl.classList.add('show');
+  clearMapSearchMarkers();
+  closeMapPlaceCard();
   const svc = new google.maps.places.PlacesService(map);
   svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
-    clearMapSearchMarkers();
-    const resultsEl = document.getElementById('map-search-results');
     if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
-      resultsEl.innerHTML = '<div class="map-search-item" style="color:var(--ink3);cursor:default">결과가 없어요</div>';
-      resultsEl.classList.add('show');
+      resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요</div>`;
       return;
     }
     resultsEl.innerHTML = '';
-    results.slice(0, 5).forEach((place, i) => {
-      // 결과 마커 표시
+    const top = results.slice(0, 5);
+    top.forEach((place, i) => {
       const marker = new google.maps.Marker({
-        map,
-        position: place.geometry.location,
+        map, position: place.geometry.location, zIndex: 999, title: place.name,
         label: { text: String(i+1), color: '#fff', fontWeight: '700', fontSize: '11px' },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#4A90E2', fillOpacity: 1,
-          strokeColor: '#fff', strokeWeight: 2, scale: 10,
-        },
-        title: place.name,
-        zIndex: 999,
+        icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 13 },
       });
+      marker.addListener('click', () => openMapPlaceCard(place, i));
       mapSearchMarkers.push(marker);
-
-      // 결과 목록 아이템
+    });
+    if (top.length > 1) {
+      const bounds = new google.maps.LatLngBounds();
+      top.forEach(p => bounds.extend(p.geometry.location));
+      map.fitBounds(bounds, { top: 70, bottom: 40, left: 20, right: 20 });
+    } else { map.setCenter(top[0].geometry.location); map.setZoom(16); }
+    top.forEach((place, i) => {
       const item = document.createElement('div');
-      item.className = 'map-search-item';
+      item.className = 'msr-result-item';
+      const ratingText = place.rating ? `⭐ ${place.rating} (${(place.user_ratings_total||0).toLocaleString()})` : '';
       item.innerHTML = `
-        <div style="display:flex;align-items:flex-start;gap:8px">
-          <span style="min-width:18px;height:18px;border-radius:50%;background:#4A90E2;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;flex-shrink:0">${i+1}</span>
-          <div style="min-width:0">
-            <div style="font-weight:600;color:var(--ink);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${place.name}</div>
-            <div style="font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${place.formatted_address || place.vicinity || ''}</div>
-          </div>
+        <div class="msr-result-num">${i+1}</div>
+        <div class="msr-result-body">
+          <div class="msr-result-name">${place.name}</div>
+          <div class="msr-result-addr">${place.formatted_address||place.vicinity||''}</div>
+          ${ratingText ? `<div class="msr-result-rating">${ratingText}</div>` : ''}
         </div>`;
-      item.onclick = () => {
-        map.setCenter(place.geometry.location);
-        map.setZoom(17);
-        document.getElementById('map-search-input').value = place.name;
-        closeMapSearchResults();
-        clearMapSearchMarkers();
-        // 선택된 장소만 마커 남기기
-        const sel = new google.maps.Marker({
-          map,
-          position: place.geometry.location,
-          title: place.name,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            fillColor: '#E24A4A', fillOpacity: 1,
-            strokeColor: '#fff', strokeWeight: 2, scale: 11,
-          },
-          zIndex: 999,
-          animation: google.maps.Animation.DROP,
-        });
-        mapSearchMarkers.push(sel);
-      };
+      item.addEventListener('click', () => openMapPlaceCard(place, i));
       resultsEl.appendChild(item);
     });
-
-    // 결과 전체가 보이게 지도 맞춤
-    if (results.length > 1) {
-      const bounds = new google.maps.LatLngBounds();
-      results.slice(0, 5).forEach(p => bounds.extend(p.geometry.location));
-      map.fitBounds(bounds, { top: 80, bottom: 40, left: 20, right: 20 });
-    } else {
-      map.setCenter(results[0].geometry.location);
-      map.setZoom(16);
-    }
-    resultsEl.classList.add('show');
   });
 }
 
-function clearMapSearchMarkers() {
-  mapSearchMarkers.forEach(m => m.setMap(null));
-  mapSearchMarkers = [];
+// 장소 상세 카드
+function openMapPlaceCard(place, idx) {
+  mapCurrentPlace = place;
+  mapSearchMarkers.forEach((m, i) => {
+    m.setIcon({ path: google.maps.SymbolPath.CIRCLE,
+      fillColor: i===idx ? '#E53935' : '#4A90E2', fillOpacity: 1,
+      strokeColor: '#fff', strokeWeight: 2, scale: i===idx ? 15 : 13 });
+    m.setZIndex(i===idx ? 1000 : 999);
+  });
+  map.panTo(place.geometry.location);
+  document.getElementById('map-search-results').classList.remove('show');
+  const svc = new google.maps.places.PlacesService(map);
+  svc.getDetails({ placeId: place.place_id,
+    fields: ['name','formatted_address','formatted_phone_number','rating','user_ratings_total','opening_hours','website','types'],
+    language: 'ko' }, (d, s) => renderMapPlaceCard(s === google.maps.places.PlacesServiceStatus.OK ? d : place, place));
 }
-
+function renderMapPlaceCard(d, fb) {
+  const card = document.getElementById('map-place-card');
+  const isOpen = d.opening_hours?.isOpen?.();
+  const openText = d.opening_hours ? (isOpen ? '<span style="color:#27AE60">영업 중</span>' : '<span style="color:#E53935">영업 종료</span>') : '';
+  const todayH = d.opening_hours?.weekday_text ? d.opening_hours.weekday_text[new Date().getDay()===0?6:new Date().getDay()-1]?.split(': ')[1] || '' : '';
+  const pid = fb.place_id || '';
+  card.innerHTML = `
+    <button class="mpc-back" onclick="closeMapPlaceCard()">← 검색 결과로</button>
+    <div class="mpc-name">${d.name||fb.name}</div>
+    <div class="mpc-category">${(d.types||[])[0]?.replace(/_/g,' ')||''}</div>
+    <div class="mpc-divider"></div>
+    ${d.formatted_address?`<div class="mpc-row"><span class="mpc-row-icon">📍</span><span class="mpc-row-text">${d.formatted_address}</span></div>`:''}
+    ${openText?`<div class="mpc-row"><span class="mpc-row-icon">🕐</span><span class="mpc-row-text">${openText}${todayH?' · '+todayH:''}</span></div>`:''}
+    ${d.formatted_phone_number?`<div class="mpc-row"><span class="mpc-row-icon">📞</span><span class="mpc-row-text">${d.formatted_phone_number}</span></div>`:''}
+    ${d.rating?`<div class="mpc-row"><span class="mpc-row-icon">⭐</span><span class="mpc-row-text">${d.rating}/5 (리뷰 ${(d.user_ratings_total||0).toLocaleString()}개)</span></div>`:''}
+    <div class="mpc-divider"></div>
+    <div class="mpc-actions">
+      <button class="mpc-action-btn" onclick="window.open('https://www.google.com/maps/place/?q=place_id:${pid}','_blank')"><span class="mpc-action-icon">🗺️</span>구글맵</button>
+      ${d.website?`<button class="mpc-action-btn" onclick="window.open('${d.website}','_blank')"><span class="mpc-action-icon">🌐</span>웹사이트</button>`:''}
+      ${d.formatted_phone_number?`<button class="mpc-action-btn" onclick="window.open('tel:${d.formatted_phone_number}')"><span class="mpc-action-icon">📞</span>전화</button>`:''}
+    </div>`;
+  card.classList.add('show');
+}
+function closeMapPlaceCard() {
+  document.getElementById('map-place-card')?.classList.remove('show');
+  mapCurrentPlace = null;
+  mapSearchMarkers.forEach(m => m.setIcon({
+    path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1,
+    strokeColor: '#fff', strokeWeight: 2, scale: 13 }));
+  const q = document.getElementById('map-search-input')?.value.trim();
+  if (q && mapSearchMarkers.length) document.getElementById('map-search-results')?.classList.add('show');
+}
+function clearMapSearchMarkers() { mapSearchMarkers.forEach(m => m.setMap(null)); mapSearchMarkers = []; }
 function closeMapSearchResults() {
-  const el = document.getElementById('map-search-results');
-  if (el) { el.classList.remove('show'); el.innerHTML = ''; }
+  document.getElementById('map-search-results')?.classList.remove('show');
 }
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('#map-search-wrap')) closeMapSearchResults();
+  if (!e.target.closest('#map-search-wrap') && !e.target.closest('#map-place-card')) {
+    closeMapSearchResults();
+    closeMapPlaceCard();
+  }
 });
 
 function geocodeAndMoveMap(titleText) {
