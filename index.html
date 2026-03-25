@@ -75,6 +75,17 @@
   window.fbDeletePlace = async (tripId, placeId) => {
     await db.collection("trips").doc(tripId).collection("places").doc(placeId).delete();
   };
+
+  // 여행 전체 삭제 (places 서브컬렉션 포함)
+  window.fbDeleteTrip = async (tripId) => {
+    // places 서브컬렉션 먼저 삭제
+    const places = await db.collection("trips").doc(tripId).collection("places").get();
+    const batch = db.batch();
+    places.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    // trip 문서 삭제
+    await db.collection("trips").doc(tripId).delete();
+  };
   window.fbWatchPlaces = (tripId, cb) => {
     return db.collection("trips").doc(tripId).collection("places").onSnapshot(snap => {
       const places = [];
@@ -90,6 +101,29 @@
   window.fbGetTripMeta = async (tripId) => {
     const snap = await db.collection("trips").doc(tripId).get();
     return snap.exists ? { id: tripId, ...snap.data() } : null;
+  };
+
+  // 전체 trips 목록 가져오기
+  window.fbGetAllTrips = async () => {
+    try {
+      // updatedAt 기준 정렬 시도
+      const snap = await db.collection("trips").orderBy("updatedAt", "desc").get();
+      const result = [];
+      snap.forEach(doc => {
+        const d = doc.data();
+        if (d.title) result.push({ id: doc.id, ...d }); // 제목 있는 것만
+      });
+      return result;
+    } catch(e) {
+      // 인덱스 없으면 정렬 없이 가져오기
+      const snap = await db.collection("trips").get();
+      const result = [];
+      snap.forEach(doc => {
+        const d = doc.data();
+        if (d.title) result.push({ id: doc.id, ...d });
+      });
+      return result.sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
+    }
   };
 </script>
 
@@ -1086,16 +1120,29 @@ html, body {
 .tl-card-dday.past { color: var(--ink3); }
 .tl-card-arrow { font-size: 18px; color: var(--sand); flex-shrink: 0; }
 .tl-card-del {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 8px;
   border: none; background: none; cursor: pointer;
-  font-size: 13px; color: var(--ink3); flex-shrink: 0;
+  font-size: 15px; color: var(--ink3); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  transition: background .13s; opacity: 0;
+  transition: background .13s, opacity .13s; opacity: 0;
 }
 .tl-card:hover .tl-card-del { opacity: 1; }
-.tl-card-del:hover { background: #FFE5E5; color: var(--red); }
+.tl-card-del:hover { background: #FFE5E5; }
 
-/* 새 여행 만들기 버튼 */
+/* 관리자 버튼 */
+#btn-admin {
+  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1.5px solid var(--sand); background: var(--white);
+  color: var(--ink3); font-size: 14px; cursor: pointer;
+  display: none; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: all .14s; opacity: 0.5;
+}
+#btn-admin:hover { opacity: 1; border-color: var(--accent2); color: var(--accent2); }
+#btn-admin.show { display: flex; }
+#btn-admin.active { background: var(--accent2); color: #fff; border-color: var(--accent2); opacity: 1; }
+
 #btn-new-trip {
   width: 100%; max-width: 560px; margin: 8px 20px 0;
   padding: 16px; border-radius: 18px;
@@ -1613,13 +1660,43 @@ html, body {
 <div id="trip-list-screen">
   <div id="trip-list-header">
     <div class="tl-logo">travel<span>.</span></div>
-    <div class="tl-sub">나의 여행 계획</div>
+    <div class="tl-sub" id="tl-sub-text">나의 여행 계획</div>
   </div>
   <div id="trip-list-cards"></div>
   <div style="width:100%;max-width:560px;padding:0 20px;">
     <button id="btn-new-trip" onclick="createNewTrip()">
       <span style="font-size:20px;">＋</span> 새 여행 만들기
     </button>
+  </div>
+</div>
+
+<!-- 관리자 버튼 -->
+<button id="btn-admin" onclick="toggleAdminMode()" title="관리자">⚙</button>
+
+<!-- 관리자 비밀번호 팝업 -->
+<div id="admin-pw-overlay" style="display:none;position:fixed;inset:0;z-index:10000;
+  background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+  <div style="background:var(--white);border-radius:20px;padding:28px;width:280px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.25);display:flex;flex-direction:column;gap:14px;">
+    <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--ink);">
+      🔐 관리자 인증
+    </div>
+    <input id="admin-pw-input" type="password" placeholder="비밀번호 입력"
+      style="border:1.5px solid var(--sand);border-radius:10px;padding:10px 14px;
+             font-family:inherit;font-size:15px;outline:none;letter-spacing:4px;"
+      onkeydown="if(event.key==='Enter')confirmAdminPw()"
+      onfocus="this.style.borderColor='var(--accent2)'"
+      onblur="this.style.borderColor='var(--sand)'" />
+    <div id="admin-pw-error" style="font-size:12px;color:#E53935;display:none;">비밀번호가 틀렸어요</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="closeAdminPw()"
+        style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sand);
+               background:none;font-family:inherit;cursor:pointer;color:var(--ink2);">취소</button>
+      <button onclick="confirmAdminPw()"
+        style="flex:1;padding:10px;border-radius:10px;border:none;
+               background:var(--accent2);color:#fff;font-family:inherit;
+               font-weight:600;cursor:pointer;">확인</button>
+    </div>
   </div>
 </div>
 
@@ -2030,7 +2107,137 @@ let pendingLatLng = null;
 let currentPlaceForMaps = null;
 
 // ── URL 파라미터에서 trip ID ─────────────────────────────────
-// ── 여행 목록 ─────────────────────────────────────────────────
+// ── 관리자 모드 ───────────────────────────────────────────────
+let isAdminMode = false;
+const ADMIN_PW = '2689';
+
+function toggleAdminMode() {
+  if (isAdminMode) {
+    // 관리자 해제
+    isAdminMode = false;
+    document.getElementById('btn-admin').classList.remove('active');
+    document.getElementById('tl-sub-text').textContent = '나의 여행 계획';
+    showTripListScreen();
+  } else {
+    // 비밀번호 입력창 표시
+    const overlay = document.getElementById('admin-pw-overlay');
+    overlay.style.display = 'flex';
+    setTimeout(() => document.getElementById('admin-pw-input').focus(), 100);
+  }
+}
+
+function confirmAdminPw() {
+  const val = document.getElementById('admin-pw-input').value;
+  if (val === ADMIN_PW) {
+    isAdminMode = true;
+    document.getElementById('admin-pw-overlay').style.display = 'none';
+    document.getElementById('admin-pw-input').value = '';
+    document.getElementById('admin-pw-error').style.display = 'none';
+    document.getElementById('btn-admin').classList.add('active');
+    document.getElementById('tl-sub-text').textContent = '전체 여행 계획 (관리자)';
+    showTripListScreen();
+  } else {
+    document.getElementById('admin-pw-error').style.display = 'block';
+    document.getElementById('admin-pw-input').value = '';
+    document.getElementById('admin-pw-input').focus();
+  }
+}
+
+function closeAdminPw() {
+  document.getElementById('admin-pw-overlay').style.display = 'none';
+  document.getElementById('admin-pw-input').value = '';
+  document.getElementById('admin-pw-error').style.display = 'none';
+}
+
+async function showTripListScreen() {
+  document.getElementById('trip-list-screen').classList.add('show');
+  // 관리자 버튼 표시
+  document.getElementById('btn-admin').classList.add('show');
+
+  const container = document.getElementById('trip-list-cards');
+  container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">불러오는 중…</div>';
+
+  const myList = getTripList();
+
+  try {
+    let trips = [];
+
+    if (isAdminMode) {
+      // 관리자: Firestore 전체 trips
+      trips = await window.fbGetAllTrips();
+    } else {
+      // 일반: 내가 방문한 trips만
+      if (!myList.length) {
+        container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">저장된 여행이 없어요<br><br>아래 버튼으로 새 여행을 만들어보세요!</div>';
+        return;
+      }
+      const metas = await Promise.all(myList.map(id => window.fbGetTripMeta(id).catch(() => null)));
+      trips = metas.filter(m => m && m.title);
+    }
+
+    if (!trips.length) {
+      container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">저장된 여행이 없어요</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+
+    trips.forEach(meta => {
+      const tripId    = meta.id;
+      const title     = meta.title || '제목 없는 여행';
+      const emoji     = getTitleEmoji(title).trim() || '✈️';
+      const startDate = meta.startDate;
+      const endDate   = meta.endDate;
+      const ddayText  = getDDayText(startDate, endDate);
+      const ddayClass = getDDayClass(startDate, endDate);
+      const dateRange = formatDateRange(startDate, endDate);
+      const isMine    = myList.includes(tripId);
+
+      const card = document.createElement('div');
+      card.className = 'tl-card';
+      card.innerHTML = `
+        <div class="tl-card-emoji">${emoji}</div>
+        <div class="tl-card-body">
+          <div class="tl-card-title">${title}
+            ${(!isMine && isAdminMode) ? '<span style="font-size:10px;color:var(--ink3);font-weight:400;margin-left:6px;">공유됨</span>' : ''}
+          </div>
+          <div class="tl-card-dates">${dateRange}</div>
+          ${ddayText ? `<div class="tl-card-dday ${ddayClass}">${ddayText}</div>` : ''}
+        </div>
+        <div class="tl-card-arrow">›</div>
+        ${isAdminMode ? '<button class="tl-card-del" title="삭제">🗑️</button>' : ''}`;
+
+      // 삭제 버튼 — 관리자만
+      if (isAdminMode) {
+        card.querySelector('.tl-card-del').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!confirm(`"${title}"\n\n이 여행을 완전히 삭제할까요?\nFirebase에서도 삭제되며 복구할 수 없어요.`)) return;
+          try {
+            await window.fbDeleteTrip(tripId);
+            removeTripFromList(tripId);
+            card.style.transition = 'opacity .3s, transform .3s';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(20px)';
+            setTimeout(() => card.remove(), 300);
+          } catch(err) {
+            alert('삭제 실패: ' + err.message);
+          }
+        });
+      }
+
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.tl-card-del')) return;
+        addTripToList(tripId);
+        enterTrip(tripId);
+      });
+      container.appendChild(card);
+    });
+
+  } catch(e) {
+    console.warn('목록 로드 실패:', e);
+    container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">목록을 불러올 수 없어요</div>';
+  }
+}
 const TRIP_LIST_KEY = 'tripList'; // localStorage에 저장
 
 function getTripList() {
@@ -2076,58 +2283,6 @@ function formatDateRange(startDate, endDate) {
   return endDate ? `${fmt(startDate)} ~ ${fmt(endDate)}` : fmt(startDate);
 }
 
-async function showTripListScreen() {
-  document.getElementById('trip-list-screen').classList.add('show');
-  const container = document.getElementById('trip-list-cards');
-  container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">불러오는 중…</div>';
-
-  const list = getTripList();
-  if (!list.length) {
-    container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">저장된 여행이 없어요<br><br>아래 버튼으로 새 여행을 만들어보세요!</div>';
-    return;
-  }
-
-  // Firebase에서 각 trip 메타 불러오기
-  const metas = await Promise.all(list.map(id => window.fbGetTripMeta(id).catch(() => null)));
-  container.innerHTML = '';
-
-  metas.forEach((meta, i) => {
-    const tripId = list[i];
-    const title = meta?.title || '제목 없는 여행';
-    const emoji = getTitleEmoji(title).trim() || '✈️';
-    const startDate = meta?.startDate;
-    const endDate   = meta?.endDate;
-    const ddayText  = getDDayText(startDate, endDate);
-    const ddayClass = getDDayClass(startDate, endDate);
-    const dateRange = formatDateRange(startDate, endDate);
-
-    const card = document.createElement('div');
-    card.className = 'tl-card';
-    card.innerHTML = `
-      <div class="tl-card-emoji">${emoji}</div>
-      <div class="tl-card-body">
-        <div class="tl-card-title">${title}</div>
-        <div class="tl-card-dates">${dateRange}</div>
-        ${ddayText ? `<div class="tl-card-dday ${ddayClass}">${ddayText}</div>` : ''}
-      </div>
-      <div class="tl-card-arrow">›</div>
-      <button class="tl-card-del" title="목록에서 삭제">✕</button>`;
-
-    card.querySelector('.tl-card-del').addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (confirm(`"${title}"을 목록에서 삭제할까요?\n(여행 데이터는 유지돼요)`)) {
-        removeTripFromList(tripId);
-        card.remove();
-        if (!getTripList().length) showTripListScreen();
-      }
-    });
-    card.addEventListener('click', (e) => {
-      if (e.target.classList.contains('tl-card-del')) return;
-      enterTrip(tripId);
-    });
-    container.appendChild(card);
-  });
-}
 
 function enterTrip(tripId) {
   const url = new URL(location.href);
