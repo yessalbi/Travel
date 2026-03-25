@@ -3192,8 +3192,8 @@ function renderSearchResults(top, resultsEl, activeMap) {
   if (activeMap && top.length > 0) {
     const bounds = new google.maps.LatLngBounds();
     top.forEach(p => p.geometry && bounds.extend(p.geometry.location));
-    if (top.length > 1) activeMap.fitBounds(bounds, { top: 70, bottom: 40, left: 20, right: 20 });
-    else { activeMap.setCenter(top[0].geometry.location); activeMap.setZoom(16); }
+    if (top.length > 1) activeMap.fitBounds(bounds, { top: 120, bottom: 80, left: 80, right: 80 });
+    else { activeMap.setCenter(top[0].geometry.location); activeMap.setZoom(14); }
   }
 
   // 마커 하이라이트 헬퍼
@@ -3955,7 +3955,7 @@ function mapOverlaySearch() {
       item.onmouseenter = () => item.style.background = '#f5f3f0';
       item.onmouseleave = () => item.style.background = '';
       item.onclick = () => {
-        map.setCenter(place.geometry.location); map.setZoom(17);
+        map.setCenter(place.geometry.location); map.setZoom(15);
         document.getElementById('map-overlay-search-input').value = place.name;
         resultsEl.style.display = 'none'; resultsEl.innerHTML = '';
         clearMapSearchMarkers();
