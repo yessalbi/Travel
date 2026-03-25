@@ -1527,6 +1527,8 @@ let checklistData = {};   // { "passport": true, "license": false, ... }
 let voucherData   = {};   // { "flight-out": "base64...", ... }
 let customCheckItems = []; // [{ id, label, emoji }, ...]
 let customVoucherItems = [];
+let deletedCheckIds   = new Set(); // 기본 항목 중 삭제된 id
+let deletedVoucherIds = new Set();
 let currentDay    = 1;
 let totalDays     = 1;
 let selectedType  = 'food';
@@ -1642,6 +1644,8 @@ function applyTripData(data) {
   if (data.vouchers)  { voucherData   = data.vouchers;  }
   if (data.customCheckItems)   customCheckItems   = data.customCheckItems;
   if (data.customVoucherItems) customVoucherItems = data.customVoucherItems;
+  if (data.deletedCheckIds)   deletedCheckIds   = new Set(data.deletedCheckIds);
+  if (data.deletedVoucherIds) deletedVoucherIds = new Set(data.deletedVoucherIds);
   renderChecklist();
   renderVouchers();
   if (data.routePoints) {
@@ -1674,7 +1678,8 @@ function renderChecklist() {
   const group = document.getElementById('check-group');
   if (!group) return;
   group.innerHTML = '';
-  [...CHECKLIST_ITEMS, ...customCheckItems].forEach(item => {
+  const visibleDefaults = CHECKLIST_ITEMS.filter(item => !deletedCheckIds.has(item.id));
+  [...visibleDefaults, ...customCheckItems].forEach(item => {
     const isCustom = customCheckItems.includes(item);
     const checked  = !!checklistData[item.id];
     const div = document.createElement('div');
@@ -1701,7 +1706,8 @@ function renderVouchers() {
   const group = document.getElementById('voucher-group');
   if (!group) return;
   group.innerHTML = '';
-  [...VOUCHER_ITEMS, ...customVoucherItems].forEach(item => {
+  const visibleDefaults = VOUCHER_ITEMS.filter(item => !deletedVoucherIds.has(item.id));
+  [...visibleDefaults, ...customVoucherItems].forEach(item => {
     const isCustom = customVoucherItems.includes(item);
     const checked  = !!voucherData[item.id];
     const div = document.createElement('div');
@@ -1802,15 +1808,24 @@ function editCustomCheckItem(id, type) {
 
 function deleteCheckItem(id, type, isCustom) {
   if (type === 'checklist') {
-    if (isCustom) customCheckItems = customCheckItems.filter(i => i.id !== id);
+    if (isCustom) {
+      customCheckItems = customCheckItems.filter(i => i.id !== id);
+    } else {
+      deletedCheckIds.add(id);
+    }
     delete checklistData[id];
     renderChecklist();
   } else {
-    if (isCustom) customVoucherItems = customVoucherItems.filter(i => i.id !== id);
+    if (isCustom) {
+      customVoucherItems = customVoucherItems.filter(i => i.id !== id);
+    } else {
+      deletedVoucherIds.add(id);
+    }
     delete voucherData[id];
     renderVouchers();
   }
   autoSave();
+  showToast('항목을 삭제했어요');
 }
 
 function deleteCustomCheckItem(id, type) {
@@ -1889,6 +1904,8 @@ async function saveAll() {
     vouchers:           voucherData,
     customCheckItems,
     customVoucherItems,
+    deletedCheckIds:   [...deletedCheckIds],
+    deletedVoucherIds: [...deletedVoucherIds],
     mapCenter:     map ? { lat: map.getCenter().lat(), lng: map.getCenter().lng() } : null,
     mapZoom:       map ? map.getZoom() : 12,
     updatedAt:     new Date().toISOString(),
