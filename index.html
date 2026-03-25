@@ -84,6 +84,12 @@
   window.fbUpdatePlace = async (tripId, placeId, data) => {
     await db.collection("trips").doc(tripId).collection("places").doc(placeId).update(data);
   };
+
+  // 여러 trip 정보 한번에 불러오기
+  window.fbGetTripMeta = async (tripId) => {
+    const snap = await db.collection("trips").doc(tripId).get();
+    return snap.exists ? { id: tripId, ...snap.data() } : null;
+  };
 </script>
 
 <!-- ── 오프라인 스냅샷 (IndexedDB) ── -->
@@ -1028,6 +1034,76 @@ html, body {
   border-top-color: var(--accent);
   animation: spin .7s linear infinite;
 }
+
+/* 여행 목록 화면 */
+#trip-list-screen {
+  position: fixed; inset: 0; z-index: 9998;
+  background: var(--cream);
+  display: none; flex-direction: column; align-items: center;
+  overflow-y: auto; padding: 0 0 40px;
+}
+#trip-list-screen.show { display: flex; }
+#trip-list-header {
+  width: 100%; max-width: 560px;
+  padding: 56px 24px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.tl-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 36px; font-weight: 700; color: var(--ink);
+  margin-bottom: 6px;
+}
+.tl-logo span { color: var(--accent); }
+.tl-sub {
+  font-size: 14px; color: var(--ink3); margin-bottom: 24px;
+}
+#trip-list-cards {
+  width: 100%; max-width: 560px;
+  padding: 0 20px; display: flex; flex-direction: column; gap: 14px;
+}
+.tl-card {
+  background: var(--white); border-radius: 18px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+  padding: 20px 22px; cursor: pointer;
+  display: flex; align-items: center; gap: 16px;
+  transition: transform .15s, box-shadow .15s;
+  border: 1.5px solid transparent;
+}
+.tl-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,0.12); border-color: var(--accent2); }
+.tl-card-emoji { font-size: 32px; flex-shrink: 0; }
+.tl-card-body { flex: 1; min-width: 0; }
+.tl-card-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 17px; font-weight: 700; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tl-card-dates { font-size: 12px; color: var(--ink3); margin-top: 3px; }
+.tl-card-dday {
+  font-size: 12px; font-weight: 700; margin-top: 4px;
+  color: var(--accent);
+}
+.tl-card-dday.past { color: var(--ink3); }
+.tl-card-arrow { font-size: 18px; color: var(--sand); flex-shrink: 0; }
+.tl-card-del {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: none; background: none; cursor: pointer;
+  font-size: 13px; color: var(--ink3); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .13s; opacity: 0;
+}
+.tl-card:hover .tl-card-del { opacity: 1; }
+.tl-card-del:hover { background: #FFE5E5; color: var(--red); }
+
+/* 새 여행 만들기 버튼 */
+#btn-new-trip {
+  width: 100%; max-width: 560px; margin: 8px 20px 0;
+  padding: 16px; border-radius: 18px;
+  border: 2px dashed var(--sand); background: none;
+  font-family: 'Playfair Display', serif;
+  font-size: 16px; color: var(--ink3); cursor: pointer;
+  transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+#btn-new-trip:hover { border-color: var(--accent2); color: var(--accent2); background: #EBF3FE; }
 /* 핀 찍기 모드 */
 #pin-mode-banner {
   position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
@@ -1532,8 +1608,28 @@ html, body {
   <div class="spinner"></div>
 </div>
 
+<!-- 여행 목록 화면 -->
+<div id="trip-list-screen">
+  <div id="trip-list-header">
+    <div class="tl-logo">travel<span>.</span></div>
+    <div class="tl-sub">나의 여행 계획</div>
+  </div>
+  <div id="trip-list-cards"></div>
+  <div style="width:100%;max-width:560px;padding:0 20px;">
+    <button id="btn-new-trip" onclick="createNewTrip()">
+      <span style="font-size:20px;">＋</span> 새 여행 만들기
+    </button>
+  </div>
+</div>
+
 <!-- 헤더 -->
 <div id="header">
+  <button onclick="goToTripList()" title="여행 목록"
+    style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
+           font-size:13px;padding:5px 10px;border-radius:8px;
+           transition:all .14s;color:var(--ink3);white-space:nowrap;flex-shrink:0;"
+    onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
+    onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">← 목록</button>
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
   <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
     <button onclick="location.reload()" title="새로고침"
@@ -1933,6 +2029,123 @@ let pendingLatLng = null;
 let currentPlaceForMaps = null;
 
 // ── URL 파라미터에서 trip ID ─────────────────────────────────
+// ── 여행 목록 ─────────────────────────────────────────────────
+const TRIP_LIST_KEY = 'tripList'; // localStorage에 저장
+
+function getTripList() {
+  try { return JSON.parse(localStorage.getItem(TRIP_LIST_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveTripList(list) {
+  try { localStorage.setItem(TRIP_LIST_KEY, JSON.stringify(list)); } catch(e) {}
+}
+function addTripToList(tripId) {
+  const list = getTripList();
+  if (!list.includes(tripId)) { list.unshift(tripId); saveTripList(list); }
+}
+function removeTripFromList(tripId) {
+  saveTripList(getTripList().filter(id => id !== tripId));
+}
+
+function getDDayText(startDate, endDate) {
+  if (!startDate) return '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const start = new Date(startDate); start.setHours(0,0,0,0);
+  const end   = endDate ? new Date(endDate) : null;
+  if (end) end.setHours(0,0,0,0);
+  const diff = Math.round((start - today) / 86400000);
+  if (diff > 0) return `D-${diff}`;
+  if (diff === 0) return '🎉 오늘 출발!';
+  if (end && today <= end) return '✈️ 여행 중';
+  return '여행 완료';
+}
+
+function getDDayClass(startDate, endDate) {
+  if (!startDate) return '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const start = new Date(startDate); start.setHours(0,0,0,0);
+  const end   = endDate ? new Date(endDate) : null;
+  if (end) end.setHours(0,0,0,0);
+  if (end && today > end) return 'past';
+  return '';
+}
+
+function formatDateRange(startDate, endDate) {
+  if (!startDate) return '날짜 미설정';
+  const fmt = d => new Date(d).toLocaleDateString('ko-KR', { month:'long', day:'numeric' });
+  return endDate ? `${fmt(startDate)} ~ ${fmt(endDate)}` : fmt(startDate);
+}
+
+async function showTripListScreen() {
+  document.getElementById('trip-list-screen').classList.add('show');
+  const container = document.getElementById('trip-list-cards');
+  container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:20px;">불러오는 중…</div>';
+
+  const list = getTripList();
+  if (!list.length) {
+    container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">저장된 여행이 없어요<br><br>아래 버튼으로 새 여행을 만들어보세요!</div>';
+    return;
+  }
+
+  // Firebase에서 각 trip 메타 불러오기
+  const metas = await Promise.all(list.map(id => window.fbGetTripMeta(id).catch(() => null)));
+  container.innerHTML = '';
+
+  metas.forEach((meta, i) => {
+    const tripId = list[i];
+    const title = meta?.title || '제목 없는 여행';
+    const emoji = getTitleEmoji(title).trim() || '✈️';
+    const startDate = meta?.startDate;
+    const endDate   = meta?.endDate;
+    const ddayText  = getDDayText(startDate, endDate);
+    const ddayClass = getDDayClass(startDate, endDate);
+    const dateRange = formatDateRange(startDate, endDate);
+
+    const card = document.createElement('div');
+    card.className = 'tl-card';
+    card.innerHTML = `
+      <div class="tl-card-emoji">${emoji}</div>
+      <div class="tl-card-body">
+        <div class="tl-card-title">${title}</div>
+        <div class="tl-card-dates">${dateRange}</div>
+        ${ddayText ? `<div class="tl-card-dday ${ddayClass}">${ddayText}</div>` : ''}
+      </div>
+      <div class="tl-card-arrow">›</div>
+      <button class="tl-card-del" title="목록에서 삭제">✕</button>`;
+
+    card.querySelector('.tl-card-del').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (confirm(`"${title}"을 목록에서 삭제할까요?\n(여행 데이터는 유지돼요)`)) {
+        removeTripFromList(tripId);
+        card.remove();
+        if (!getTripList().length) showTripListScreen();
+      }
+    });
+    card.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tl-card-del')) return;
+      enterTrip(tripId);
+    });
+    container.appendChild(card);
+  });
+}
+
+function enterTrip(tripId) {
+  const url = new URL(location.href);
+  url.searchParams.set('trip', tripId);
+  location.href = url.toString();
+}
+
+function createNewTrip() {
+  const newId = generateId();
+  addTripToList(newId);
+  enterTrip(newId);
+}
+
+function goToTripList() {
+  const url = new URL(location.href);
+  url.searchParams.delete('trip');
+  location.href = url.toString();
+}
+
 function getTripIdFromUrl() {
   const p = new URLSearchParams(location.search);
   return p.get('trip');
@@ -1948,7 +2161,18 @@ function generateId() {
 
 // ── 초기화 ────────────────────────────────────────────────────
 async function init() {
-  TRIP_ID = getTripIdFromUrl() || generateId();
+  const fromUrl = getTripIdFromUrl();
+
+  // trip ID 없으면 목록 화면
+  if (!fromUrl) {
+    document.getElementById('loading').style.display = 'none';
+    await showTripListScreen();
+    return;
+  }
+
+  TRIP_ID = fromUrl;
+  // 목록에 추가 (첫 방문 or 공유 링크로 들어온 경우)
+  addTripToList(TRIP_ID);
   setTripIdInUrl(TRIP_ID);
   document.getElementById('trip-id-badge').textContent = '🔑 ' + TRIP_ID;
 
