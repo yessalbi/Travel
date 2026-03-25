@@ -1342,7 +1342,7 @@ html, body {
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
   <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
     <span id="trip-id-badge">ID 로드 중…</span>
-    <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : fa509cd</span>
+    <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
   </div>
   <button class="header-btn ghost" id="share-btn">🔗 공유</button>
   <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
@@ -4521,6 +4521,23 @@ function showToast(msg) {
 
 // ── 시작 ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', init);
+
+// 최신 커밋 해시를 GitHub API에서 가져와 빌드 배지에 표시
+(async () => {
+  try {
+    const res = await fetch(
+      'https://api.github.com/repos/yessalbi/Travel/commits/main',
+      { headers: { Accept: 'application/vnd.github.v3+json' } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const hash = data.sha?.slice(0, 7);
+    if (hash) {
+      const badge = document.getElementById('build-badge');
+      if (badge) badge.textContent = 'Build : ' + hash;
+    }
+  } catch(e) { /* 오프라인이거나 API 실패 시 무시 */ }
+})();
 </script>
 <!-- 모바일 지도 전체화면 오버레이 -->
 <div id="map-overlay">
