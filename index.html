@@ -2875,32 +2875,29 @@ function runPlacesTextSearch(q) {
     return;
   }
 
-  const parsed = parseProximityQuery(q);
-  if (parsed) {
-    // 기준 장소 지오코딩 후 nearbySearch
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({ address: parsed.location, language: 'ko' }, (geoResults, geoStatus) => {
-      if (geoStatus !== 'OK' || !geoResults.length) {
-        runTextSearchRaw(q, svc, resultsEl, activeMap); return;
-      }
-      const center = geoResults[0].geometry.location;
-      if (activeMap) { activeMap.setCenter(center); activeMap.setZoom(15); }
-      const nearReq = { location: center, radius: 1000, language: 'ko' };
-      if (parsed.keyword) nearReq.keyword = parsed.keyword;
-      svc.nearbySearch(nearReq, (results, status) => {
-        if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
-          runTextSearchRaw(q, svc, resultsEl, activeMap); return;
-        }
+  const mapCenter = activeMap ? activeMap.getCenter() : null;
+  const mapBounds = activeMap ? activeMap.getBounds() : null;
+  const isNearby  = /근처|주변|가까운|인근|nearby/i.test(q);
+
+  if (isNearby && mapCenter) {
+    const keyword = q.replace(/근처|주변|가까운|인근|nearby/gi, '').trim();
+    svc.nearbySearch({ location: mapCenter, radius: 1500, keyword, language: 'ko' }, (results, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results.length) {
         renderSearchResults(results.slice(0, 20), resultsEl, activeMap);
-      });
+      } else {
+        runTextSearchRaw(q, svc, resultsEl, activeMap, mapCenter, mapBounds);
+      }
     });
   } else {
-    runTextSearchRaw(q, svc, resultsEl, activeMap);
+    runTextSearchRaw(q, svc, resultsEl, activeMap, mapCenter, mapBounds);
   }
 }
 
-function runTextSearchRaw(q, svc, resultsEl, activeMap) {
-  svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
+function runTextSearchRaw(q, svc, resultsEl, activeMap, mapCenter, mapBounds) {
+  const req = { query: q, language: 'ko' };
+  if (mapBounds) req.bounds = mapBounds;
+  else if (mapCenter) req.location = mapCenter;
+  svc.textSearch(req, (results, status) => {
     if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
       resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요</div>`;
       return;
@@ -4259,35 +4256,31 @@ function runSchPlaceSearch() {
   schPlaceMarkers = [];
 
   const svc = new google.maps.places.PlacesService(schPlaceMap);
-  svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
-    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+  const mapCenter = schPlaceMap.getCenter();
+  const mapBounds = schPlaceMap.getBounds();
+  const isNearby  = /근처|주변|가까운|인근|nearby/i.test(q);
+
+  const renderSchResults = (results) => {
+    if (!results || !results.length) {
       resultsEl.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--ink3);">검색 결과가 없어요</div>';
       return;
     }
     resultsEl.innerHTML = '';
-    const top = results.slice(0, 6);
-
-    // 지도에 마커 + fitBounds
+    const top = results.slice(0, 10);
     const bounds = new google.maps.LatLngBounds();
     top.forEach((place, i) => {
+      if (!place.geometry) return;
       bounds.extend(place.geometry.location);
       const marker = new google.maps.Marker({
-        position: place.geometry.location,
-        map: schPlaceMap,
-        label: { text: String(i + 1), color: '#fff', fontWeight: '700', fontSize: '11px' },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#5B4CF5', fillOpacity: 1,
-          strokeColor: '#fff', strokeWeight: 2, scale: 13,
-        },
+        position: place.geometry.location, map: schPlaceMap,
+        label: { text: String(i+1), color: '#fff', fontWeight: '700', fontSize: '11px' },
+        icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#5B4CF5', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 13 },
         title: place.name,
       });
       marker.addListener('click', () => selectSchPlace(place, i));
       schPlaceMarkers.push(marker);
     });
     schPlaceMap.fitBounds(bounds, 40);
-
-    // 결과 리스트
     top.forEach((place, i) => {
       const item = document.createElement('div');
       item.className = 'sch-place-result-item';
@@ -4296,14 +4289,35 @@ function runSchPlaceSearch() {
         <div class="sch-place-result-name">
           <span style="display:inline-block;width:18px;height:18px;border-radius:50%;
             background:#5B4CF5;color:#fff;font-size:10px;font-weight:700;
-            text-align:center;line-height:18px;margin-right:6px;">${i + 1}</span>
+            text-align:center;line-height:18px;margin-right:6px;">${i+1}</span>
           ${place.name}
         </div>
-        <div class="sch-place-result-addr">${place.formatted_address || place.vicinity || ''}</div>`;
+        <div class="sch-place-result-addr">${place.formatted_address||place.vicinity||''}</div>`;
       item.onclick = () => selectSchPlace(place, i);
       resultsEl.appendChild(item);
     });
-  });
+  };
+
+  if (isNearby && mapCenter) {
+    const keyword = q.replace(/근처|주변|가까운|인근|nearby/gi, '').trim();
+    svc.nearbySearch({ location: mapCenter, radius: 1500, keyword, language: 'ko' }, (results, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results.length) {
+        renderSchResults(results);
+      } else {
+        const req = { query: q, language: 'ko' };
+        if (mapBounds) req.bounds = mapBounds;
+        else if (mapCenter) req.location = mapCenter;
+        svc.textSearch(req, (r2, s2) => renderSchResults(s2 === google.maps.places.PlacesServiceStatus.OK ? r2 : []));
+      }
+    });
+  } else {
+    const req = { query: q, language: 'ko' };
+    if (mapBounds) req.bounds = mapBounds;
+    else if (mapCenter) req.location = mapCenter;
+    svc.textSearch(req, (results, status) => {
+      renderSchResults(status === google.maps.places.PlacesServiceStatus.OK ? results : []);
+    });
+  }
 }
 
 function selectSchPlace(place, idx) {
