@@ -745,6 +745,10 @@ html, body {
   #header h1  { font-size: 17px; }
   .popup { padding: 20px; }
   .map-tab-mobile { display: flex; }
+  /* 챙겨야할 것 탭(index 2) 활성 시 지도 숨기기 */
+  body.checklist-active #map-wrapper { display: none; }
+  /* 장소 검색 패널 — 모바일 추가 여백 */
+  #sch-place-panel-header { padding-top: 18px; }
 }
 
 @media (max-width: 480px) {
@@ -930,19 +934,15 @@ html, body {
 .btn-check-clear:hover { background: var(--red); color: #fff; }
 
 /* 일정 추가 팝업 — 장소 검색 슬라이드 모드 */
-/* 장소 검색 모드: 오버레이 배경은 그대로 어둡게 유지 */
+/* ── 장소 검색 패널 ─────────────────────────────────────────── */
+/* 오버레이 배경은 어둡게 유지 */
 #schedule-overlay.place-search-mode { background: rgba(0,0,0,0.35); }
-#schedule-overlay.place-search-mode .popup {
-  box-shadow: 4px 0 32px rgba(0,0,0,0.22);
-}
 #schedule-overlay .popup {
   transition: transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s;
 }
 
 /* 장소 검색 버튼 */
-.sch-name-wrap {
-  display: flex; gap: 6px; align-items: center;
-}
+.sch-name-wrap { display: flex; gap: 6px; align-items: center; }
 .sch-name-wrap input { flex: 1; }
 .btn-place-search {
   padding: 8px 12px; border-radius: 8px; white-space: nowrap;
@@ -950,32 +950,41 @@ html, body {
   color: var(--accent2); font-size: 12px; font-weight: 600;
   cursor: pointer; transition: all .15s; flex-shrink: 0;
 }
-.btn-place-search:hover { background: var(--accent2); color: #fff; }
-.btn-place-search.active { background: var(--accent2); color: #fff; }
+.btn-place-search:hover, .btn-place-search.active { background: var(--accent2); color: #fff; }
 
-/* 검색 패널 — left-panel 오른쪽에 붙음 */
+/* PC: 팝업 오른쪽에 나란히 붙는 패널 */
 #sch-place-panel {
-  position: fixed; top: 0; width: 360px; max-width: calc(100vw - 400px);
-  height: 100vh; z-index: 201; display: none;
-  flex-direction: column;
-  background: var(--white);
-  box-shadow: 4px 0 24px rgba(0,0,0,0.14);
-  border-right: 1px solid var(--sand);
+  position: fixed; top: 50%; transform: translateY(-50%);
+  height: 80vh; max-height: 640px;
+  width: 340px;
+  z-index: 300; display: none; flex-direction: column;
+  background: var(--white); border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.22);
+  overflow: hidden;
 }
 #sch-place-panel.open { display: flex; }
+
+/* 모바일: 바텀 시트 */
+@media (max-width: 768px) {
+  #sch-place-panel {
+    top: auto; bottom: 0; left: 0 !important; right: 0;
+    width: 100% !important; max-width: 100%;
+    height: 75vh; max-height: 75vh;
+    border-radius: 20px 20px 0 0;
+    transform: none;
+  }
+}
+
 #sch-place-panel-header {
   padding: 14px 14px 10px;
   border-bottom: 1px solid var(--stone);
   display: flex; flex-direction: column; gap: 8px;
   flex-shrink: 0;
 }
-#sch-place-search-bar {
-  display: flex; gap: 6px;
-}
+#sch-place-search-bar { display: flex; gap: 6px; }
 #sch-place-input {
   flex: 1; border: 1.5px solid var(--sand); border-radius: 8px;
-  padding: 8px 12px; font-family: inherit; font-size: 13px;
-  outline: none;
+  padding: 8px 12px; font-family: inherit; font-size: 13px; outline: none;
 }
 #sch-place-input:focus { border-color: var(--accent2); }
 #sch-place-search-btn {
@@ -983,21 +992,20 @@ html, body {
   border: none; background: var(--accent2); color: #fff;
   font-size: 13px; font-weight: 600; cursor: pointer;
 }
-/* 결과 리스트 — 내용만큼만, 최대 280px 스크롤 */
+/* 결과 리스트: 내용만큼만, 최대 220px */
 #sch-place-results {
-  flex-shrink: 0;
-  overflow-y: auto;
-  max-height: 280px;
+  flex-shrink: 0; overflow-y: auto; max-height: 220px;
 }
 .sch-place-result-item {
-  padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--stone);
-  display: flex; flex-direction: column; gap: 3px;
-  transition: background .13s;
+  padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--stone);
+  display: flex; flex-direction: column; gap: 3px; transition: background .13s;
 }
 .sch-place-result-item:hover { background: var(--stone); }
 .sch-place-result-name { font-size: 13px; font-weight: 600; color: var(--ink1); }
 .sch-place-result-addr { font-size: 11px; color: var(--ink3); }
 .sch-place-result-item.selected { background: #EBF3FE; border-left: 3px solid var(--accent2); }
+/* 미니 지도: 나머지 공간 전부 */
+#sch-place-map { flex: 1; min-height: 160px; }
 #sch-place-map { flex: 1; min-height: 0; }
 
 .check-group { display: flex; flex-direction: column; gap: 6px; }
@@ -3231,6 +3239,7 @@ function openGoogleMapsPlace() {
 // ── 패널 탭 전환 ──────────────────────────────────────────────
 function switchPanelTab(idx) {
   document.body.classList.remove('map-fullscreen');
+  document.body.classList.toggle('checklist-active', idx === 2);
   document.getElementById('header').style.display = '';
   document.querySelectorAll('.panel-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
@@ -3753,25 +3762,27 @@ function openSchPlacePanel() {
   const overlay = document.getElementById('schedule-overlay');
   const popup   = overlay.querySelector('.popup');
 
-  // left-panel 오른쪽 끝 좌표 계산
-  const leftPanel = document.getElementById('left-panel');
-  const panelRight = leftPanel ? leftPanel.getBoundingClientRect().right : 380;
+  const isMobile = window.innerWidth <= 768;
 
-  // 패널을 left-panel 바로 오른쪽에 배치
-  panel.style.left = panelRight + 'px';
+  if (!isMobile) {
+    // PC: 팝업 오른쪽에 딱 붙여서 배치
+    const popupRect = popup.getBoundingClientRect();
+    const gap = 12;
+    let left = popupRect.right + gap;
+    // 화면 오른쪽 넘치면 팝업 왼쪽에 배치
+    if (left + 340 > window.innerWidth - 8) {
+      left = popupRect.left - 340 - gap;
+    }
+    panel.style.left = left + 'px';
+    panel.style.top  = '50%';
+    panel.style.transform = 'translateY(-50%)';
+  }
+
   panel.classList.add('open');
   overlay.classList.add('place-search-mode');
   document.getElementById('btn-place-search').classList.add('active');
 
-  // 팝업을 left-panel 왼쪽 끝에 맞춰 이동
-  const popupWidth = popup.offsetWidth;
-  const viewportCenterX = window.innerWidth / 2;
-  const targetLeft = leftPanel ? leftPanel.getBoundingClientRect().left + 16 : 16;
-  const currentLeft = viewportCenterX - popupWidth / 2;
-  const shift = targetLeft - currentLeft;
-  popup.style.transform = `translateX(${shift}px)`;
-
-  // 패널 내 미니 지도 초기화 (한 번만)
+  // 미니 지도 초기화 (한 번만)
   if (!schPlaceMap && window.google) {
     const center = map ? map.getCenter() : { lat: 35.6895, lng: 139.6917 };
     schPlaceMap = new google.maps.Map(document.getElementById('sch-place-map'), {
@@ -3782,14 +3793,15 @@ function openSchPlacePanel() {
     });
   } else if (schPlaceMap && map) {
     schPlaceMap.setCenter(map.getCenter());
-    schPlaceMap.setZoom(map.getZoom());
+    schPlaceMap.setZoom(13);
     setTimeout(() => google.maps.event.trigger(schPlaceMap, 'resize'), 50);
   }
 
   setTimeout(() => {
+    if (schPlaceMap) google.maps.event.trigger(schPlaceMap, 'resize');
     const inp = document.getElementById('sch-place-input');
     if (inp) inp.focus();
-  }, 320);
+  }, 100);
 }
 
 function closeSchPlacePanel() {
@@ -3798,9 +3810,6 @@ function closeSchPlacePanel() {
   if (!panel) return;
   panel.classList.remove('open');
   overlay.classList.remove('place-search-mode');
-  // 팝업 위치 원복
-  const popup = overlay.querySelector('.popup');
-  if (popup) popup.style.transform = '';
   const btn = document.getElementById('btn-place-search');
   if (btn) btn.classList.remove('active');
   schPlaceMarkers.forEach(m => m.setMap(null));
