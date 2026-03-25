@@ -2742,7 +2742,7 @@ let mapSearchMarkers = [];
 let mapCurrentPlace  = null;
 // 최근 검색: [{ name, address, lat, lng, placeId, type }]
 let mapRecentSearches = [];
-try { mapRecentSearches = JSON.parse(localStorage.getItem('mapRecentSearches2') || '[]'); } catch(e) {}
+try { mapRecentSearches = JSON.parse(localStorage.getItem('mapRecentSearches') || '[]'); } catch(e) {}
 
 function placeTypeEmoji(types) {
   if (!types || !types.length) return '🕐';
@@ -2780,22 +2780,15 @@ function clearMapSearch() {
 }
 
 // 최근 검색 — 장소 객체 저장
-function saveMapRecentSearch(place) {
-  const entry = {
-    name: place.name,
-    address: place.formatted_address || place.vicinity || '',
-    lat: place.geometry.location.lat(),
-    lng: place.geometry.location.lng(),
-    placeId: place.place_id,
-    types: place.types || [],
-  };
-  mapRecentSearches = [entry, ...mapRecentSearches.filter(r => r.placeId !== entry.placeId)].slice(0, 8);
-  try { localStorage.setItem('mapRecentSearches2', JSON.stringify(mapRecentSearches)); } catch(e) {}
+function saveMapRecentSearch(q) {
+  if (!q || typeof q !== 'string') return;
+  mapRecentSearches = [q, ...mapRecentSearches.filter(r => r !== q)].slice(0, 8);
+  try { localStorage.setItem('mapRecentSearches', JSON.stringify(mapRecentSearches)); } catch(e) {}
 }
-function deleteMapRecentSearch(placeId, e) {
+function deleteMapRecentSearch(q, e) {
   e.stopPropagation();
-  mapRecentSearches = mapRecentSearches.filter(r => r.placeId !== placeId);
-  try { localStorage.setItem('mapRecentSearches2', JSON.stringify(mapRecentSearches)); } catch(e) {}
+  mapRecentSearches = mapRecentSearches.filter(r => r !== q);
+  try { localStorage.setItem('mapRecentSearches', JSON.stringify(mapRecentSearches)); } catch(e) {}
   showMapRecentSearches();
 }
 function showMapRecentSearches() {
@@ -2803,43 +2796,19 @@ function showMapRecentSearches() {
   if (!el) return;
   if (!mapRecentSearches.length) { el.classList.remove('show'); return; }
   el.innerHTML = `<div class="msr-section-title">최근 검색</div>`;
-  mapRecentSearches.forEach(h => {
+  mapRecentSearches.forEach(q => {
     const item = document.createElement('div');
     item.className = 'msr-recent-item';
     item.innerHTML = `
-      <div class="msr-recent-icon">${placeTypeEmoji(h.types)}</div>
-      <div style="flex:1;min-width:0;">
-        <div class="msr-recent-text" style="font-weight:500;color:var(--ink)">${h.name}</div>
-        <div class="msr-recent-text" style="font-size:11px;color:var(--ink3);margin-top:1px">${h.address}</div>
-      </div>
+      <div class="msr-recent-icon">🕐</div>
+      <span class="msr-recent-text">${q}</span>
       <button class="msr-recent-del" title="삭제">✕</button>`;
-    item.querySelector('.msr-recent-del').addEventListener('click', (e) => deleteMapRecentSearch(h.placeId, e));
+    item.querySelector('.msr-recent-del').addEventListener('click', (e) => deleteMapRecentSearch(q, e));
     item.addEventListener('click', () => {
       const inp = document.getElementById('map-search-input');
-      inp.value = h.name;
+      if (inp) { inp.value = q; }
       document.getElementById('map-search-clear')?.classList.add('show');
-      closeMapSearchResults();
-      map.panTo({ lat: h.lat, lng: h.lng });
-      map.setZoom(16);
-      clearMapSearchMarkers();
-      // 빨간 핀
-      const m = new google.maps.Marker({
-        map, position: { lat: h.lat, lng: h.lng }, title: h.name, zIndex: 1000,
-        animation: google.maps.Animation.DROP,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44"><ellipse cx="18" cy="41" rx="7" ry="3" fill="rgba(0,0,0,0.15)"/><path d="M18 2 C9.16 2 2 9.16 2 18 C2 28.5 18 42 18 42 C18 42 34 28.5 34 18 C34 9.16 26.84 2 18 2Z" fill="#EA4335" stroke="#fff" stroke-width="2"/><circle cx="18" cy="18" r="7" fill="#fff" opacity=".9"/></svg>`),
-          scaledSize: new google.maps.Size(36, 44), anchor: new google.maps.Point(18, 44),
-        },
-      });
-      mapSearchMarkers.push(m);
-      if (h.placeId) {
-        const svc = new google.maps.places.PlacesService(map);
-        svc.getDetails({ placeId: h.placeId,
-          fields: ['name','formatted_address','formatted_phone_number','rating','user_ratings_total','opening_hours','website','types','place_id','geometry'],
-          language: 'ko' }, (d, s) => {
-          if (s === google.maps.places.PlacesServiceStatus.OK) renderMapPlaceCard(d, d);
-        });
-      }
+      mapSearch();
     });
     el.appendChild(item);
   });
