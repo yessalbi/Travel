@@ -955,8 +955,8 @@ html, body {
 /* PC: 팝업 오른쪽에 나란히 붙는 패널 */
 #sch-place-panel {
   position: fixed; top: 50%; transform: translateY(-50%);
-  height: 80vh; max-height: 640px;
-  width: 340px;
+  height: 85vh; max-height: 700px;
+  width: 400px;
   z-index: 300; display: none; flex-direction: column;
   background: var(--white); border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.22);
@@ -2484,16 +2484,27 @@ function setupMap() {
     styles: [
       // POI 전체 숨김 후 필요한 것만 켜기
       { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
+      // 음식점 / 편의점 / 카페
       { featureType: 'poi.food_and_drink', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.food_and_drink', elementType: 'labels.text.fill', stylers: [{ color: '#c07040' }] },
+      // 편의점·마트·일반 상점 (business)
+      { featureType: 'poi.business', elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.business', elementType: 'labels.text.fill', stylers: [{ color: '#888844' }] },
+      // 숙소
       { featureType: 'poi.lodging', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.lodging', elementType: 'labels.text.fill', stylers: [{ color: '#5080b0' }] },
+      // 관광지
       { featureType: 'poi.attraction', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.attraction', elementType: 'labels.text.fill', stylers: [{ color: '#9060a0' }] },
+      // 쇼핑
       { featureType: 'poi.shop', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.shop', elementType: 'labels.text.fill', stylers: [{ color: '#807030' }] },
+      // 공원
       { featureType: 'poi.park', elementType: 'labels', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#5a8a5a' }] },
+      // 의료·학교 등 기타 시설
+      { featureType: 'poi.medical', elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.school', elementType: 'all', stylers: [{ visibility: 'on' }] },
       // 대중교통 아이콘 숨기고 역명만
       { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
       { featureType: 'transit.station', elementType: 'labels.text', stylers: [{ visibility: 'on' }] },
@@ -3770,8 +3781,8 @@ function openSchPlacePanel() {
     const gap = 12;
     let left = popupRect.right + gap;
     // 화면 오른쪽 넘치면 팝업 왼쪽에 배치
-    if (left + 340 > window.innerWidth - 8) {
-      left = popupRect.left - 340 - gap;
+    if (left + 400 > window.innerWidth - 8) {
+      left = popupRect.left - 400 - gap;
     }
     panel.style.left = left + 'px';
     panel.style.top  = '50%';
@@ -3782,14 +3793,23 @@ function openSchPlacePanel() {
   overlay.classList.add('place-search-mode');
   document.getElementById('btn-place-search').classList.add('active');
 
-  // 미니 지도 초기화 (한 번만)
   if (!schPlaceMap && window.google) {
     const center = map ? map.getCenter() : { lat: 35.6895, lng: 139.6917 };
+    const poiStyles = [
+      { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
+      { featureType: 'poi.food_and_drink', elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.business',       elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.lodging',        elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.attraction',     elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.shop',           elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.park',           elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+    ];
     schPlaceMap = new google.maps.Map(document.getElementById('sch-place-map'), {
       center, zoom: 13,
       disableDefaultUI: true,
       gestureHandling: 'greedy',
-      styles: [{ featureType:'poi', elementType:'labels', stylers:[{visibility:'off'}] }],
+      styles: poiStyles,
     });
   } else if (schPlaceMap && map) {
     schPlaceMap.setCenter(map.getCenter());
@@ -3936,7 +3956,15 @@ window.addEventListener('DOMContentLoaded', init);
 <!-- 일정 추가 — 장소 검색 패널 -->
 <div id="sch-place-panel">
   <div id="sch-place-panel-header">
-    <div style="font-size:13px;font-weight:700;color:var(--ink1);">🔍 장소 검색</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:13px;font-weight:700;color:var(--ink1);">🔍 장소 검색</div>
+      <button onclick="closeSchPlacePanel()"
+        style="width:28px;height:28px;border-radius:50%;border:none;background:var(--stone);
+               cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;
+               color:var(--ink2);transition:background .13s;"
+        onmouseover="this.style.background='var(--sand)'"
+        onmouseout="this.style.background='var(--stone)'">✕</button>
+    </div>
     <div id="sch-place-search-bar">
       <input id="sch-place-input" type="text" placeholder="장소명 입력 후 Enter"
         onkeydown="if(event.key==='Enter')runSchPlaceSearch()" />
