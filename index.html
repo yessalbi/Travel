@@ -2824,6 +2824,20 @@ function mapSearch() {
   saveMapRecentSearch(q);
   runPlacesTextSearch(q);
 }
+// 쿼리에서 근처/주변 패턴 감지
+const PROXIMITY_KEYWORDS = ['근처', '주변', '인근', '가까운', '근방', 'near', 'nearby'];
+
+function parseProximityQuery(q) {
+  for (const kw of PROXIMITY_KEYWORDS) {
+    const idx = q.indexOf(kw);
+    if (idx === -1) continue;
+    const before = q.slice(0, idx).trim();
+    const after  = q.slice(idx + kw.length).trim();
+    if (before) return { location: before, keyword: after || '' };
+  }
+  return null;
+}
+
 function runPlacesTextSearch(q) {
   if (!window.google) return;
   const resultsEl = document.getElementById('map-search-results');
@@ -2834,95 +2848,115 @@ function runPlacesTextSearch(q) {
   closeMapPlaceCard();
 
   const activeMap = map || window._lastMap;
-  const mapEl = document.getElementById('map');
   let svc;
   try {
-    svc = new google.maps.places.PlacesService(activeMap || mapEl);
+    svc = new google.maps.places.PlacesService(activeMap || document.getElementById('map'));
   } catch(e) {
     resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">지도가 준비되지 않았어요</div>`;
     return;
   }
 
-  // "근처/주변/가까운/nearby" 키워드면 nearbySearch 우선 사용
-  const isNearby = /근처|주변|가까운|인근|nearby/i.test(q);
+  const parsed = parseProximityQuery(q);
+  if (parsed) {
+    // 기준 장소 지오코딩 후 nearbySearch
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ address: parsed.location, language: 'ko' }, (geoResults, geoStatus) => {
+      if (geoStatus !== 'OK' || !geoResults.length) {
+        runTextSearchRaw(q, svc, resultsEl, activeMap); return;
+      }
+      const center = geoResults[0].geometry.location;
+      if (activeMap) { activeMap.setCenter(center); activeMap.setZoom(15); }
+      const nearReq = { location: center, radius: 1000, language: 'ko' };
+      if (parsed.keyword) nearReq.keyword = parsed.keyword;
+      svc.nearbySearch(nearReq, (results, status) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+          runTextSearchRaw(q, svc, resultsEl, activeMap); return;
+        }
+        renderSearchResults(results.slice(0, 20), resultsEl, activeMap);
+      });
+    });
+  } else {
+    runTextSearchRaw(q, svc, resultsEl, activeMap);
+  }
+}
 
-  const renderResults = (results) => {
-    if (!results || !results.length) {
+function runTextSearchRaw(q, svc, resultsEl, activeMap) {
+  svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
+    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
       resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요</div>`;
       return;
     }
-    resultsEl.innerHTML = '';
-    const top = results.slice(0, 20);
+    renderSearchResults(results.slice(0, 20), resultsEl, activeMap);
+  });
+}
 
-    top.forEach((place, i) => {
-      if (!activeMap || !place.geometry) return;
-      const marker = new google.maps.Marker({
-        map: activeMap, position: place.geometry.location, zIndex: 999, title: place.name,
-        label: { text: String(i+1), color: '#fff', fontWeight: '700', fontSize: '10px' },
-        icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 12 },
-      });
-      marker.addListener('click', () => openMapPlaceCard(place, i));
-      mapSearchMarkers.push(marker);
+function renderSearchResults(top, resultsEl, activeMap) {
+  resultsEl.innerHTML = '';
+
+  // 마커 생성
+  top.forEach((place, i) => {
+    if (!activeMap || !place.geometry) return;
+    const marker = new google.maps.Marker({
+      map: activeMap, position: place.geometry.location, zIndex: 10, title: place.name,
+      label: { text: String(i+1), color: '#fff', fontWeight: '700', fontSize: '10px' },
+      icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 12 },
     });
+    marker.addListener('click', () => openMapPlaceCard(place, i));
+    mapSearchMarkers.push(marker);
+  });
 
-    if (activeMap) {
-      if (top.length > 1) {
-        const bounds = new google.maps.LatLngBounds();
-        top.forEach(p => p.geometry && bounds.extend(p.geometry.location));
-        activeMap.fitBounds(bounds, { top: 70, bottom: 40, left: 20, right: 20 });
-      } else if (top[0]?.geometry) {
-        activeMap.setCenter(top[0].geometry.location);
-        activeMap.setZoom(16);
-      }
+  if (activeMap && top.length > 0) {
+    const bounds = new google.maps.LatLngBounds();
+    top.forEach(p => p.geometry && bounds.extend(p.geometry.location));
+    if (top.length > 1) activeMap.fitBounds(bounds, { top: 70, bottom: 40, left: 20, right: 20 });
+    else { activeMap.setCenter(top[0].geometry.location); activeMap.setZoom(16); }
+  }
+
+  // 마커 하이라이트 헬퍼
+  const highlightMarker = (idx, on) => {
+    const m = mapSearchMarkers[idx];
+    if (!m) return;
+    if (on) {
+      m.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#E53935', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5, scale: 16 });
+      m.setLabel({ text: String(idx+1), color: '#fff', fontWeight: '800', fontSize: '11px' });
+      m.setZIndex(1000);
+    } else {
+      m.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 12 });
+      m.setLabel({ text: String(idx+1), color: '#fff', fontWeight: '700', fontSize: '10px' });
+      m.setZIndex(10);
     }
-
-    top.forEach((place, i) => {
-      const item = document.createElement('div');
-      item.className = 'msr-result-item';
-      const ratingStars = place.rating ? `${'★'.repeat(Math.round(place.rating))}${'☆'.repeat(5-Math.round(place.rating))}` : '';
-      const ratingText = place.rating ? `${place.rating} ${ratingStars} (${(place.user_ratings_total||0).toLocaleString()})` : '';
-      const openNow = place.opening_hours?.open_now;
-      const openBadge = place.opening_hours != null
-        ? (openNow ? '<span style="color:#27AE60;font-size:11px;">영업 중</span>' : '<span style="color:#E53935;font-size:11px;">영업 종료</span>')
-        : '';
-      item.innerHTML = `
-        <div class="msr-result-num">${i+1}</div>
-        <div class="msr-result-body">
-          <div class="msr-result-name">${place.name}</div>
-          <div class="msr-result-addr">${place.formatted_address||place.vicinity||''}</div>
-          ${ratingText ? `<div class="msr-result-rating">${ratingText} ${openBadge}</div>` : (openBadge ? `<div style="margin-top:2px">${openBadge}</div>` : '')}
-        </div>`;
-      item.addEventListener('click', () => openMapPlaceCard(place, i));
-      resultsEl.appendChild(item);
-    });
   };
 
-  if (isNearby && activeMap) {
-    // 근처 검색: 현재 지도 중심 기준 1km 반경 nearbySearch
-    // 검색어에서 장소 유형 키워드 추출 (편의점, 음식점, 카페 등)
-    const keyword = q.replace(/근처|주변|가까운|인근|nearby/gi, '').trim();
-    const center = activeMap.getCenter();
-    svc.nearbySearch({
-      location: center,
-      radius: 1000,
-      keyword: keyword,
-      language: 'ko',
-    }, (results, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && results.length) {
-        renderResults(results);
-      } else {
-        // nearbySearch 실패 시 textSearch 폴백
-        svc.textSearch({ query: q, language: 'ko' }, (r2, s2) => {
-          renderResults(s2 === google.maps.places.PlacesServiceStatus.OK ? r2 : []);
-        });
-      }
+  // 리스트 아이템 생성
+  top.forEach((place, i) => {
+    const item = document.createElement('div');
+    item.className = 'msr-result-item';
+    const stars = place.rating ? `${'★'.repeat(Math.round(place.rating))}${'☆'.repeat(5-Math.round(place.rating))}` : '';
+    const ratingText = place.rating ? `${place.rating} ${stars} (${(place.user_ratings_total||0).toLocaleString()})` : '';
+    const openNow = place.opening_hours?.open_now;
+    const openBadge = place.opening_hours != null
+      ? (openNow ? '<span style="color:#27AE60;font-size:11px;">영업 중</span>' : '<span style="color:#E53935;font-size:11px;">영업 종료</span>') : '';
+    item.innerHTML = `
+      <div class="msr-result-num" style="transition:transform .15s,background .15s">${i+1}</div>
+      <div class="msr-result-body">
+        <div class="msr-result-name">${place.name}</div>
+        <div class="msr-result-addr">${place.formatted_address||place.vicinity||''}</div>
+        ${ratingText ? `<div class="msr-result-rating">${ratingText} ${openBadge}</div>` : (openBadge ? `<div style="margin-top:2px">${openBadge}</div>` : '')}
+      </div>`;
+    // 호버 시 마커 하이라이트
+    item.addEventListener('mouseenter', () => {
+      highlightMarker(i, true);
+      item.querySelector('.msr-result-num').style.background = '#E53935';
+      item.querySelector('.msr-result-num').style.transform = 'scale(1.2)';
     });
-  } else {
-    // 일반 텍스트 검색
-    svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
-      renderResults(status === google.maps.places.PlacesServiceStatus.OK ? results : []);
+    item.addEventListener('mouseleave', () => {
+      highlightMarker(i, false);
+      item.querySelector('.msr-result-num').style.background = '';
+      item.querySelector('.msr-result-num').style.transform = '';
     });
-  }
+    item.addEventListener('click', () => openMapPlaceCard(place, i));
+    resultsEl.appendChild(item);
+  });
 }
 
 // 장소 상세 카드
@@ -4110,8 +4144,34 @@ function openSchPlacePanel() {
   overlay.classList.add('place-search-mode');
   document.getElementById('btn-place-search').classList.add('active');
 
+  // 기준 위치: 편집 중이면 해당 일정, 새 추가면 현재 날 마지막 위치 일정, 없으면 메인 지도 중심
+  function getSchPanelCenter() {
+    const items = scheduleData[currentDay] || [];
+    // 편집 중이면 바로 위 일정(편집 대상 이전) 위치
+    let candidates = [];
+    if (editingScheduleIdx !== null) {
+      // 편집 항목 본인 포함해서 위치 있는 것 찾기
+      for (let i = editingScheduleIdx; i >= 0; i--) {
+        if (items[i]?.lat && items[i]?.lng) { candidates.push(items[i]); break; }
+      }
+    }
+    // 새 추가면 현재 날 마지막 위치 등록된 일정
+    if (!candidates.length) {
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (items[i]?.lat && items[i]?.lng) { candidates.push(items[i]); break; }
+      }
+    }
+    if (candidates.length) {
+      return { lat: candidates[0].lat, lng: candidates[0].lng };
+    }
+    // 메인 지도 중심 폴백
+    return map ? { lat: map.getCenter().lat(), lng: map.getCenter().lng() }
+               : { lat: 35.6895, lng: 139.6917 };
+  }
+
+  const center = getSchPanelCenter();
+
   if (!schPlaceMap && window.google) {
-    const center = map ? map.getCenter() : { lat: 35.6895, lng: 139.6917 };
     const poiStyles = [
       { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
       { featureType: 'poi.food_and_drink', elementType: 'all', stylers: [{ visibility: 'on' }] },
@@ -4123,14 +4183,14 @@ function openSchPlacePanel() {
       { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
     ];
     schPlaceMap = new google.maps.Map(document.getElementById('sch-place-map'), {
-      center, zoom: 13,
+      center, zoom: 15,
       disableDefaultUI: true,
       gestureHandling: 'greedy',
       styles: poiStyles,
     });
-  } else if (schPlaceMap && map) {
-    schPlaceMap.setCenter(map.getCenter());
-    schPlaceMap.setZoom(13);
+  } else if (schPlaceMap) {
+    schPlaceMap.setCenter(center);
+    schPlaceMap.setZoom(15);
     setTimeout(() => google.maps.event.trigger(schPlaceMap, 'resize'), 50);
   }
 
