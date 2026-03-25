@@ -2683,7 +2683,9 @@ function renderDayTabs() {
     c.appendChild(btn);
   }
   renderScheduleList();
-  if (map) { drawDayRoutes(); fitDayBounds(currentDay); }
+  // 여행 정보 탭(0)이 활성화되어 있으면 fitDayBounds 건너뜀
+  const activeTab = sessionStorage.getItem('panelTab');
+  if (map && activeTab !== '0') { drawDayRoutes(); fitDayBounds(currentDay); }
 }
 
 // ── 일정 렌더링 ───────────────────────────────────────────────
@@ -4378,6 +4380,17 @@ function restoreUIState() {
     renderDayTabs();
     renderScheduleList();
   }
+  // 탭별 지도 맞춤 — 지도 준비 후 실행
+  const applyMapFit = () => {
+    if (tab === '0' || tab === null) {
+      fitAllPins();
+    } else if (tab !== 'map' && tab !== null) {
+      drawDayRoutes();
+      fitDayBounds(currentDay);
+    }
+  };
+  if (map) applyMapFit();
+  else document.addEventListener('maps-ready', applyMapFit, { once: true });
 }
 
 // ── 여행 설정 위자드 ──────────────────────────────────────────
