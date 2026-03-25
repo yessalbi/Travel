@@ -943,18 +943,59 @@ html, body {
   #left-panel {
     width: 100%; border-right: none;
     border-bottom: 1px solid var(--sand);
-    overflow: hidden;
-    min-height: 0;
+    overflow: hidden; min-height: 0;
   }
   .panel-page { overflow: visible; }
   #map-wrapper { height: 60vw; min-height: 300px; flex-shrink: 0; }
-  #header h1  { font-size: 17px; }
   .popup { padding: 20px; }
   .map-tab-mobile { display: flex; }
-  /* 챙겨야할 것 탭(index 2) 활성 시 지도 숨기기 */
   body.checklist-active #map-wrapper { display: none; }
-  /* 장소 검색 패널 — 모바일 추가 여백 */
   #sch-place-panel-header { padding-top: 18px; }
+
+  /* 모바일 헤더 — 2줄 레이아웃 */
+  #header {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 16px 8px;
+    gap: 6px;
+  }
+  /* 1줄: 제목 중앙 */
+  #header h1 {
+    font-size: 18px;
+    text-align: center;
+    flex: none;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* 2줄: 버튼들 가로 정렬 */
+  #header-btn-row {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+  /* 리프레시 버튼 모바일 크기 */
+  #header-btn-row button[onclick="location.reload()"] {
+    font-size: 16px; padding: 4px 6px;
+  }
+  /* 배지 그룹 */
+  #header-badge-group {
+    flex-direction: column; gap: 1px;
+  }
+  #header h1 span { color: var(--accent); }
+  /* 오프라인 저장 버튼 텍스트 줄이기 */
+  #save-btn { font-size: 12px; padding: 6px 10px; }
+  #share-btn { font-size: 12px; padding: 6px 10px; }
+
+  /* 헤더 높이만큼 패딩 조정 */
+  #main { padding-top: 110px; }
+
+  /* 토스트 — 상단으로 이동 (하단 배너와 안 겹치도록) */
+  #toast { bottom: auto; top: 120px; }
 }
 
 @media (max-width: 480px) {
@@ -1490,17 +1531,19 @@ html, body {
 <!-- 헤더 -->
 <div id="header">
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
-  <button onclick="location.reload()" title="새로고침"
-    style="border:none;background:none;cursor:pointer;font-size:18px;
-           padding:4px 6px;border-radius:8px;transition:background .14s;color:var(--ink3);"
-    onmouseover="this.style.background='var(--stone)'"
-    onmouseout="this.style.background='none'">↺</button>
-  <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-    <span id="trip-id-badge">ID 로드 중…</span>
-    <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
+  <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
+    <button onclick="location.reload()" title="새로고침"
+      style="border:none;background:none;cursor:pointer;font-size:18px;
+             padding:4px 6px;border-radius:8px;transition:background .14s;color:var(--ink3);"
+      onmouseover="this.style.background='var(--stone)'"
+      onmouseout="this.style.background='none'">↺</button>
+    <div id="header-badge-group" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+      <span id="trip-id-badge">ID 로드 중…</span>
+      <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
+    </div>
+    <button class="header-btn ghost" id="share-btn">🔗 공유</button>
+    <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
   </div>
-  <button class="header-btn ghost" id="share-btn">🔗 공유</button>
-  <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
 </div>
 
 <!-- 메인 -->
@@ -2461,8 +2504,6 @@ async function captureStaticMap(dayNum) {
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
 
-    showToast('지도 캡처 중… 잠깐 기다려주세요 📸');
-
     const canvas = await html2canvas(mapEl, {
       useCORS: true,
       allowTaint: true,
@@ -2580,13 +2621,11 @@ document.getElementById('save-btn').onclick = async () => {
   try {
     const payload = buildPayload();
     await window.offlineSave(TRIP_ID, payload);
-    // 현재 보이는 지도 + 모든 day 스냅샷 저장
-    showToast('지도 스냅샷 저장 중… ⏳');
     await captureStaticMap(currentDay);
     const btn = document.getElementById('save-btn');
     btn.textContent = '✅ 저장됨';
     setTimeout(() => { btn.innerHTML = '📥 오프라인 저장'; }, 1800);
-    showToast('데이터 + 지도를 이 기기에 저장했어요 📥');
+    showToast('이 기기에 저장됐어요 📥');
   } catch(e) {
     showToast('저장 실패: ' + e.message);
   }
