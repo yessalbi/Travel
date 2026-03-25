@@ -862,6 +862,63 @@ html, body {
 /* ── 챙겨야할 것 탭 ── */
 #checklist-section { padding: 16px 20px; display: flex; flex-direction: column; gap: 20px; }
 
+/* 섹션 헤더 (라벨 + 추가버튼) */
+.check-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.check-section-header .section-label { margin-bottom: 0; }
+.btn-check-add {
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px 11px; border-radius: 20px;
+  border: 1.5px solid var(--accent2); background: none;
+  color: var(--accent2); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.btn-check-add:hover { background: var(--accent2); color: #fff; }
+
+/* 커스텀 항목 액션 버튼 */
+.check-item-actions {
+  display: flex; gap: 4px; margin-left: auto; flex-shrink: 0;
+}
+.check-item-act {
+  width: 24px; height: 24px; border-radius: 6px;
+  border: none; background: none; cursor: pointer;
+  font-size: 12px; display: flex; align-items: center; justify-content: center;
+  color: var(--ink3); transition: all .13s; opacity: 0;
+}
+.check-item:hover .check-item-act { opacity: 1; }
+.check-item-act:hover { background: var(--sand); color: var(--ink1); }
+.check-item-act.del:hover { background: #FFE5E5; color: var(--red); }
+
+/* 인라인 추가/수정 폼 */
+.check-inline-form {
+  display: flex; gap: 6px; align-items: center;
+  padding: 8px 10px; border-radius: 10px;
+  background: var(--white); border: 1.5px solid var(--accent2);
+  margin-top: 2px;
+}
+.check-inline-form input {
+  flex: 1; border: none; outline: none;
+  font-size: 13px; font-family: inherit; background: none;
+  color: var(--ink1);
+}
+.check-inline-emoji {
+  width: 32px; text-align: center; font-size: 18px; cursor: pointer;
+  border-radius: 6px; padding: 2px;
+}
+.check-inline-emoji:hover { background: var(--stone); }
+.check-inline-confirm {
+  padding: 4px 10px; border-radius: 8px;
+  border: none; background: var(--accent2); color: #fff;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.check-inline-cancel {
+  padding: 4px 8px; border-radius: 8px;
+  border: none; background: var(--stone); color: var(--ink2);
+  font-size: 12px; cursor: pointer;
+}
+
 /* 체크박스 리스트 */
 .check-group { display: flex; flex-direction: column; gap: 6px; }
 .check-item {
@@ -1124,13 +1181,19 @@ html, body {
 
         <!-- 여행 준비물 -->
         <div>
-          <div class="section-label">여행 준비물</div>
+          <div class="check-section-header">
+            <div class="section-label">여행 준비물</div>
+            <button class="btn-check-add" onclick="showCheckInlineForm('check-group','checklist')">＋ 추가</button>
+          </div>
           <div class="check-group" id="check-group"></div>
         </div>
 
         <!-- 바우처 / 티켓 -->
         <div>
-          <div class="section-label">바우처 / 티켓</div>
+          <div class="check-section-header">
+            <div class="section-label">바우처 / 티켓</div>
+            <button class="btn-check-add" onclick="showCheckInlineForm('voucher-group','voucher')">＋ 추가</button>
+          </div>
           <div class="check-group" id="voucher-group"></div>
         </div>
 
@@ -1350,6 +1413,8 @@ let scheduleData  = {};
 let placesData    = [];
 let checklistData = {};   // { "passport": true, "license": false, ... }
 let voucherData   = {};   // { "flight-out": "base64...", ... }
+let customCheckItems = []; // [{ id, label, emoji }, ...]
+let customVoucherItems = [];
 let currentDay    = 1;
 let totalDays     = 1;
 let selectedType  = 'food';
@@ -1461,8 +1526,12 @@ function applyTripData(data) {
   }
   if (data.schedule)     scheduleData  = data.schedule;
   if (data.transitModes) transitModes  = data.transitModes;
-  if (data.checklist) { checklistData = data.checklist; renderChecklist(); }
-  if (data.vouchers)  { voucherData   = data.vouchers;  renderVouchers(); }
+  if (data.checklist) { checklistData = data.checklist; }
+  if (data.vouchers)  { voucherData   = data.vouchers;  }
+  if (data.customCheckItems)   customCheckItems   = data.customCheckItems;
+  if (data.customVoucherItems) customVoucherItems = data.customVoucherItems;
+  renderChecklist();
+  renderVouchers();
   if (data.routePoints) {
     routePoints = data.routePoints;
     if (map) drawRoute();
@@ -1485,20 +1554,50 @@ const CHECKLIST_ITEMS = [
   { id: 'visit-japan', label: 'Visit Japan Web',  emoji: '🇯🇵' },
 ];
 
+// ── 커스텀 항목 추가/수정/삭제 ────────────────────────────────
+const EMOJI_SUGGESTIONS = ['📋','🎫','🎟️','💊','🔑','💳','📱','🔋','🧳','👟','🕶️','🧴','💉','📷','🎧','🪥','🧺','🪪','📝','💰'];
+let checkInlineEditId = null;
 
 function renderChecklist() {
   const group = document.getElementById('check-group');
   if (!group) return;
   group.innerHTML = '';
-  CHECKLIST_ITEMS.forEach(item => {
-    const checked = !!checklistData[item.id];
+  [...CHECKLIST_ITEMS, ...customCheckItems].forEach(item => {
+    const isCustom = customCheckItems.includes(item);
+    const checked  = !!checklistData[item.id];
     const div = document.createElement('label');
     div.className = 'check-item' + (checked ? ' checked' : '');
     div.innerHTML = `
       <span class="check-emoji">${item.emoji}</span>
       <span class="check-label">${item.label}</span>
-      <div class="check-box">${checked ? '✓' : ''}</div>`;
+      <div class="check-box">${checked ? '✓' : ''}</div>
+      ${isCustom ? `<div class="check-item-actions" onclick="event.stopPropagation()">
+        <button class="check-item-act" onclick="editCustomCheckItem('${item.id}','checklist')" title="수정">✏️</button>
+        <button class="check-item-act del" onclick="deleteCustomCheckItem('${item.id}','checklist')" title="삭제">✕</button>
+      </div>` : ''}`;
     div.onclick = () => toggleCheck(item.id);
+    group.appendChild(div);
+  });
+}
+
+function renderVouchers() {
+  const group = document.getElementById('voucher-group');
+  if (!group) return;
+  group.innerHTML = '';
+  [...VOUCHER_ITEMS, ...customVoucherItems].forEach(item => {
+    const isCustom = customVoucherItems.includes(item);
+    const checked  = !!voucherData[item.id];
+    const div = document.createElement('label');
+    div.className = 'check-item' + (checked ? ' checked' : '');
+    div.innerHTML = `
+      <span class="check-emoji">${item.emoji}</span>
+      <span class="check-label">${item.label}</span>
+      <div class="check-box">${checked ? '✓' : ''}</div>
+      ${isCustom ? `<div class="check-item-actions" onclick="event.stopPropagation()">
+        <button class="check-item-act" onclick="editCustomCheckItem('${item.id}','voucher')" title="수정">✏️</button>
+        <button class="check-item-act del" onclick="deleteCustomCheckItem('${item.id}','voucher')" title="삭제">✕</button>
+      </div>` : ''}`;
+    div.onclick = () => toggleVoucher(item.id);
     group.appendChild(div);
   });
 }
@@ -1509,7 +1608,97 @@ function toggleCheck(id) {
   autoSave();
 }
 
-// ── 바우처 체크리스트 ─────────────────────────────────────────
+function showCheckInlineForm(groupId, type, editId = null) {
+  // 기존 폼 있으면 제거
+  const existing = document.getElementById('check-inline-form-' + groupId);
+  if (existing) existing.remove();
+  if (checkInlineEditId === editId && editId !== null) { checkInlineEditId = null; return; }
+  checkInlineEditId = editId;
+
+  const group = document.getElementById(groupId);
+  if (!group) return;
+
+  const items = type === 'checklist' ? customCheckItems : customVoucherItems;
+  const editItem = editId ? items.find(i => i.id === editId) : null;
+  const defaultEmoji = editItem ? editItem.emoji : '📋';
+  const defaultLabel = editItem ? editItem.label : '';
+
+  const form = document.createElement('div');
+  form.className = 'check-inline-form';
+  form.id = 'check-inline-form-' + groupId;
+  form.innerHTML = `
+    <span class="check-inline-emoji" id="ci-emoji-${groupId}" onclick="cycleEmoji('${groupId}')">${defaultEmoji}</span>
+    <input id="ci-input-${groupId}" type="text" placeholder="항목 이름 입력..." value="${defaultLabel}" maxlength="30"
+      onkeydown="if(event.key==='Enter')confirmCheckInline('${groupId}','${type}','${editId||''}')"/>
+    <button class="check-inline-confirm" onclick="confirmCheckInline('${groupId}','${type}','${editId||''}')">확인</button>
+    <button class="check-inline-cancel" onclick="cancelCheckInline('${groupId}')">취소</button>`;
+  group.appendChild(form);
+
+  const input = document.getElementById('ci-input-' + groupId);
+  setTimeout(() => input && input.focus(), 50);
+}
+
+let emojiIdx = {};
+function cycleEmoji(groupId) {
+  if (!emojiIdx[groupId]) emojiIdx[groupId] = 0;
+  emojiIdx[groupId] = (emojiIdx[groupId] + 1) % EMOJI_SUGGESTIONS.length;
+  const el = document.getElementById('ci-emoji-' + groupId);
+  if (el) el.textContent = EMOJI_SUGGESTIONS[emojiIdx[groupId]];
+}
+
+function confirmCheckInline(groupId, type, editId) {
+  const input = document.getElementById('ci-input-' + groupId);
+  const emojiEl = document.getElementById('ci-emoji-' + groupId);
+  if (!input) return;
+  const label = input.value.trim();
+  if (!label) { input.focus(); return; }
+  const emoji = emojiEl ? emojiEl.textContent : '📋';
+  const items = type === 'checklist' ? customCheckItems : customVoucherItems;
+
+  if (editId) {
+    const item = items.find(i => i.id === editId);
+    if (item) { item.label = label; item.emoji = emoji; }
+  } else {
+    const newId = 'custom-' + Date.now();
+    items.push({ id: newId, label, emoji });
+  }
+  cancelCheckInline(groupId);
+  type === 'checklist' ? renderChecklist() : renderVouchers();
+  autoSave();
+}
+
+function cancelCheckInline(groupId) {
+  const form = document.getElementById('check-inline-form-' + groupId);
+  if (form) form.remove();
+  checkInlineEditId = null;
+}
+
+function editCustomCheckItem(id, type) {
+  const groupId = type === 'checklist' ? 'check-group' : 'voucher-group';
+  showCheckInlineForm(groupId, type, id);
+}
+
+function deleteCustomCheckItem(id, type) {
+  if (type === 'checklist') {
+    customCheckItems = customCheckItems.filter(i => i.id !== id);
+    delete checklistData[id];
+    renderChecklist();
+  } else {
+    customVoucherItems = customVoucherItems.filter(i => i.id !== id);
+    delete voucherData[id];
+    renderVouchers();
+  }
+  autoSave();
+}
+
+
+function toggleVoucher(id) {
+  voucherData[id] = !voucherData[id];
+  renderVouchers();
+  autoSave();
+}
+
+// ── 바우처 체크리스트 기본 항목 ───────────────────────────────
 const VOUCHER_ITEMS = [
   { id: 'eticket-out', label: '비행기 출국 E-Ticket', emoji: '✈️' },
   { id: 'eticket-in',  label: '비행기 귀국 E-Ticket', emoji: '🛬' },
@@ -1517,29 +1706,6 @@ const VOUCHER_ITEMS = [
   { id: 'hotel1',      label: '호텔 바우처 1',          emoji: '🏨' },
   { id: 'hotel2',      label: '호텔 바우처 2',          emoji: '🏩' },
 ];
-
-function renderVouchers() {
-  const group = document.getElementById('voucher-group');
-  if (!group) return;
-  group.innerHTML = '';
-  VOUCHER_ITEMS.forEach(item => {
-    const checked = !!voucherData[item.id];
-    const div = document.createElement('label');
-    div.className = 'check-item' + (checked ? ' checked' : '');
-    div.innerHTML = `
-      <span class="check-emoji">${item.emoji}</span>
-      <span class="check-label">${item.label}</span>
-      <div class="check-box">${checked ? '✓' : ''}</div>`;
-    div.onclick = () => toggleVoucher(item.id);
-    group.appendChild(div);
-  });
-}
-
-function toggleVoucher(id) {
-  voucherData[id] = !voucherData[id];
-  renderVouchers();
-  autoSave();
-}
 
 // ── 저장 ─────────────────────────────────────────────────────
 async function saveAll() {
@@ -1571,8 +1737,10 @@ async function saveAll() {
     schedule:      scheduleData,
     transitModes,
     routePoints,
-    checklist:     checklistData,
-    vouchers:      voucherData,
+    checklist:          checklistData,
+    vouchers:           voucherData,
+    customCheckItems,
+    customVoucherItems,
     mapCenter:     map ? { lat: map.getCenter().lat(), lng: map.getCenter().lng() } : null,
     mapZoom:       map ? map.getZoom() : 12,
     updatedAt:     new Date().toISOString(),
