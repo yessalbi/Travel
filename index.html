@@ -2092,7 +2092,14 @@ function renderVouchers() {
       <button class="check-del-btn" title="삭제">✕</button>`;
     div.querySelector('.check-box').addEventListener('click', () => toggleVoucher(item.id));
     div.querySelector('.check-item-body').addEventListener('click', () => toggleVoucher(item.id));
-    div.querySelector('.voucher-view-btn').addEventListener('click', (e) => {
+    const viewBtn = div.querySelector('.voucher-view-btn');
+    // iOS 한 번 탭으로 동작하게 touchend 사용
+    viewBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openPdfPopup(item.id, item.label);
+    });
+    viewBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       openPdfPopup(item.id, item.label);
     });
@@ -4912,6 +4919,31 @@ function showToast(msg) {
 
 // ── 시작 ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', init);
+
+// ESC 키 — 레이어 순서대로 닫기
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  // 1순위: PDF 전체화면
+  if (document.getElementById('pdf-fullscreen')?.classList.contains('show')) {
+    closePdfFullscreen(); return;
+  }
+  // 2순위: PDF 팝업
+  if (document.getElementById('pdf-overlay')?.classList.contains('show')) {
+    closePdfPopup(); return;
+  }
+  // 3순위: 일정 추가/편집 팝업
+  if (document.getElementById('schedule-overlay')?.classList.contains('show')) {
+    closeSchPlacePanel(); closeOverlay('schedule-overlay'); return;
+  }
+  // 4순위: 장소 추가 팝업
+  if (document.getElementById('place-overlay')?.classList.contains('show')) {
+    closeOverlay('place-overlay'); return;
+  }
+  // 5순위: 여행 설정 팝업
+  if (document.getElementById('trip-setup-overlay')?.classList.contains('show')) {
+    closeOverlay('trip-setup-overlay'); return;
+  }
+});
 
 // 최신 커밋 해시를 GitHub API에서 가져와 빌드 배지에 표시
 (async () => {
