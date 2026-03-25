@@ -1011,10 +1011,11 @@ html, body {
 .check-group { display: flex; flex-direction: column; gap: 6px; }
 .check-item {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 10px;
+  padding: 10px 4px 10px 12px; border-radius: 10px;
   background: var(--stone); cursor: pointer;
   transition: background .14s; user-select: none;
   border: 1.5px solid transparent;
+  overflow: hidden;
 }
 .check-item:hover { background: var(--sand); }
 .check-item.checked {
@@ -1033,6 +1034,23 @@ html, body {
 .check-label { font-size: 13px; font-weight: 500; color: var(--ink2); flex: 1; }
 .check-item.checked .check-label { color: var(--ink3); text-decoration: line-through; }
 .check-emoji { font-size: 16px; flex-shrink: 0; }
+
+/* 개별 삭제 버튼 */
+.check-del-btn {
+  flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 7px;
+  border: none; background: #E53935; color: #fff;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .13s; margin-left: 2px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .15s;
+}
+.check-item:hover .check-del-btn {
+  opacity: 1; pointer-events: all;
+}
+.check-del-btn:hover { background: #b71c1c; }
+
 
 /* 바우처 그리드 */
 .voucher-grid {
@@ -1271,10 +1289,7 @@ html, body {
         <div>
           <div class="check-section-header">
             <div class="section-label">여행 준비물</div>
-            <div style="display:flex;gap:6px;">
-              <button class="btn-check-clear" onclick="clearCheckedItems('checklist')">✓ 선택 삭제</button>
-              <button class="btn-check-add" onclick="showCheckInlineForm('check-group','checklist')">＋ 추가</button>
-            </div>
+            <button class="btn-check-add" onclick="showCheckInlineForm('check-group','checklist')">＋ 추가</button>
           </div>
           <div class="check-group" id="check-group"></div>
         </div>
@@ -1283,10 +1298,7 @@ html, body {
         <div>
           <div class="check-section-header">
             <div class="section-label">바우처 / 티켓</div>
-            <div style="display:flex;gap:6px;">
-              <button class="btn-check-clear" onclick="clearCheckedItems('voucher')">✓ 선택 삭제</button>
-              <button class="btn-check-add" onclick="showCheckInlineForm('voucher-group','voucher')">＋ 추가</button>
-            </div>
+            <button class="btn-check-add" onclick="showCheckInlineForm('voucher-group','voucher')">＋ 추가</button>
           </div>
           <div class="check-group" id="voucher-group"></div>
         </div>
@@ -1668,10 +1680,7 @@ function renderChecklist() {
       <span class="check-emoji">${item.emoji}</span>
       <span class="check-label">${item.label}</span>
       <div class="check-box">${checked ? '✓' : ''}</div>
-      ${isCustom ? `<div class="check-item-actions" onclick="event.stopPropagation()">
-        <button class="check-item-act" onclick="editCustomCheckItem('${item.id}','checklist')" title="수정">✏️</button>
-        <button class="check-item-act del" onclick="deleteCustomCheckItem('${item.id}','checklist')" title="삭제">✕</button>
-      </div>` : ''}`;
+      <button class="check-del-btn" onclick="event.stopPropagation();deleteCheckItem('${item.id}','checklist',${isCustom})" title="삭제">✕</button>`;
     div.onclick = () => toggleCheck(item.id);
     group.appendChild(div);
   });
@@ -1690,10 +1699,7 @@ function renderVouchers() {
       <span class="check-emoji">${item.emoji}</span>
       <span class="check-label">${item.label}</span>
       <div class="check-box">${checked ? '✓' : ''}</div>
-      ${isCustom ? `<div class="check-item-actions" onclick="event.stopPropagation()">
-        <button class="check-item-act" onclick="editCustomCheckItem('${item.id}','voucher')" title="수정">✏️</button>
-        <button class="check-item-act del" onclick="deleteCustomCheckItem('${item.id}','voucher')" title="삭제">✕</button>
-      </div>` : ''}`;
+      <button class="check-del-btn" onclick="event.stopPropagation();deleteCheckItem('${item.id}','voucher',${isCustom})" title="삭제">✕</button>`;
     div.onclick = () => toggleVoucher(item.id);
     group.appendChild(div);
   });
@@ -1775,17 +1781,21 @@ function editCustomCheckItem(id, type) {
   showCheckInlineForm(groupId, type, id);
 }
 
-function deleteCustomCheckItem(id, type) {
+function deleteCheckItem(id, type, isCustom) {
   if (type === 'checklist') {
-    customCheckItems = customCheckItems.filter(i => i.id !== id);
+    if (isCustom) customCheckItems = customCheckItems.filter(i => i.id !== id);
     delete checklistData[id];
     renderChecklist();
   } else {
-    customVoucherItems = customVoucherItems.filter(i => i.id !== id);
+    if (isCustom) customVoucherItems = customVoucherItems.filter(i => i.id !== id);
     delete voucherData[id];
     renderVouchers();
   }
   autoSave();
+}
+
+function deleteCustomCheckItem(id, type) {
+  deleteCheckItem(id, type, true);
 }
 
 function clearCheckedItems(type) {
