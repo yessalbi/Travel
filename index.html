@@ -2108,18 +2108,17 @@ let currentPlaceForMaps = null;
 
 // ── URL 파라미터에서 trip ID ─────────────────────────────────
 // ── 관리자 모드 ───────────────────────────────────────────────
-let isAdminMode = false;
+let isAdminMode = sessionStorage.getItem('adminMode') === '1';
 const ADMIN_PW = '2689';
 
 function toggleAdminMode() {
   if (isAdminMode) {
-    // 관리자 해제
     isAdminMode = false;
+    sessionStorage.removeItem('adminMode');
     document.getElementById('btn-admin').classList.remove('active');
     document.getElementById('tl-sub-text').textContent = '나의 여행 계획';
     showTripListScreen();
   } else {
-    // 비밀번호 입력창 표시
     const overlay = document.getElementById('admin-pw-overlay');
     overlay.style.display = 'flex';
     setTimeout(() => document.getElementById('admin-pw-input').focus(), 100);
@@ -2130,6 +2129,7 @@ function confirmAdminPw() {
   const val = document.getElementById('admin-pw-input').value;
   if (val === ADMIN_PW) {
     isAdminMode = true;
+    sessionStorage.setItem('adminMode', '1');
     document.getElementById('admin-pw-overlay').style.display = 'none';
     document.getElementById('admin-pw-input').value = '';
     document.getElementById('admin-pw-error').style.display = 'none';
@@ -2151,8 +2151,16 @@ function closeAdminPw() {
 
 async function showTripListScreen() {
   document.getElementById('trip-list-screen').classList.add('show');
-  // 관리자 버튼 표시
-  document.getElementById('btn-admin').classList.add('show');
+  // 관리자 버튼 표시 + 상태 복원
+  const adminBtn = document.getElementById('btn-admin');
+  adminBtn.classList.add('show');
+  if (isAdminMode) {
+    adminBtn.classList.add('active');
+    document.getElementById('tl-sub-text').textContent = '전체 여행 계획 (관리자)';
+  } else {
+    adminBtn.classList.remove('active');
+    document.getElementById('tl-sub-text').textContent = '나의 여행 계획';
+  }
 
   const container = document.getElementById('trip-list-cards');
   container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">불러오는 중…</div>';
