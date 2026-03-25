@@ -930,10 +930,10 @@ html, body {
 .btn-check-clear:hover { background: var(--red); color: #fff; }
 
 /* 일정 추가 팝업 — 장소 검색 슬라이드 모드 */
-#schedule-overlay.place-search-mode { background: rgba(0,0,0,0.0); }
+/* 장소 검색 모드: 오버레이 배경은 그대로 어둡게 유지 */
+#schedule-overlay.place-search-mode { background: rgba(0,0,0,0.35); }
 #schedule-overlay.place-search-mode .popup {
-  transform: translateX(calc(-50vw + 10px));
-  box-shadow: 4px 0 32px rgba(0,0,0,0.18);
+  box-shadow: 4px 0 32px rgba(0,0,0,0.22);
 }
 #schedule-overlay .popup {
   transition: transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s;
@@ -953,19 +953,21 @@ html, body {
 .btn-place-search:hover { background: var(--accent2); color: #fff; }
 .btn-place-search.active { background: var(--accent2); color: #fff; }
 
-/* 팝업 위에 뜨는 지도 검색 패널 */
+/* 검색 패널 — left-panel 오른쪽에 붙음 */
 #sch-place-panel {
-  position: fixed; top: 0; right: 0; width: calc(50vw - 10px);
+  position: fixed; top: 0; width: 360px; max-width: calc(100vw - 400px);
   height: 100vh; z-index: 201; display: none;
   flex-direction: column;
   background: var(--white);
-  box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+  box-shadow: 4px 0 24px rgba(0,0,0,0.14);
+  border-right: 1px solid var(--sand);
 }
 #sch-place-panel.open { display: flex; }
 #sch-place-panel-header {
-  padding: 16px 16px 10px;
+  padding: 14px 14px 10px;
   border-bottom: 1px solid var(--stone);
   display: flex; flex-direction: column; gap: 8px;
+  flex-shrink: 0;
 }
 #sch-place-search-bar {
   display: flex; gap: 6px;
@@ -981,8 +983,11 @@ html, body {
   border: none; background: var(--accent2); color: #fff;
   font-size: 13px; font-weight: 600; cursor: pointer;
 }
+/* 결과 리스트 — 내용만큼만, 최대 280px 스크롤 */
 #sch-place-results {
-  overflow-y: auto; flex: 1;
+  flex-shrink: 0;
+  overflow-y: auto;
+  max-height: 280px;
 }
 .sch-place-result-item {
   padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--stone);
@@ -3746,9 +3751,25 @@ function toggleSchPlacePanel() {
 function openSchPlacePanel() {
   const panel   = document.getElementById('sch-place-panel');
   const overlay = document.getElementById('schedule-overlay');
+  const popup   = overlay.querySelector('.popup');
+
+  // left-panel 오른쪽 끝 좌표 계산
+  const leftPanel = document.getElementById('left-panel');
+  const panelRight = leftPanel ? leftPanel.getBoundingClientRect().right : 380;
+
+  // 패널을 left-panel 바로 오른쪽에 배치
+  panel.style.left = panelRight + 'px';
   panel.classList.add('open');
   overlay.classList.add('place-search-mode');
   document.getElementById('btn-place-search').classList.add('active');
+
+  // 팝업을 left-panel 왼쪽 끝에 맞춰 이동
+  const popupWidth = popup.offsetWidth;
+  const viewportCenterX = window.innerWidth / 2;
+  const targetLeft = leftPanel ? leftPanel.getBoundingClientRect().left + 16 : 16;
+  const currentLeft = viewportCenterX - popupWidth / 2;
+  const shift = targetLeft - currentLeft;
+  popup.style.transform = `translateX(${shift}px)`;
 
   // 패널 내 미니 지도 초기화 (한 번만)
   if (!schPlaceMap && window.google) {
@@ -3762,9 +3783,9 @@ function openSchPlacePanel() {
   } else if (schPlaceMap && map) {
     schPlaceMap.setCenter(map.getCenter());
     schPlaceMap.setZoom(map.getZoom());
+    setTimeout(() => google.maps.event.trigger(schPlaceMap, 'resize'), 50);
   }
 
-  // 검색창에 포커스
   setTimeout(() => {
     const inp = document.getElementById('sch-place-input');
     if (inp) inp.focus();
@@ -3777,6 +3798,9 @@ function closeSchPlacePanel() {
   if (!panel) return;
   panel.classList.remove('open');
   overlay.classList.remove('place-search-mode');
+  // 팝업 위치 원복
+  const popup = overlay.querySelector('.popup');
+  if (popup) popup.style.transform = '';
   const btn = document.getElementById('btn-place-search');
   if (btn) btn.classList.remove('active');
   schPlaceMarkers.forEach(m => m.setMap(null));
