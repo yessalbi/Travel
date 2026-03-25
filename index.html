@@ -2833,11 +2833,8 @@ function runPlacesTextSearch(q) {
   clearMapSearchMarkers();
   closeMapPlaceCard();
 
-  // map이 오버레이에 있을 수 있으므로 DOM에서 직접 찾기
-  const mapEl = document.getElementById('map');
   const activeMap = map || window._lastMap;
-
-  // PlacesService는 map DOM 엘리먼트로도 생성 가능
+  const mapEl = document.getElementById('map');
   let svc;
   try {
     svc = new google.maps.places.PlacesService(activeMap || mapEl);
@@ -2846,16 +2843,17 @@ function runPlacesTextSearch(q) {
     return;
   }
 
-  svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
-    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+  // "근처/주변/가까운/nearby" 키워드면 nearbySearch 우선 사용
+  const isNearby = /근처|주변|가까운|인근|nearby/i.test(q);
+
+  const renderResults = (results) => {
+    if (!results || !results.length) {
       resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요</div>`;
       return;
     }
     resultsEl.innerHTML = '';
-    // 최대 20개 표시
     const top = results.slice(0, 20);
 
-    // 지도 마커 (최대 20개)
     top.forEach((place, i) => {
       if (!activeMap || !place.geometry) return;
       const marker = new google.maps.Marker({
@@ -2867,19 +2865,17 @@ function runPlacesTextSearch(q) {
       mapSearchMarkers.push(marker);
     });
 
-    // fitBounds
     if (activeMap) {
       if (top.length > 1) {
         const bounds = new google.maps.LatLngBounds();
         top.forEach(p => p.geometry && bounds.extend(p.geometry.location));
         activeMap.fitBounds(bounds, { top: 70, bottom: 40, left: 20, right: 20 });
-      } else if (top[0].geometry) {
+      } else if (top[0]?.geometry) {
         activeMap.setCenter(top[0].geometry.location);
         activeMap.setZoom(16);
       }
     }
 
-    // 결과 목록
     top.forEach((place, i) => {
       const item = document.createElement('div');
       item.className = 'msr-result-item';
@@ -2899,7 +2895,34 @@ function runPlacesTextSearch(q) {
       item.addEventListener('click', () => openMapPlaceCard(place, i));
       resultsEl.appendChild(item);
     });
-  });
+  };
+
+  if (isNearby && activeMap) {
+    // 근처 검색: 현재 지도 중심 기준 1km 반경 nearbySearch
+    // 검색어에서 장소 유형 키워드 추출 (편의점, 음식점, 카페 등)
+    const keyword = q.replace(/근처|주변|가까운|인근|nearby/gi, '').trim();
+    const center = activeMap.getCenter();
+    svc.nearbySearch({
+      location: center,
+      radius: 1000,
+      keyword: keyword,
+      language: 'ko',
+    }, (results, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results.length) {
+        renderResults(results);
+      } else {
+        // nearbySearch 실패 시 textSearch 폴백
+        svc.textSearch({ query: q, language: 'ko' }, (r2, s2) => {
+          renderResults(s2 === google.maps.places.PlacesServiceStatus.OK ? r2 : []);
+        });
+      }
+    });
+  } else {
+    // 일반 텍스트 검색
+    svc.textSearch({ query: q, language: 'ko' }, (results, status) => {
+      renderResults(status === google.maps.places.PlacesServiceStatus.OK ? results : []);
+    });
+  }
 }
 
 // 장소 상세 카드
