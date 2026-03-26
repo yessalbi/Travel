@@ -509,6 +509,44 @@ html, body {
 .item-time  { font-size: 11px; color: var(--ink3); }
 .item-name  { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-desc  { font-size: 12px; color: var(--ink3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 메모 인라인 편집 */
+.item-memo-wrap { margin-top: 6px; }
+.item-memo-text { font-size: 12px; color: var(--ink3); line-height: 1.5; white-space: pre-wrap; }
+.item-memo-input {
+  width: 100%; border: 1.5px solid var(--sand); border-radius: 8px;
+  padding: 6px 10px; font-family: inherit; font-size: 12px;
+  color: var(--ink); resize: none; outline: none;
+  background: var(--stone); line-height: 1.5;
+}
+.item-memo-input:focus { border-color: var(--accent2); background: var(--white); }
+.item-act-btn-memo {
+  font-size: 11px; color: var(--ink3); border: none; background: none;
+  cursor: pointer; padding: 2px 4px; border-radius: 4px;
+  transition: background .13s;
+}
+.item-act-btn-memo:hover { background: var(--stone); color: var(--accent2); }
+
+/* 지난 여행 섹션 */
+.tl-section-title {
+  width: 100%; max-width: 560px; padding: 20px 20px 8px;
+  font-size: 13px; font-weight: 700; color: var(--ink3);
+  display: flex; align-items: center; gap: 8px;
+}
+.tl-section-title::after {
+  content: ''; flex: 1; height: 1px; background: var(--sand);
+}
+.tl-card.past-trip {
+  opacity: 0.75; border: 1.5px solid var(--sand);
+}
+.tl-card.past-trip:hover { opacity: 1; }
+.tl-archive-btn {
+  flex-shrink: 0; font-size: 11px; padding: 4px 8px;
+  border-radius: 6px; border: 1px solid var(--sand);
+  background: none; cursor: pointer; color: var(--ink3);
+  transition: all .13s;
+}
+.tl-archive-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
 
 /* 일정 아이템 액션 버튼들 */
 .item-actions {
@@ -2273,8 +2311,20 @@ async function showTripListScreen() {
           <div class="tl-card-dates">${dateRange}</div>
           ${ddayText ? `<div class="tl-card-dday ${ddayClass}">${ddayText}</div>` : ''}
         </div>
+        ${!isAdminMode ? `<button class="tl-archive-btn" title="지난 여행으로 이동">🗂</button>` : ''}
         <div class="tl-card-arrow">›</div>
         ${isAdminMode ? '<button class="tl-card-del" title="삭제">🗑️</button>' : ''}`;
+
+      // 지난 여행으로 보내기 (일반 모드)
+      if (!isAdminMode) {
+        card.querySelector('.tl-archive-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!confirm(`"${title}"을 지난 여행으로 이동할까요?`)) return;
+          archiveTrip(tripId);
+          card.style.transition = 'opacity .3s'; card.style.opacity = '0';
+          setTimeout(() => showTripListScreen(), 320);
+        });
+      }
 
       // 삭제 버튼 — 관리자만
       if (isAdminMode) {
@@ -2306,14 +2356,94 @@ async function showTripListScreen() {
     console.warn('목록 로드 실패:', e);
     container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">목록을 불러올 수 없어요</div>';
   }
+
+  // 지난 여행 섹션 (일반 모드에서만)
+  if (!isAdminMode) await renderPastTrips();
 }
-const TRIP_LIST_KEY = 'tripList'; // localStorage에 저장
+async function renderPastTrips() {
+  // 기존 지난 여행 섹션 제거
+  document.getElementById('past-trips-section')?.remove();
+
+  const pastList = getPastTripList();
+  if (!pastList.length) return;
+
+  const screen = document.getElementById('trip-list-screen');
+  const newBtn  = document.getElementById('btn-new-trip')?.parentElement;
+
+  const section = document.createElement('div');
+  section.id = 'past-trips-section';
+  section.style.cssText = 'width:100%;max-width:560px;padding:0 20px;display:flex;flex-direction:column;gap:14px;';
+
+  // 섹션 제목
+  const titleEl = document.createElement('div');
+  titleEl.className = 'tl-section-title';
+  titleEl.innerHTML = '🗂 지난 여행';
+  section.appendChild(titleEl);
+
+  // trip 정보 불러오기
+  const metas = await Promise.all(pastList.map(id => window.fbGetTripMeta(id).catch(() => null)));
+  metas.forEach((meta, i) => {
+    if (!meta) return;
+    const tripId  = pastList[i];
+    const title   = meta.title || '제목 없는 여행';
+    const emoji   = getTitleEmoji(title).trim() || '✈️';
+    const dateRange = formatDateRange(meta.startDate, meta.endDate);
+
+    const card = document.createElement('div');
+    card.className = 'tl-card past-trip';
+    card.innerHTML = `
+      <div class="tl-card-emoji">${emoji}</div>
+      <div class="tl-card-body">
+        <div class="tl-card-title">${title}</div>
+        <div class="tl-card-dates">${dateRange}</div>
+        <div class="tl-card-dday past">여행 완료</div>
+      </div>
+      <button class="tl-archive-btn" title="현재 목록으로 복원">↩ 복원</button>
+      <div class="tl-card-arrow">›</div>`;
+
+    card.querySelector('.tl-archive-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      unarchiveTrip(tripId);
+      card.style.transition = 'opacity .3s'; card.style.opacity = '0';
+      setTimeout(() => showTripListScreen(), 320);
+    });
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.tl-archive-btn')) return;
+      addTripToList(tripId);
+      enterTrip(tripId);
+    });
+    section.appendChild(card);
+  });
+
+  // 새 여행 버튼 앞에 삽입
+  if (newBtn) screen.insertBefore(section, newBtn);
+  else screen.appendChild(section);
+}
+const PAST_TRIPS_KEY = 'pastTripList';
 
 function getTripList() {
   try { return JSON.parse(localStorage.getItem(TRIP_LIST_KEY) || '[]'); } catch(e) { return []; }
 }
 function saveTripList(list) {
   try { localStorage.setItem(TRIP_LIST_KEY, JSON.stringify(list)); } catch(e) {}
+}
+function getPastTripList() {
+  try { return JSON.parse(localStorage.getItem(PAST_TRIPS_KEY) || '[]'); } catch(e) { return []; }
+}
+function savePastTripList(list) {
+  try { localStorage.setItem(PAST_TRIPS_KEY, JSON.stringify(list)); } catch(e) {}
+}
+function archiveTrip(tripId) {
+  // 현재 목록에서 제거 → 지난 여행 목록에 추가
+  saveTripList(getTripList().filter(id => id !== tripId));
+  const past = getPastTripList();
+  if (!past.includes(tripId)) { past.unshift(tripId); savePastTripList(past); }
+}
+function unarchiveTrip(tripId) {
+  // 지난 여행 → 현재 목록으로 복원
+  savePastTripList(getPastTripList().filter(id => id !== tripId));
+  const list = getTripList();
+  if (!list.includes(tripId)) { list.unshift(tripId); saveTripList(list); }
 }
 function addTripToList(tripId) {
   const list = getTripList();
@@ -3149,6 +3279,49 @@ const MODE_LIST = [
   { id: 'bicycling', icon: '🚲', label: '자전거' },
 ];
 
+function toggleMemoEdit(idx) {
+  const day = currentDay;
+  const wrap = document.getElementById(`memo-wrap-${day}-${idx}`);
+  if (!wrap) return;
+  const item = (scheduleData[day] || [])[idx];
+  if (!item) return;
+
+  // 이미 textarea가 열려있으면 저장하고 닫기
+  const existing = wrap.querySelector('.item-memo-input');
+  if (existing) {
+    item.memo = existing.value.trim();
+    autoSave();
+    wrap.innerHTML = item.memo
+      ? `<div class="item-memo-text">${item.memo}</div>` : '';
+    return;
+  }
+
+  // textarea 열기
+  const ta = document.createElement('textarea');
+  ta.className = 'item-memo-input';
+  ta.rows = 3;
+  ta.placeholder = '메모를 입력하세요 (예약번호, 주의사항 등)';
+  ta.value = item.memo || '';
+  wrap.innerHTML = '';
+  wrap.appendChild(ta);
+  ta.focus();
+
+  // 바깥 클릭 시 자동 저장
+  ta.addEventListener('blur', () => {
+    item.memo = ta.value.trim();
+    autoSave();
+    wrap.innerHTML = item.memo
+      ? `<div class="item-memo-text">${item.memo}</div>` : '';
+  });
+  // Enter+Shift는 줄바꿈, Enter만 저장
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      ta.blur();
+    }
+  });
+}
+
 function renderScheduleList() {
   const list = document.getElementById('schedule-list');
   const items = scheduleData[currentDay] || [];
@@ -3160,6 +3333,7 @@ function renderScheduleList() {
     const div = document.createElement('div');
     div.className = 'schedule-item type-' + item.type;
     const hasLoc = item.lat && item.lng;
+    const hasMemo = item.memo && item.memo.trim();
     div.innerHTML = `
       <div class="item-icon">${typeIcon[item.type]||'📌'}</div>
       <div class="item-body" onclick="onScheduleItemClick(${idx})">
@@ -3167,8 +3341,12 @@ function renderScheduleList() {
         <div class="item-name">${item.name}</div>
         <div class="item-desc">${item.desc || ''}</div>
         ${hasLoc ? '<div class="item-has-loc">📍 위치 등록됨</div>' : ''}
+        <div class="item-memo-wrap" id="memo-wrap-${currentDay}-${idx}">
+          ${hasMemo ? `<div class="item-memo-text" id="memo-text-${currentDay}-${idx}">${item.memo}</div>` : ''}
+        </div>
       </div>
       <div class="item-actions">
+        <button class="item-act-btn-memo" onclick="toggleMemoEdit(${idx})" title="메모">📝</button>
         <button class="item-act-btn item-edit" onclick="openEditSchedule(${idx})">편집</button>
         <button class="item-act-btn item-del"  onclick="deleteScheduleItem(${idx})">✕</button>
       </div>`;
@@ -4142,6 +4320,16 @@ function renderMapPlaceCard(d, fb) {
         ? `<img src="${photoUrl}" class="mpc-photo" style="height:180px;width:100%;object-fit:cover;" />`
         : `<div class="mpc-photo" style="height:180px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--stone);">🗺️</div>`}
       <button class="mpc-back" onclick="closeMapPlaceCard()">←</button>
+      <button onclick="addPoiToSchedule('${name.replace(/'/g,"\\'")}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0})"
+        style="position:absolute;top:10px;right:10px;z-index:2;
+          background:rgba(255,255,255,0.92);border:none;border-radius:20px;
+          padding:6px 12px;font-size:12px;font-weight:700;color:var(--accent2);
+          cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,0.2);
+          display:flex;align-items:center;gap:4px;transition:background .13s;"
+        onmouseover="this.style.background='#fff'"
+        onmouseout="this.style.background='rgba(255,255,255,0.92)'">
+        ＋ Day${currentDay} 추가
+      </button>
     </div>
     <div class="mpc-header">
       <div class="mpc-name">${name}</div>
@@ -4190,6 +4378,25 @@ function switchMpcTab(btn, idx) {
   const card = document.getElementById('map-place-card');
   card.querySelectorAll('.mpc-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   card.querySelectorAll('.mpc-tab-panel').forEach((p,i) => p.classList.toggle('active', i===idx));
+}
+
+// POI 카드에서 현재 Day 일정에 바로 추가
+function addPoiToSchedule(name, lat, lng) {
+  if (!scheduleData[currentDay]) scheduleData[currentDay] = [];
+  const newItem = {
+    type: 'sight',
+    name: name,
+    time: '',
+    desc: '',
+    memo: '',
+    lat: lat || null,
+    lng: lng || null,
+  };
+  scheduleData[currentDay].push(newItem);
+  renderScheduleList();
+  autoSave();
+  showToast(`✅ Day${currentDay} 일정에 추가됐어요`);
+  closeMapPlaceCard();
 }
 function closeMapPlaceCard() {
   document.getElementById('map-place-card')?.classList.remove('show');
