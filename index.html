@@ -18,11 +18,9 @@
   <link rel="icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
   <link id="dynamic-manifest" rel="manifest">
   <script>
-    // 현재 URL의 trip ID를 포함한 manifest를 동적으로 생성
-    // → 홈화면 추가 시 각자의 trip ID로 고정됨
     (function() {
       const tripId = new URLSearchParams(location.search).get('trip') || '';
-      const startUrl = location.pathname + (tripId ? '?trip=' + tripId : '');
+      const startUrl = location.origin + location.pathname + (tripId ? '?trip=' + tripId : '');
       const manifest = {
         name: '여행 계획판',
         short_name: '여행앱',
@@ -31,14 +29,13 @@
         background_color: '#ffffff',
         theme_color: '#1a1a2e',
         icons: [{
-          src: 'https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true',
+          src: 'https://raw.githubusercontent.com/yessalbi/Travel/main/icon_new.png',
           sizes: '192x192',
           type: 'image/png'
         }]
       };
-      const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-      const url  = URL.createObjectURL(blob);
-      document.getElementById('dynamic-manifest').href = url;
+      const encoded = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+      document.getElementById('dynamic-manifest').href = encoded;
     })();
   </script>
 </head>
@@ -904,11 +901,11 @@ html, body {
 
 /* 장소 상세 카드 */
 #map-place-card {
-  position: absolute; top: 0; left: 16px; z-index: 10;
+  position: absolute; top: 70px; left: 16px; z-index: 10;
   width: 340px; background: var(--white); border-radius: 16px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.18);
   display: none; flex-direction: column; overflow: hidden;
-  max-height: calc(100% - 32px);
+  max-height: calc(100% - 90px);
 }
 #map-place-card.show { display: flex; }
 
@@ -3703,27 +3700,15 @@ function setupMap() {
     styles: [
       // POI 전체 숨김 후 필요한 것만 켜기
       { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
-      // 음식점 / 편의점 / 카페
-      { featureType: 'poi.food_and_drink', elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.food_and_drink', elementType: 'labels.text.fill', stylers: [{ color: '#c07040' }] },
-      // 편의점·마트·일반 상점 (business)
+      // 일반 업체 (음식점·편의점·카페 등 포함)
       { featureType: 'poi.business', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.business', elementType: 'labels.text.fill', stylers: [{ color: '#888844' }] },
-      // 숙소
-      { featureType: 'poi.lodging', elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.lodging', elementType: 'labels.text.fill', stylers: [{ color: '#5080b0' }] },
       // 관광지
       { featureType: 'poi.attraction', elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.attraction', elementType: 'labels.text.fill', stylers: [{ color: '#9060a0' }] },
-      // 쇼핑
-      { featureType: 'poi.shop', elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.shop', elementType: 'labels.text.fill', stylers: [{ color: '#807030' }] },
       // 공원
       { featureType: 'poi.park', elementType: 'labels', stylers: [{ visibility: 'on' }] },
       { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#5a8a5a' }] },
-      // 의료·학교 등 기타 시설
-      { featureType: 'poi.medical', elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.school', elementType: 'all', stylers: [{ visibility: 'on' }] },
       // 대중교통 아이콘 숨기고 역명만
       { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
       { featureType: 'transit.station', elementType: 'labels.text', stylers: [{ visibility: 'on' }] },
@@ -5406,12 +5391,9 @@ function openSchPlacePanel() {
   if (!schPlaceMap && window.google) {
     const poiStyles = [
       { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
-      { featureType: 'poi.food_and_drink', elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.business',       elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.lodging',        elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.attraction',     elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.shop',           elementType: 'all', stylers: [{ visibility: 'on' }] },
-      { featureType: 'poi.park',           elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.business',   elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.attraction', elementType: 'all', stylers: [{ visibility: 'on' }] },
+      { featureType: 'poi.park',       elementType: 'all', stylers: [{ visibility: 'on' }] },
       { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
     ];
     schPlaceMap = new google.maps.Map(document.getElementById('sch-place-map'), {
