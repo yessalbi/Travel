@@ -73,7 +73,10 @@
     await db.collection("trips").doc(tripId).collection("places").doc(placeId).delete();
   };
 
-  // 여행 전체 삭제 (places 서브컬렉션 포함)
+  // 여행 아카이브 상태 Firebase에 저장
+  window.fbSetArchived = async (tripId, archived) => {
+    await db.collection("trips").doc(tripId).set({ isArchived: archived }, { merge: true });
+  };
   window.fbDeleteTrip = async (tripId) => {
     // places 서브컬렉션 먼저 삭제
     const places = await db.collection("trips").doc(tripId).collection("places").get();
@@ -2268,27 +2271,39 @@ async function showTripListScreen() {
 
   try {
     let trips = [];
+    let archivedTrips = [];
 
     if (isAdminMode) {
-      // 관리자: Firestore 전체 trips
-      trips = await window.fbGetAllTrips();
+      const all = await window.fbGetAllTrips();
+      trips = all.filter(t => !t.isArchived);
+      archivedTrips = all.filter(t => t.isArchived);
     } else {
-      // 일반: 내가 방문한 trips만
-      if (!myList.length) {
-        container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">저장된 여행이 없어요<br><br>아래 버튼으로 새 여행을 만들어보세요!</div>';
-        return;
-      }
-      const metas = await Promise.all(myList.map(id => window.fbGetTripMeta(id).catch(() => null)));
-      trips = metas.filter(m => m && m.title);
+      const myList = getTripList();
+      const allMeta = await window.fbGetAllTrips();
+      // Firebase isArchived 기준으로 분리
+      const activeIds = new Set();
+      const archivedIds = new Set();
+      allMeta.forEach(t => {
+        if (t.isArchived) archivedIds.add(t.id);
+        else activeIds.add(t.id);
+      });
+      // 내가 방문한 것 중 active
+      trips = myList
+        .filter(id => !archivedIds.has(id))
+        .map(id => allMeta.find(t => t.id === id))
+        .filter(Boolean);
+      // 전체 아카이브 (내 것 + 공유받은 것)
+      archivedTrips = allMeta.filter(t => t.isArchived);
     }
 
-    if (!trips.length) {
-      container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">저장된 여행이 없어요</div>';
+    if (!trips.length && !archivedTrips.length) {
+      container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">저장된 여행이 없어요<br><br>아래 버튼으로 새 여행을 만들어보세요!</div>';
       return;
     }
 
     container.innerHTML = '';
 
+    // 현재 여행 카드들
     trips.forEach(meta => {
       const tripId    = meta.id;
       const title     = meta.title || '제목 없는 여행';
@@ -2352,72 +2367,50 @@ async function showTripListScreen() {
       container.appendChild(card);
     });
 
+    // 지난 여행 섹션
+    if (archivedTrips.length) {
+      const sectionTitle = document.createElement('div');
+      sectionTitle.className = 'tl-section-title';
+      sectionTitle.innerHTML = '🗂 지난 여행';
+      container.appendChild(sectionTitle);
+
+      archivedTrips.forEach(meta => {
+        const tripId  = meta.id;
+        const title   = meta.title || '제목 없는 여행';
+        const emoji   = getTitleEmoji(title).trim() || '✈️';
+        const dateRange = formatDateRange(meta.startDate, meta.endDate);
+
+        const card = document.createElement('div');
+        card.className = 'tl-card past-trip';
+        card.innerHTML = `
+          <div class="tl-card-emoji">${emoji}</div>
+          <div class="tl-card-body">
+            <div class="tl-card-title">${title}</div>
+            <div class="tl-card-dates">${dateRange}</div>
+            <div class="tl-card-dday past">여행 완료</div>
+          </div>
+          <button class="tl-archive-btn" title="현재 목록으로 복원">↩ 복원</button>
+          <div class="tl-card-arrow">›</div>`;
+
+        card.querySelector('.tl-archive-btn').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await unarchiveTrip(tripId);
+          card.style.transition = 'opacity .3s'; card.style.opacity = '0';
+          setTimeout(() => showTripListScreen(), 320);
+        });
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.tl-archive-btn')) return;
+          addTripToList(tripId);
+          enterTrip(tripId);
+        });
+        container.appendChild(card);
+      });
+    }
+
   } catch(e) {
     console.warn('목록 로드 실패:', e);
     container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">목록을 불러올 수 없어요</div>';
   }
-
-  // 지난 여행 섹션 (일반 모드에서만)
-  if (!isAdminMode) await renderPastTrips();
-}
-async function renderPastTrips() {
-  // 기존 지난 여행 섹션 제거
-  document.getElementById('past-trips-section')?.remove();
-
-  const pastList = getPastTripList();
-  if (!pastList.length) return;
-
-  const screen = document.getElementById('trip-list-screen');
-  const newBtn  = document.getElementById('btn-new-trip')?.parentElement;
-
-  const section = document.createElement('div');
-  section.id = 'past-trips-section';
-  section.style.cssText = 'width:100%;max-width:560px;padding:0 20px;display:flex;flex-direction:column;gap:14px;';
-
-  // 섹션 제목
-  const titleEl = document.createElement('div');
-  titleEl.className = 'tl-section-title';
-  titleEl.innerHTML = '🗂 지난 여행';
-  section.appendChild(titleEl);
-
-  // trip 정보 불러오기
-  const metas = await Promise.all(pastList.map(id => window.fbGetTripMeta(id).catch(() => null)));
-  metas.forEach((meta, i) => {
-    if (!meta) return;
-    const tripId  = pastList[i];
-    const title   = meta.title || '제목 없는 여행';
-    const emoji   = getTitleEmoji(title).trim() || '✈️';
-    const dateRange = formatDateRange(meta.startDate, meta.endDate);
-
-    const card = document.createElement('div');
-    card.className = 'tl-card past-trip';
-    card.innerHTML = `
-      <div class="tl-card-emoji">${emoji}</div>
-      <div class="tl-card-body">
-        <div class="tl-card-title">${title}</div>
-        <div class="tl-card-dates">${dateRange}</div>
-        <div class="tl-card-dday past">여행 완료</div>
-      </div>
-      <button class="tl-archive-btn" title="현재 목록으로 복원">↩ 복원</button>
-      <div class="tl-card-arrow">›</div>`;
-
-    card.querySelector('.tl-archive-btn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      unarchiveTrip(tripId);
-      card.style.transition = 'opacity .3s'; card.style.opacity = '0';
-      setTimeout(() => showTripListScreen(), 320);
-    });
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.tl-archive-btn')) return;
-      addTripToList(tripId);
-      enterTrip(tripId);
-    });
-    section.appendChild(card);
-  });
-
-  // 새 여행 버튼 앞에 삽입
-  if (newBtn) screen.insertBefore(section, newBtn);
-  else screen.appendChild(section);
 }
 const PAST_TRIPS_KEY = 'pastTripList';
 
@@ -2433,17 +2426,19 @@ function getPastTripList() {
 function savePastTripList(list) {
   try { localStorage.setItem(PAST_TRIPS_KEY, JSON.stringify(list)); } catch(e) {}
 }
-function archiveTrip(tripId) {
-  // 현재 목록에서 제거 → 지난 여행 목록에 추가
+async function archiveTrip(tripId) {
   saveTripList(getTripList().filter(id => id !== tripId));
   const past = getPastTripList();
   if (!past.includes(tripId)) { past.unshift(tripId); savePastTripList(past); }
+  // Firebase에도 저장
+  try { await window.fbSetArchived(tripId, true); } catch(e) {}
 }
-function unarchiveTrip(tripId) {
-  // 지난 여행 → 현재 목록으로 복원
+async function unarchiveTrip(tripId) {
   savePastTripList(getPastTripList().filter(id => id !== tripId));
   const list = getTripList();
   if (!list.includes(tripId)) { list.unshift(tripId); saveTripList(list); }
+  // Firebase에도 저장
+  try { await window.fbSetArchived(tripId, false); } catch(e) {}
 }
 function addTripToList(tripId) {
   const list = getTripList();
@@ -4380,23 +4375,34 @@ function switchMpcTab(btn, idx) {
   card.querySelectorAll('.mpc-tab-panel').forEach((p,i) => p.classList.toggle('active', i===idx));
 }
 
-// POI 카드에서 현재 Day 일정에 바로 추가
+// POI 카드에서 현재 Day 일정 추가 팝업 열기
 function addPoiToSchedule(name, lat, lng) {
-  if (!scheduleData[currentDay]) scheduleData[currentDay] = [];
-  const newItem = {
-    type: 'sight',
-    name: name,
-    time: '',
-    desc: '',
-    memo: '',
-    lat: lat || null,
-    lng: lng || null,
-  };
-  scheduleData[currentDay].push(newItem);
-  renderScheduleList();
-  autoSave();
-  showToast(`✅ Day${currentDay} 일정에 추가됐어요`);
   closeMapPlaceCard();
+
+  // 일정 추가 팝업을 POI 정보로 미리 채워서 열기
+  editingScheduleIdx = null;
+  document.getElementById('sch-name').value = name || '';
+  document.getElementById('sch-desc').value = '';
+
+  // 위치 자동 설정
+  schPendingLatLng = (lat && lng) ? { lat, lng } : null;
+  const pb = document.getElementById('sch-pick-btn');
+  if (schPendingLatLng) {
+    pb.textContent = `✅ 위치 선택됨 (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+    pb.classList.add('picked');
+  } else {
+    pb.textContent = '📍 지도에서 위치 클릭하기';
+    pb.classList.remove('picked');
+  }
+
+  tpState['scht'] = { h: '1', m: '00', ap: 'AM' };
+  updateTpDisplay('scht');
+  syncTpPopup('scht');
+  selectTypeByValue('sight');
+  document.querySelector('#schedule-overlay .popup-title').textContent = `Day${currentDay} 일정 추가`;
+  document.querySelector('#schedule-overlay .btn-save').textContent = '추가';
+  closeSchPlacePanel();
+  openOverlay('schedule-overlay');
 }
 function closeMapPlaceCard() {
   document.getElementById('map-place-card')?.classList.remove('show');
