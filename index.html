@@ -3719,6 +3719,37 @@ function setupMap() {
   window._lastMap = map; // 검색 등에서 참조용
 
   map.addListener('click', (e) => {
+    // 지도 POI 직접 클릭 — placeId가 있으면 장소 카드 표시
+    if (e.placeId && !routeMode && !domPinMode && !schPinMode && !pinMode) {
+      e.stop(); // 기본 구글 팝업 막기
+      const svc = new google.maps.places.PlacesService(map);
+      // 로딩 카드 먼저 표시
+      const card = document.getElementById('map-place-card');
+      card.innerHTML = `
+        <div style="position:relative;">
+          <div class="mpc-photo" style="height:180px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--stone);">🗺️</div>
+          <button class="mpc-back" onclick="closeMapPlaceCard()">←</button>
+        </div>
+        <div class="mpc-header">
+          <div class="mpc-name">정보 불러오는 중…</div>
+          <div class="mpc-sub">잠깐만요</div>
+        </div>`;
+      card.classList.add('show');
+      map.panTo(e.latLng);
+      svc.getDetails({
+        placeId: e.placeId,
+        fields: ['name','formatted_address','formatted_phone_number','international_phone_number',
+                 'rating','user_ratings_total','opening_hours','website','types',
+                 'photos','reviews','price_level','place_id','geometry'],
+        language: 'ko'
+      }, (d, s) => {
+        if (s === google.maps.places.PlacesServiceStatus.OK) {
+          mapCurrentPlace = d;
+          renderMapPlaceCard(d, d);
+        }
+      });
+      return;
+    }
     if (routeMode) {
       addRoutePoint(e.latLng);
     } else if (domPinMode) {
