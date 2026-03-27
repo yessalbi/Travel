@@ -3,7 +3,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>여행 계획판</title>
 
   <!-- iOS PWA -->
@@ -1115,10 +1115,10 @@ html, body {
 .ov-tab.active { color: var(--accent2); font-weight: 600; }
 
 @media (max-width: 768px) {
-  /* iOS input 확대 방지 — 16px 미만이면 사파리가 자동 확대 */
-  input, select, textarea {
-    font-size: 16px !important;
-  }
+  html, body { overflow: auto; }
+  #main { overflow: visible; }
+  /* iOS 확대 방지: 16px 필수. 패딩 줄여서 시각적으로 작아 보이게 */
+  input, select, textarea { font-size: 16px !important; }
   #main { flex-direction: column; height: auto; overflow: visible; padding-top: 0; }
   #left-panel {
     width: 100%; border-right: none;
