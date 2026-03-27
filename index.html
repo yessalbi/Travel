@@ -1173,7 +1173,7 @@ html, body {
   #header-badge-group { flex-direction: column; gap: 1px; }
   #save-btn { font-size: 12px; padding: 6px 10px; }
   #share-btn { font-size: 12px; padding: 6px 10px; }
-  #main { padding-top: 0; } /* JS로 동적 설정 */
+  #main { padding-top: 105px; } /* fallback, JS가 덮어씀 */
   #toast { bottom: auto; top: 125px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
@@ -2605,6 +2605,16 @@ function generateId() {
 
 // ── 초기화 ────────────────────────────────────────────────────
 async function init() {
+  // 헤더 높이에 맞춰 main padding 조정 (모바일 빈 공간 방지)
+  const fixPadding = () => {
+    const h = document.getElementById('header');
+    const m = document.getElementById('main');
+    if (h && m) m.style.paddingTop = h.offsetHeight + 'px';
+  };
+  fixPadding();
+  setTimeout(fixPadding, 200);
+  window.addEventListener('resize', fixPadding);
+
   const fromUrl = getTripIdFromUrl();
 
   // trip ID 없으면 목록 화면
@@ -6086,17 +6096,6 @@ function showToast(msg) {
 
 // ── 시작 ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', init);
-
-// 모바일에서 헤더 높이에 맞춰 main padding 동적 조정
-function adjustMainPadding() {
-  const header = document.getElementById('header');
-  const main   = document.getElementById('main');
-  if (!header || !main) return;
-  main.style.paddingTop = header.offsetHeight + 'px';
-}
-window.addEventListener('DOMContentLoaded', adjustMainPadding);
-window.addEventListener('resize', adjustMainPadding);
-setTimeout(adjustMainPadding, 100); // 렌더링 후 한 번 더
 
 // ESC 키 — 레이어 순서대로 닫기
 document.addEventListener('keydown', (e) => {
