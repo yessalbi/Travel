@@ -6006,8 +6006,6 @@ function updateTicketDisplay() {
   const fa = document.getElementById('flight-airline')?.value?.trim() || '';
   const ff = document.getElementById('flight-from')?.value?.trim() || '';
   const ft = document.getElementById('flight-to')?.value?.trim() || '';
-  const fd = getTimePicker('tp-flight-depart');
-  const fa2 = getTimePicker('tp-flight-arrive');
 
   const dAirlineEl = document.getElementById('depart-airline-display');
   if (dAirlineEl) dAirlineEl.textContent = fa || '항공사를 입력해주세요';
@@ -6016,9 +6014,9 @@ function updateTicketDisplay() {
   const dToEl = document.getElementById('depart-to-display');
   if (dToEl) dToEl.textContent = ft || 'NRT';
   const dTimeEl = document.getElementById('depart-time-display');
-  if (dTimeEl) dTimeEl.textContent = fd ? fmtTime(fd) : '--:--';
+  if (dTimeEl) dTimeEl.textContent = getTpFormatted('tp-flight-depart');
   const dArrEl = document.getElementById('depart-arrive-display');
-  if (dArrEl) dArrEl.textContent = fa2 ? fmtTime(fa2) : '--:--';
+  if (dArrEl) dArrEl.textContent = getTpFormatted('tp-flight-arrive');
   // 편명 (항공사에서 영숫자 코드 추출)
   const fno = fa.match(/[A-Z0-9]{2,3}\d{3,4}/i)?.[0] || fa.split(' ').slice(-1)[0] || '-';
   const dFlightEl = document.getElementById('depart-flightno-display');
@@ -6028,8 +6026,6 @@ function updateTicketDisplay() {
   const ra = document.getElementById('return-airline')?.value?.trim() || '';
   const rf = document.getElementById('return-from')?.value?.trim() || '';
   const rt = document.getElementById('return-to')?.value?.trim() || '';
-  const rd = getTimePicker('tp-return-depart');
-  const ra2 = getTimePicker('tp-return-arrive');
 
   const rAirlineEl = document.getElementById('return-airline-display');
   if (rAirlineEl) rAirlineEl.textContent = ra || '항공사를 입력해주세요';
@@ -6038,19 +6034,30 @@ function updateTicketDisplay() {
   const rToEl = document.getElementById('return-to-display');
   if (rToEl) rToEl.textContent = rt || 'ICN';
   const rTimeEl = document.getElementById('return-time-display');
-  if (rTimeEl) rTimeEl.textContent = rd ? fmtTime(rd) : '--:--';
+  if (rTimeEl) rTimeEl.textContent = getTpFormatted('tp-return-depart');
   const rArrEl = document.getElementById('return-arrive-display');
-  if (rArrEl) rArrEl.textContent = ra2 ? fmtTime(ra2) : '--:--';
+  if (rArrEl) rArrEl.textContent = getTpFormatted('tp-return-arrive');
   const rno = ra.match(/[A-Z0-9]{2,3}\d{3,4}/i)?.[0] || ra.split(' ').slice(-1)[0] || '-';
   const rFlightEl = document.getElementById('return-flightno-display');
   if (rFlightEl) rFlightEl.textContent = rno;
 }
 
-function getTimePicker(id) {
-  const el = document.getElementById(id);
-  if (!el) return '';
-  const sel = el.querySelector('select');
-  return sel ? sel.value : '';
+function getTpFormatted(containerId) {
+  const prefixMap = {
+    'tp-flight-depart': 'fdep',
+    'tp-flight-arrive': 'farr',
+    'tp-return-depart': 'rdep',
+    'tp-return-arrive': 'rarr',
+  };
+  const prefix = prefixMap[containerId];
+  if (!prefix) return '--:--';
+  const s = tpState[prefix];
+  if (!s || !s.h) return '--:--';
+  return `${String(s.h).padStart(2,'0')}:${s.m} ${s.ap}`;
+}
+
+function getTimePicker(containerId) {
+  return getTpFormatted(containerId);
 }
 
 // ── 국내/해외 여행 자동 감지 ─────────────────────────────────
