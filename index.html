@@ -244,10 +244,16 @@ html, body {
   display: flex; align-items: center; gap: 16px;
   padding: 0 24px;
 }
-/* travel. 로고 — 항상 표시, 중앙 */
-#header-logo { display: block; flex-shrink: 0; }
-/* h1 PC에서도 숨김 — travel.로 대체 */
-#header h1 { display: none; }
+/* travel. 로고 */
+#header-logo { display: block; flex-shrink: 0; font-size: 20px; }
+/* h1 복원 */
+#header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px; font-weight: 700;
+  color: var(--ink); flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#header h1 span { color: var(--accent); }
 .header-btn {
   border: none; cursor: pointer; border-radius: 8px;
   font-family: inherit; font-size: 13px; font-weight: 500;
@@ -1121,25 +1127,27 @@ html, body {
     flex-direction: column;
     align-items: stretch;
     padding: 10px 14px 8px;
-    gap: 4px;
+    gap: 2px;
+    position: relative;
   }
-  /* 1줄: 목록버튼(좌) + travel.(중앙) + 빈공간(우) */
   #header > #btn-back-list {
     position: absolute;
     top: 12px; left: 14px;
     font-size: 12px; padding: 4px 8px;
   }
-  /* travel. 로고 — 모바일에서 중앙 크게 */
   #header-logo {
-    font-size: 22px !important;
+    font-size: 26px !important;
     text-align: center;
     width: 100%;
-    flex: 1 !important;
   }
-  /* 여행 제목 숨김 (모바일 이미 none) */
-  #header h1 { display: none; }
-
-  /* 2줄: 버튼들 가로 정렬 */
+  #header h1 {
+    font-size: 13px !important;
+    text-align: center;
+    flex: none !important;
+    width: 100%;
+    opacity: 0.8;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   #header-btn-row {
     display: flex !important;
     align-items: center;
@@ -1150,12 +1158,8 @@ html, body {
   #header-badge-group { flex-direction: column; gap: 1px; }
   #save-btn { font-size: 12px; padding: 6px 10px; }
   #share-btn { font-size: 12px; padding: 6px 10px; }
-
-  /* 헤더 높이만큼 패딩 조정 */
-  #main { padding-top: 110px; }
-
-  /* 토스트 */
-  #toast { bottom: auto; top: 130px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  #main { padding-top: 135px; }
+  #toast { bottom: auto; top: 150px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
@@ -1861,11 +1865,11 @@ html, body {
     onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
     onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">← 목록</button>
 
-  <!-- PC/태블릿: travel. 로고 중앙 -->
-  <div id="header-logo" style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--ink);flex:1;text-align:center;">travel<span style="color:var(--accent);">.</span></div>
+  <!-- travel. 로고 -->
+  <div id="header-logo" style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--ink);flex-shrink:0;">travel<span style="color:var(--accent);">.</span></div>
 
-  <!-- 여행 제목 (숨김 — 주황카드에 표시) -->
-  <h1 id="trip-title-display" style="display:none;">여행 계획판 <span>✈</span></h1>
+  <!-- 여행 제목 -->
+  <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
 
   <!-- 우측 버튼들 -->
   <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
@@ -5402,12 +5406,41 @@ async function loadWeather() {
   const startDate = document.getElementById('trip-start').value;
   const endDate   = document.getElementById('trip-end').value;
   const section   = document.getElementById('weather-section');
-  if (!startDate || !endDate || !map) { if (section) section.style.display = 'none'; return; }
+  if (!startDate || !endDate) { if (section) section.style.display = 'none'; return; }
 
-  // 지도 중심 좌표 사용 (여행지)
-  const center = map.getCenter();
-  const lat = center.lat().toFixed(4);
-  const lng = center.lng().toFixed(4);
+  // 여행지 좌표 결정 — 인천공항(ICN) 반경 50km 제외 후 첫 번째 일정 핀
+  const ICN_LAT = 37.4602, ICN_LNG = 126.4407;
+  const EXCLUDE_RADIUS = 0.5; // 약 50km
+  let lat, lng;
+
+  // 모든 일정에서 인천공항 제외한 첫 번째 좌표 탐색
+  const allDays = Object.values(scheduleData || {});
+  for (const dayItems of allDays) {
+    for (const item of (dayItems || [])) {
+      if (item.lat && item.lng) {
+        const dist = Math.sqrt((item.lat - ICN_LAT)**2 + (item.lng - ICN_LNG)**2);
+        if (dist > EXCLUDE_RADIUS) {
+          lat = item.lat.toFixed(4);
+          lng = item.lng.toFixed(4);
+          break;
+        }
+      }
+    }
+    if (lat) break;
+  }
+
+  // 일정 핀이 없으면 지도 중심 사용 (단, 인천공항 반경이면 스킵)
+  if (!lat && map) {
+    const center = map.getCenter();
+    const cLat = center.lat(), cLng = center.lng();
+    const dist = Math.sqrt((cLat - ICN_LAT)**2 + (cLng - ICN_LNG)**2);
+    if (dist > EXCLUDE_RADIUS) {
+      lat = cLat.toFixed(4);
+      lng = cLng.toFixed(4);
+    }
+  }
+
+  if (!lat) { if (section) section.style.display = 'none'; return; }
 
   const cacheKey = `${lat},${lng},${startDate},${endDate}`;
   if (weatherCache[cacheKey]) {
