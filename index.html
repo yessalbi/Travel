@@ -4746,26 +4746,37 @@ function renderMapPlaceCard(d, fb) {
         ? `<img src="${photoUrl}" class="mpc-photo" style="height:180px;width:100%;object-fit:cover;" />`
         : `<div class="mpc-photo" style="height:180px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--stone);">🗺️</div>`}
       <button class="mpc-back" onclick="closeMapPlaceCard()">←</button>
+      ${fb._extraDayBtns ? (() => {
+        let btns = '<div style="position:absolute;top:10px;right:10px;z-index:2;display:flex;flex-direction:column;gap:4px;align-items:flex-end;">';
+        for (let i = 1; i <= totalDays; i++) {
+          btns += `<button onclick="addPlaceToDay(${i},'${name.replace(/'/g,"\\'")}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0})"
+            style="background:rgba(255,255,255,0.92);border:none;border-radius:20px;
+              padding:5px 10px;font-size:11px;font-weight:700;color:var(--accent2);
+              cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,0.2);white-space:nowrap;">＋ Day${i}</button>`;
+        }
+        btns += '</div>';
+        return btns;
+      })() : `
       <button onclick="addPoiToSchedule('${name.replace(/'/g,"\\'")}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0})"
         style="position:absolute;top:10px;right:10px;z-index:2;
           background:rgba(255,255,255,0.92);border:none;border-radius:20px;
           padding:6px 12px;font-size:12px;font-weight:700;color:var(--accent2);
           cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,0.2);
-          display:flex;align-items:center;gap:4px;transition:background .13s;"
+          display:flex;align-items:center;gap:4px;"
         onmouseover="this.style.background='#fff'"
         onmouseout="this.style.background='rgba(255,255,255,0.92)'">
         ＋ Day${currentDay} 추가
       </button>
-      <button onclick="savePoiToPlaces('${name.replace(/'/g,"\\'")}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0},'${photoUrl||''}')"
+      <button onclick="savePoiToPlaces('${name.replace(/'/g,"\\'")}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0},'${photoUrl||''}','${pid}')"
         style="position:absolute;top:44px;right:10px;z-index:2;
           background:rgba(255,255,255,0.92);border:none;border-radius:20px;
           padding:6px 12px;font-size:12px;font-weight:700;color:var(--accent);
           cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,0.2);
-          display:flex;align-items:center;gap:4px;transition:background .13s;"
+          display:flex;align-items:center;gap:4px;"
         onmouseover="this.style.background='#fff'"
         onmouseout="this.style.background='rgba(255,255,255,0.92)'">
         🍴 맛집&장소 저장
-      </button>
+      </button>`}
     </div>
     <div class="mpc-header">
       <div class="mpc-name">${name}</div>
@@ -4780,6 +4791,7 @@ function renderMapPlaceCard(d, fb) {
       <button class="mpc-action-btn" onclick="openGoogleMaps('${pid}','${name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0})">🗺️ 구글맵</button>
       ${d.website ? `<button class="mpc-action-btn" onclick="window.open('${d.website}','_blank')">🌐 웹사이트</button>` : ''}
       ${d.international_phone_number||d.formatted_phone_number ? `<button class="mpc-action-btn" onclick="window.open('tel:${d.international_phone_number||d.formatted_phone_number}')">📞 전화</button>` : ''}
+      ${fb._extraDayBtns ? `<button class="mpc-action-btn" style="color:var(--red);" onclick="deletePlaceChip('${name.replace(/'/g, "\\'")}')">🗑️ 삭제</button>` : ''}
     </div>
     <div class="mpc-tabs">
       <button class="mpc-tab active" onclick="switchMpcTab(this,0)">개요</button>
@@ -5486,14 +5498,13 @@ function highlightPlaceMarker(idx) {
   });
 }
 
-function savePoiToPlaces(name, lat, lng, img) {
+function savePoiToPlaces(name, lat, lng, img, placeId) {
   if (!name || !lat || !lng) return;
-  // 중복 체크
   if (placesData.find(p => p.name === name)) {
     showToast('이미 맛집&장소에 저장된 장소예요');
     return;
   }
-  placesData.push({ name, lat, lng, img: img || '', desc: '' });
+  placesData.push({ name, lat, lng, img: img || '', desc: '', placeId: placeId || '' });
   autoSave();
   renderPlaceChips();
   renderMapMarkers();
@@ -5506,7 +5517,43 @@ function showPlacePopup(place) {
   const card = document.getElementById('map-place-card');
   if (!card) return;
 
-  // Day 추가 버튼 생성 (1~totalDays)
+  // placeId 있으면 → Places API 상세 조회 (검색 카드와 동일하게)
+  if (place.placeId && window.google && map) {
+    // 로딩 상태 먼저
+    card.innerHTML = `
+      <div style="position:relative;">
+        <div class="mpc-photo" style="height:180px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--stone);">🍴</div>
+        <button class="mpc-back" onclick="closeMapPlaceCard()">←</button>
+      </div>
+      <div class="mpc-header">
+        <div class="mpc-name">${place.name}</div>
+        <div class="mpc-sub">정보 불러오는 중…</div>
+      </div>`;
+    card.classList.add('show');
+
+    const svc = new google.maps.places.PlacesService(map);
+    svc.getDetails({
+      placeId: place.placeId,
+      fields: ['name','geometry','formatted_address','formatted_phone_number',
+               'international_phone_number','rating','user_ratings_total',
+               'opening_hours','website','types','photos','reviews','price_level','place_id'],
+      language: 'ko',
+    }, (d, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && d) {
+        // Day 추가 버튼도 포함해서 렌더링
+        renderMapPlaceCard(d, { ...place, place_id: place.placeId, _extraDayBtns: true });
+      } else {
+        renderPlaceCardBasic(place, card);
+      }
+    });
+    return;
+  }
+
+  // placeId 없으면 → 로컬 데이터로 기본 카드 표시
+  renderPlaceCardBasic(place, card);
+}
+
+function renderPlaceCardBasic(place, card) {
   let dayBtns = '';
   for (let d = 1; d <= totalDays; d++) {
     dayBtns += `<button onclick="addPlaceToDay(${d},'${place.name.replace(/'/g,"\\'")}',${place.lat||0},${place.lng||0})"
@@ -5516,7 +5563,6 @@ function showPlacePopup(place) {
       ＋ Day${d}
     </button>`;
   }
-
   const photoHtml = place.img
     ? `<img src="${place.img}" class="mpc-photo" style="height:180px;width:100%;object-fit:cover;" />`
     : `<div class="mpc-photo" style="height:180px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--stone);">🍴</div>`;
