@@ -4199,9 +4199,14 @@ function showMapRecentSearches() {
     item.querySelector('.msr-recent-del').addEventListener('click', (e) => deleteMapRecentSearch(q, e));
     item.addEventListener('click', () => {
       const inp = document.getElementById('map-search-input');
-      if (inp) { inp.value = q; }
+      if (inp) inp.value = q;
       document.getElementById('map-search-clear')?.classList.add('show');
-      mapSearch();
+      saveMapRecentSearch(q);
+      runPlacesTextSearch(q);
+      // 결과창 강제 show (타이밍 보정)
+      setTimeout(() => {
+        document.getElementById('map-search-results')?.classList.add('show');
+      }, 100);
     });
     el.appendChild(item);
   });
@@ -4432,26 +4437,28 @@ function openMapPlaceCard(place, idx) {
 }
 
 function openGoogleMaps(placeId, name, lat, lng) {
-  // iOS: 구글맵 앱 스킴 시도 → 실패시 웹 fallback
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const isIOS    = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isIOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
 
-  if (isIOS && placeId) {
-    // iOS 구글맵 앱: comgooglemaps 스킴
-    const appUrl = `comgooglemaps://?q=${encodeURIComponent(name)}&center=${lat},${lng}&zoom=16`;
-    const webUrl = `https://maps.google.com/maps?q=${encodeURIComponent(name)}&ll=${lat},${lng}&z=16`;
-    // 앱 스킴 시도 후 실패하면 웹으로
-    const start = Date.now();
-    window.location.href = appUrl;
-    setTimeout(() => {
-      if (Date.now() - start < 1500) window.open(webUrl, '_blank');
-    }, 1000);
-  } else if (isMobile && placeId) {
-    // Android
-    window.open(`https://maps.google.com/maps?q=${encodeURIComponent(name)}&ll=${lat},${lng}&z=16`, '_blank');
+  if (lat && lng) {
+    // 좌표 기반 URL — 모든 플랫폼에서 확실하게 동작
+    const webUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${placeId}&center=${lat},${lng}`;
+    if (isIOS) {
+      // iOS: 구글맵 앱 좌표 스킴
+      const appUrl = `comgooglemaps://?q=${lat},${lng}&query=${encodeURIComponent(name)}`;
+      const timer = setTimeout(() => window.open(webUrl, '_blank'), 1000);
+      window.addEventListener('blur', () => clearTimeout(timer), { once: true });
+      window.location.href = appUrl;
+    } else if (isAndroid) {
+      // Android: geo 스킴
+      window.open(`geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(name)})`, '_blank');
+    } else {
+      // PC
+      window.open(webUrl, '_blank');
+    }
   } else {
-    // PC: place_id URL
-    window.open(`https://www.google.com/maps/place/?q=place_id:${placeId}`, '_blank');
+    // 좌표 없으면 이름으로 검색
+    window.open(`https://www.google.com/maps/search/${encodeURIComponent(name)}`, '_blank');
   }
 }
 
