@@ -1131,7 +1131,7 @@ html, body {
   #left-panel {
     width: 100%; border-right: none;
     border-bottom: 1px solid var(--sand);
-    overflow: hidden; min-height: 0;
+    overflow: visible; min-height: 0;
   }
   .panel-page { overflow: visible; }
   #map-wrapper { height: 60vw; min-height: 300px; flex-shrink: 0; }
@@ -5244,6 +5244,8 @@ function mapOverlaySearch() {
           icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#E24A4A', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 11 },
           zIndex: 999, animation: google.maps.Animation.DROP });
         mapSearchMarkers.push(sel);
+        // POI 카드 열기 (place_id 있으면)
+        if (place.place_id) openMapPlaceCard(place.place_id);
       };
       resultsEl.appendChild(item);
     });
@@ -6142,12 +6144,12 @@ document.addEventListener('keydown', (e) => {
 <!-- 모바일 지도 전체화면 오버레이 -->
 <div id="map-overlay">
   <div id="map-overlay-map"></div>
-  <div id="map-overlay-search" style="position:absolute;top:68px;left:16px;z-index:20;display:flex;align-items:center;background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.15);width:220px;overflow:visible">
+  <div id="map-overlay-search" style="position:absolute;top:12px;left:12px;right:12px;z-index:20;display:flex;align-items:center;background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.15);overflow:visible">
     <input id="map-overlay-search-input" type="text" placeholder="🔍 장소 검색"
-      style="flex:1;border:none;outline:none;padding:8px 10px;font-family:inherit;font-size:12px;color:#333;background:transparent;border-radius:10px 0 0 10px;"
+      style="flex:1;border:none;outline:none;padding:8px 10px;font-family:inherit;font-size:14px;color:#333;background:transparent;border-radius:10px 0 0 10px;"
       onkeydown="if(event.key==='Enter')mapOverlaySearch()" />
     <button onclick="mapOverlaySearch()"
-      style="border:none;background:none;cursor:pointer;padding:8px 10px;font-size:14px;color:#888;border-radius:0 10px 10px 0;flex-shrink:0;">→</button>
+      style="border:none;background:none;cursor:pointer;padding:8px 12px;font-size:16px;color:#888;border-radius:0 10px 10px 0;flex-shrink:0;">🔍</button>
     <div id="map-overlay-search-results"
       style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.12);display:none;flex-direction:column;max-height:280px;overflow-y:auto;z-index:30;"></div>
   </div>
