@@ -4452,26 +4452,22 @@ function openMapPlaceCard(place, idx) {
 function openGoogleMaps(placeId, name, lat, lng) {
   const isIOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const isAndroid = /Android/i.test(navigator.userAgent);
+  const encName   = encodeURIComponent(name);
 
-  if (lat && lng) {
-    // 좌표 기반 URL — 모든 플랫폼에서 확실하게 동작
-    const webUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${placeId}&center=${lat},${lng}`;
-    if (isIOS) {
-      // iOS: 구글맵 앱 좌표 스킴
-      const appUrl = `comgooglemaps://?q=${lat},${lng}&query=${encodeURIComponent(name)}`;
-      const timer = setTimeout(() => window.open(webUrl, '_blank'), 1000);
-      window.addEventListener('blur', () => clearTimeout(timer), { once: true });
-      window.location.href = appUrl;
-    } else if (isAndroid) {
-      // Android: geo 스킴
-      window.open(`geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(name)})`, '_blank');
-    } else {
-      // PC
-      window.open(webUrl, '_blank');
-    }
+  // 가장 확실한 방법: 장소명으로 검색 + 좌표로 위치 고정
+  const webUrl = `https://www.google.com/maps/search/${encName}/@${lat},${lng},17z`;
+
+  if (isIOS) {
+    // iOS 구글맵 앱: 장소명 검색 스킴
+    const appUrl = `comgooglemaps://?q=${encName}&center=${lat},${lng}&zoom=17`;
+    const timer = setTimeout(() => window.open(webUrl, '_blank'), 1000);
+    window.addEventListener('blur', () => clearTimeout(timer), { once: true });
+    window.location.href = appUrl;
+  } else if (isAndroid) {
+    // Android: geo 스킴에 장소명 포함
+    window.open(`geo:${lat},${lng}?q=${encName}`, '_blank');
   } else {
-    // 좌표 없으면 이름으로 검색
-    window.open(`https://www.google.com/maps/search/${encodeURIComponent(name)}`, '_blank');
+    window.open(webUrl, '_blank');
   }
 }
 
