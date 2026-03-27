@@ -244,12 +244,20 @@ html, body {
   display: flex; align-items: center; gap: 16px;
   padding: 0 24px;
 }
-/* travel. 로고 */
-#header-logo { display: block; flex-shrink: 0; font-size: 20px; }
-/* h1 복원 */
+/* travel. 로고 — position:absolute로 진짜 중앙 */
+#header-logo {
+  display: block;
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  font-family: 'Playfair Display', serif;
+  font-size: 26px; font-weight: 700; color: var(--ink);
+  pointer-events: none;
+}
+#header-logo span { color: var(--accent); }
+/* h1 — 목록버튼 바로 옆 */
 #header h1 {
   font-family: 'Playfair Display', serif;
-  font-size: 20px; font-weight: 700;
+  font-size: 18px; font-weight: 700;
   color: var(--ink); flex: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -1126,28 +1134,35 @@ html, body {
     height: auto;
     flex-direction: column;
     align-items: stretch;
-    padding: 10px 14px 8px;
-    gap: 2px;
+    padding: 8px 14px 6px;
+    gap: 4px;
     position: relative;
   }
+  /* 1줄: 목록(좌) + 로고·제목(중앙) */
   #header > #btn-back-list {
     position: absolute;
-    top: 12px; left: 14px;
+    top: 10px; left: 14px;
     font-size: 12px; padding: 4px 8px;
+    z-index: 1;
   }
   #header-logo {
-    font-size: 26px !important;
+    position: static !important;
+    transform: none !important;
+    font-size: 22px !important;
     text-align: center;
     width: 100%;
+    pointer-events: auto;
   }
   #header h1 {
-    font-size: 13px !important;
+    font-size: 12px !important;
     text-align: center;
     flex: none !important;
     width: 100%;
-    opacity: 0.8;
+    opacity: 0.7;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: -2px;
   }
+  /* 2줄: 버튼들 */
   #header-btn-row {
     display: flex !important;
     align-items: center;
@@ -1158,8 +1173,8 @@ html, body {
   #header-badge-group { flex-direction: column; gap: 1px; }
   #save-btn { font-size: 12px; padding: 6px 10px; }
   #share-btn { font-size: 12px; padding: 6px 10px; }
-  #main { padding-top: 135px; }
-  #toast { bottom: auto; top: 150px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  #main { padding-top: 115px; }
+  #toast { bottom: auto; top: 125px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
