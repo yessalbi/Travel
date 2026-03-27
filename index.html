@@ -3557,6 +3557,7 @@ function renderDayTabs() {
       if (!navigator.onLine) {
         showOfflineMap();
       } else {
+        clearAllDayRoutes(); // 전체 경로 지우고 현재 Day만
         drawDayRoutes();
         fitDayBounds(i);
       }
@@ -5439,26 +5440,27 @@ function switchPanelTab(idx) {
   sessionStorage.setItem('panelTab', idx);
   if (idx === 0 && map) {
     fitAllPins();
-    drawAllDayRoutes();   // 여행 정보 탭: 전체 Day 경로 색상별 표시
+    drawAllDayRoutes();
   }
   if (idx === 1 && map) {
+    clearAllDayRoutes(); // 전체 경로 지우고
     clearDayRoutes();
-    drawDayRoutes();      // 일별 일정 탭: 현재 Day만
+    drawDayRoutes();     // 현재 Day만
   }
 }
 
 // Day별 색상 팔레트
 const DAY_COLORS = [
-  { stroke: '#E8430A', shadow: '#FFB199' },  // Day1 — 주황
-  { stroke: '#1565C0', shadow: '#90CAF9' },  // Day2 — 파랑
-  { stroke: '#2E7D32', shadow: '#A5D6A7' },  // Day3 — 초록
-  { stroke: '#6A1B9A', shadow: '#CE93D8' },  // Day4 — 보라
-  { stroke: '#AD1457', shadow: '#F48FB1' },  // Day5 — 핑크
-  { stroke: '#00695C', shadow: '#80CBC4' },  // Day6 — 민트
-  { stroke: '#E65100', shadow: '#FFCC80' },  // Day7 — 진주황
-  { stroke: '#1A237E', shadow: '#9FA8DA' },  // Day8 — 인디고
-  { stroke: '#558B2F', shadow: '#DCEDC8' },  // Day9 — 연두
-  { stroke: '#BF360C', shadow: '#FFAB91' },  // Day10 — 벽돌
+  { stroke: '#FF3D00', shadow: '#FF8A65' },  // Day1  — 강렬한 빨강주황
+  { stroke: '#D500F9', shadow: '#EA80FC' },  // Day2  — 보라 마젠타
+  { stroke: '#00B0FF', shadow: '#80D8FF' },  // Day3  — 하늘 파랑
+  { stroke: '#FFD600', shadow: '#FFFF8D' },  // Day4  — 노랑
+  { stroke: '#00E676', shadow: '#69F0AE' },  // Day5  — 형광 초록
+  { stroke: '#FF4081', shadow: '#FF80AB' },  // Day6  — 핫핑크
+  { stroke: '#FFAB40', shadow: '#FFE57F' },  // Day7  — 주황
+  { stroke: '#40C4FF', shadow: '#B3E5FC' },  // Day8  — 밝은 파랑
+  { stroke: '#B2FF59', shadow: '#F4FF81' },  // Day9  — 라임
+  { stroke: '#EA80FC', shadow: '#F8BBD0' },  // Day10 — 연보라핑크
 ];
 
 let allDayPolylines = [];
@@ -5522,13 +5524,13 @@ function drawAllDaySegment(from, to, mode, col) {
     if (col.shadow) {
       allDayPolylines.push(new google.maps.Polyline({
         path: routePath, geodesic: true,
-        strokeColor: col.shadow, strokeOpacity: 0.5, strokeWeight: 5, map, zIndex: 1,
+        strokeColor: '#fff', strokeOpacity: 0.8, strokeWeight: 6, map, zIndex: 1,
       }));
     }
     // 메인선
     allDayPolylines.push(new google.maps.Polyline({
       path: routePath, geodesic: true,
-      strokeColor: col.stroke, strokeOpacity: 0.85, strokeWeight: 3, map, zIndex: 2,
+      strokeColor: col.stroke, strokeOpacity: 0.95, strokeWeight: 4, map, zIndex: 2,
     }));
   });
 }
@@ -5771,7 +5773,9 @@ function restoreUIState() {
   const applyMapFit = () => {
     if (tab === '0' || tab === null) {
       fitAllPins();
+      drawAllDayRoutes(); // 초기 로드 시 전체 경로 표시
     } else if (tab !== 'map' && tab !== null) {
+      clearAllDayRoutes();
       drawDayRoutes();
       fitDayBounds(currentDay);
     }
