@@ -5440,20 +5440,16 @@ function savePoiToPlaces(name, lat, lng, img) {
 }
 
 function showPlacePopup(place) {
-  // 기존 팝업 대신 지도 정보카드로 표시
-  if (!place.lat || !place.lng) return;
-
   // 지도를 해당 장소로 이동
-  if (map) map.panTo({ lat: place.lat, lng: place.lng });
+  if (map && place.lat && place.lng) map.panTo({ lat: place.lat, lng: place.lng });
 
-  // 여행정보 탭이면 그대로, 아니면 그냥 카드만 표시
   const card = document.getElementById('map-place-card');
   if (!card) return;
 
   // Day 추가 버튼 생성 (1~totalDays)
   let dayBtns = '';
   for (let d = 1; d <= totalDays; d++) {
-    dayBtns += `<button onclick="addPlaceToDay(${d},'${place.name.replace(/'/g,"\\'")}',${place.lat},${place.lng})"
+    dayBtns += `<button onclick="addPlaceToDay(${d},'${place.name.replace(/'/g,"\\'")}',${place.lat||0},${place.lng||0})"
       style="background:rgba(255,255,255,0.92);border:none;border-radius:20px;
         padding:5px 10px;font-size:11px;font-weight:700;color:var(--accent2);
         cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,0.2);white-space:nowrap;">
@@ -5475,12 +5471,22 @@ function showPlacePopup(place) {
     </div>
     <div class="mpc-header">
       <div class="mpc-name">${place.name}</div>
-      <div class="mpc-sub">${place.desc || ''}</div>
+      <div class="mpc-sub">${place.desc || (place.lat ? '📍 위치 등록됨' : '')}</div>
     </div>
     <div class="mpc-actions">
-      <button class="mpc-action-btn" onclick="openGoogleMaps('','${place.name.replace(/'/g,"\\'")}',${place.lat},${place.lng})">🗺️ 구글맵</button>
+      <button class="mpc-action-btn" onclick="openGoogleMaps('','${place.name.replace(/'/g,"\\'")}',${place.lat||0},${place.lng||0})">🗺️ 구글맵</button>
+      <button class="mpc-action-btn" style="color:var(--red);" onclick="deletePlaceChip('${place.name.replace(/'/g,"\\'")}')">🗑️ 삭제</button>
     </div>`;
   card.classList.add('show');
+}
+
+function deletePlaceChip(name) {
+  placesData = placesData.filter(p => p.name !== name);
+  autoSave();
+  renderPlaceChips();
+  renderMapMarkers();
+  closeMapPlaceCard();
+  showToast(`"${name}" 삭제됐어요`);
 }
 
 function addPlaceToDay(dayNum, name, lat, lng) {
