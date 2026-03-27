@@ -4373,8 +4373,26 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
     language: 'ko',
   }, (place, status) => {
     if (status !== google.maps.places.PlacesServiceStatus.OK || !place) return;
-    if (targetMap) targetMap.panTo(place.geometry.location);
-    renderMapPlaceCard(place, place); // fb = place itself
+    renderMapPlaceCard(place, place);
+    // 카드(바텀시트 ~78vh) 높이만큼 위로 오프셋해서 장소가 카드 위에 보이게
+    if (targetMap) {
+      setTimeout(() => {
+        const mapHeight = targetMap.getDiv().offsetHeight;
+        const cardHeight = mapHeight * 0.78;
+        const offset = cardHeight / 2;
+        const proj = targetMap.getProjection();
+        if (proj) {
+          const loc = place.geometry.location;
+          const point = proj.fromLatLngToPoint(loc);
+          const scale = Math.pow(2, targetMap.getZoom());
+          point.y -= offset / scale;
+          const newLoc = proj.fromPointToLatLng(point);
+          targetMap.panTo(newLoc);
+        } else {
+          targetMap.panTo(place.geometry.location);
+        }
+      }, 100);
+    }
   });
 }
 
