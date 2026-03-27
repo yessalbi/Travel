@@ -5073,10 +5073,10 @@ function clearRoute() {
 
 // ── 일별 색연필 경로 ──────────────────────────────────────────
 const MODE_COLORS = {
-  driving:   { stroke: '#E8430A', shadow: '#FFB199', weight: 6  },  // 빨간주황 - 굵은 실선
-  transit:   { stroke: '#1565C0', shadow: '#90CAF9', weight: 5  },  // 진파랑   - 실선
-  walking:   { stroke: '#2E7D32', shadow: null,      weight: 3  },  // 진초록   - 점선
-  bicycling: { stroke: '#F57F17', shadow: '#FFF176', weight: 4  },  // 진노랑   - 파선
+  driving:   { stroke: '#E8430A', shadow: '#FFB199', weight: 4  },  // 빨간주황 - 굵은 실선
+  transit:   { stroke: '#1565C0', shadow: '#90CAF9', weight: 3  },  // 진파랑   - 실선
+  walking:   { stroke: '#2E7D32', shadow: null,      weight: 2  },  // 진초록   - 점선
+  bicycling: { stroke: '#F57F17', shadow: '#FFF176', weight: 3  },  // 진노랑   - 파선
 };
 
 // 인천공항 좌표 (반경 3km 이내면 필터)
@@ -5148,7 +5148,7 @@ function drawSegmentRoute(from, to, mode) {
     // 바탕 흰선
     dayPolylines.push(new google.maps.Polyline({
       path, geodesic: true,
-      strokeColor: '#fff', strokeOpacity: 0.6, strokeWeight: 6, map, zIndex: 1,
+      strokeColor: '#fff', strokeOpacity: 0.6, strokeWeight: 4, map, zIndex: 1,
     }));
     // 초록 점선
     dayPolylines.push(new google.maps.Polyline({
@@ -5172,7 +5172,7 @@ function drawSegmentRoute(from, to, mode) {
     const path = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
     dayPolylines.push(new google.maps.Polyline({
       path, geodesic: true,
-      strokeColor: '#fff', strokeOpacity: 0.6, strokeWeight: 7, map, zIndex: 1,
+      strokeColor: '#fff', strokeOpacity: 0.6, strokeWeight: 5, map, zIndex: 1,
     }));
     dayPolylines.push(new google.maps.Polyline({
       path, geodesic: true,
@@ -5437,8 +5437,100 @@ function switchPanelTab(idx) {
   document.querySelectorAll('.panel-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
   sessionStorage.setItem('panelTab', idx);
-  // 여행 정보 탭(0) → 맛집&장소 + 모든 일정 핀 전체 보이게
-  if (idx === 0 && map) fitAllPins();
+  if (idx === 0 && map) {
+    fitAllPins();
+    drawAllDayRoutes();   // 여행 정보 탭: 전체 Day 경로 색상별 표시
+  }
+  if (idx === 1 && map) {
+    clearDayRoutes();
+    drawDayRoutes();      // 일별 일정 탭: 현재 Day만
+  }
+}
+
+// Day별 색상 팔레트
+const DAY_COLORS = [
+  { stroke: '#E8430A', shadow: '#FFB199' },  // Day1 — 주황
+  { stroke: '#1565C0', shadow: '#90CAF9' },  // Day2 — 파랑
+  { stroke: '#2E7D32', shadow: '#A5D6A7' },  // Day3 — 초록
+  { stroke: '#6A1B9A', shadow: '#CE93D8' },  // Day4 — 보라
+  { stroke: '#AD1457', shadow: '#F48FB1' },  // Day5 — 핑크
+  { stroke: '#00695C', shadow: '#80CBC4' },  // Day6 — 민트
+  { stroke: '#E65100', shadow: '#FFCC80' },  // Day7 — 진주황
+  { stroke: '#1A237E', shadow: '#9FA8DA' },  // Day8 — 인디고
+  { stroke: '#558B2F', shadow: '#DCEDC8' },  // Day9 — 연두
+  { stroke: '#BF360C', shadow: '#FFAB91' },  // Day10 — 벽돌
+];
+
+let allDayPolylines = [];
+
+function clearAllDayRoutes() {
+  allDayPolylines.forEach(p => p.setMap(null));
+  allDayPolylines = [];
+}
+
+function drawAllDayRoutes() {
+  if (!map) return;
+  clearAllDayRoutes();
+  clearDayRoutes(); // 현재 Day 단독 경로도 지우기
+
+  const days = Object.keys(scheduleData).map(Number).sort((a,b) => a-b);
+  days.forEach(day => {
+    const items = scheduleData[day] || [];
+    const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
+    if (locItems.length < 2) return;
+
+    const col = DAY_COLORS[(day - 1) % DAY_COLORS.length];
+
+    locItems.forEach((item, i) => {
+      if (i >= locItems.length - 1) return;
+      const next = locItems[i + 1];
+      const origIdx = items.indexOf(item);
+      const mode = transitModes[transitKey(day, origIdx)] || 'driving';
+      drawAllDaySegment(item, next, mode, col);
+    });
+  });
+}
+
+function drawAllDaySegment(from, to, mode, col) {
+  if (!window.google || !map) return;
+  const path = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
+
+  if (mode === 'walking' || mode === 'bicycling') {
+    // 직선으로 표시
+    allDayPolylines.push(new google.maps.Polyline({
+      path, geodesic: true,
+      strokeColor: '#fff', strokeOpacity: 0.5, strokeWeight: 3, map, zIndex: 1,
+    }));
+    allDayPolylines.push(new google.maps.Polyline({
+      path, geodesic: true,
+      strokeColor: col.stroke, strokeOpacity: 0.8, strokeWeight: 2, map, zIndex: 2,
+    }));
+    return;
+  }
+
+  // 렌트카/대중교통 — Directions API
+  const svc = new google.maps.DirectionsService();
+  svc.route({
+    origin:      new google.maps.LatLng(from.lat, from.lng),
+    destination: new google.maps.LatLng(to.lat,   to.lng),
+    travelMode:  google.maps.TravelMode[mode.toUpperCase()] || google.maps.TravelMode.DRIVING,
+  }, (result, status) => {
+    const routePath = status === google.maps.DirectionsStatus.OK
+      ? result.routes[0].overview_path
+      : path;
+    // 흰 테두리
+    if (col.shadow) {
+      allDayPolylines.push(new google.maps.Polyline({
+        path: routePath, geodesic: true,
+        strokeColor: col.shadow, strokeOpacity: 0.5, strokeWeight: 5, map, zIndex: 1,
+      }));
+    }
+    // 메인선
+    allDayPolylines.push(new google.maps.Polyline({
+      path: routePath, geodesic: true,
+      strokeColor: col.stroke, strokeOpacity: 0.85, strokeWeight: 3, map, zIndex: 2,
+    }));
+  });
 }
 
 // 맛집&장소 + 전체 일정 핀을 한눈에 보이게 fitBounds
