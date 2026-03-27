@@ -4385,7 +4385,7 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
           const loc = place.geometry.location;
           const point = proj.fromLatLngToPoint(loc);
           const scale = Math.pow(2, targetMap.getZoom());
-          point.y -= offset / scale;
+          point.y += offset / scale;
           const newLoc = proj.fromPointToLatLng(point);
           targetMap.panTo(newLoc);
         } else {
@@ -5260,9 +5260,47 @@ function switchToMapTab() {
   }
 }
 
+// 최근 검색 localStorage
+const OVERLAY_RECENT_KEY = 'overlayRecentSearches';
+function getOverlayRecent() {
+  try { return JSON.parse(localStorage.getItem(OVERLAY_RECENT_KEY) || '[]'); } catch { return []; }
+}
+function saveOverlayRecent(q) {
+  const list = getOverlayRecent().filter(s => s !== q);
+  list.unshift(q);
+  localStorage.setItem(OVERLAY_RECENT_KEY, JSON.stringify(list.slice(0, 8)));
+}
+function showOverlayRecent() {
+  const list = getOverlayRecent();
+  const resultsEl = document.getElementById('map-overlay-search-results');
+  if (!list.length || !resultsEl) return;
+  resultsEl.innerHTML = `<div style="padding:8px 14px 4px;font-size:11px;color:#aaa;font-weight:600;letter-spacing:0.3px;">최근 검색</div>`;
+  list.forEach(q => {
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0ede8;display:flex;align-items:center;gap:10px;';
+    item.innerHTML = `<span style="font-size:14px;color:#aaa;">🕐</span><span style="flex:1;color:#333;">${q}</span>
+      <button onclick="event.stopPropagation();removeOverlayRecent('${q.replace(/'/g,"\\'")}');showOverlayRecent();"
+        style="border:none;background:none;cursor:pointer;color:#ccc;font-size:14px;padding:0 2px;">✕</button>`;
+    item.onmouseenter = () => item.style.background = '#f5f3f0';
+    item.onmouseleave = () => item.style.background = '';
+    item.onclick = () => {
+      document.getElementById('map-overlay-search-input').value = q;
+      mapOverlaySearch();
+    };
+    resultsEl.appendChild(item);
+  });
+  resultsEl.style.display = 'flex';
+  resultsEl.style.flexDirection = 'column';
+}
+function removeOverlayRecent(q) {
+  const list = getOverlayRecent().filter(s => s !== q);
+  localStorage.setItem(OVERLAY_RECENT_KEY, JSON.stringify(list));
+}
+
 function mapOverlaySearch() {
   const q = document.getElementById('map-overlay-search-input').value.trim();
   if (!q || !overlayMap) return;
+  saveOverlayRecent(q); // 최근 검색 저장
   const svc = new google.maps.places.PlacesService(overlayMap);
   const resultsEl = document.getElementById('map-overlay-search-results');
   resultsEl.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#aaa;">검색 중…</div>';
@@ -6214,7 +6252,8 @@ document.addEventListener('keydown', (e) => {
     <span style="padding:0 4px 0 14px;font-size:16px;color:#aaa;">🔍</span>
     <input id="map-overlay-search-input" type="text" placeholder="장소 검색"
       style="flex:1;border:none;outline:none;padding:10px 8px;font-family:inherit;font-size:14px;color:#333;background:transparent;"
-      onkeydown="if(event.key==='Enter')mapOverlaySearch()" />
+      onkeydown="if(event.key==='Enter')mapOverlaySearch()"
+      onfocus="showOverlayRecent()" />
     <button onclick="mapOverlaySearch()"
       style="border:none;background:none;cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:#4A90E2;flex-shrink:0;">검색</button>
     <div id="map-overlay-search-results"
