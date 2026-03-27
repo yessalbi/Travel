@@ -1117,7 +1117,7 @@ html, body {
 @media (max-width: 768px) {
   html, body { overflow: auto; }
   #main { overflow: visible; }
-  #main { flex-direction: column; height: auto; overflow: visible; }
+  #main { flex-direction: column; height: auto; overflow: visible; padding-top: 0; }
   #left-panel {
     width: 100%; border-right: none;
     border-bottom: 1px solid var(--sand);
@@ -1130,20 +1130,20 @@ html, body {
   body.checklist-active #map-wrapper { display: none; }
   #sch-place-panel-header { padding-top: 18px; }
 
-  /* 모바일 헤더 */
+  /* 모바일 헤더 — position:static으로 자연스럽게 */
   #header {
+    position: static;
     height: auto;
     flex-direction: column;
     align-items: center;
     padding: 8px 14px 6px;
     gap: 2px;
   }
-  /* 목록 버튼 — 일반 흐름에서 왼쪽 정렬 */
   #header > #btn-back-list {
-    position: static;
-    align-self: flex-start;
+    position: absolute;
+    top: 10px; left: 14px;
     font-size: 12px; padding: 4px 8px;
-    margin-bottom: -28px; /* 로고와 같은 줄처럼 */
+    z-index: 1;
   }
   #header-logo {
     position: static !important;
@@ -1171,8 +1171,8 @@ html, body {
   #header-badge-group { flex-direction: column; gap: 1px; }
   #save-btn { font-size: 12px; padding: 6px 10px; }
   #share-btn { font-size: 12px; padding: 6px 10px; }
-  #main { padding-top: 100px; }
-  #toast { bottom: auto; top: 110px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  #main { padding-top: 0; }
+  #toast { top: 10px; bottom: auto; transform: translateX(-50%) translateY(-20px); opacity: 0; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
@@ -3366,6 +3366,12 @@ function renderDayTabs() {
   // 여행 정보 탭(0)이 활성화되어 있으면 fitDayBounds 건너뜀
   const activeTab = sessionStorage.getItem('panelTab');
   if (map && activeTab !== '0') { drawDayRoutes(); fitDayBounds(currentDay); }
+  // Day 날씨 뱃지 업데이트
+  const startDate = document.getElementById('trip-start').value;
+  if (startDate && Object.keys(weatherCache).length) {
+    const cached = weatherCache[Object.keys(weatherCache)[0]];
+    if (cached?.data?.daily) updateDayWeatherBadge(cached.data.daily.time || [], cached.data.daily, startDate);
+  }
 }
 
 // ── 일정 렌더링 ───────────────────────────────────────────────
