@@ -1014,19 +1014,24 @@ html, body {
 }
 #map-search-results.show { display: flex; }
 
-/* 검색결과 닫기 버튼 — 결과창 아래 중앙에 고정 부유 */
-#map-search-close-btn {
-  position: absolute; left: 50%; transform: translateX(-50%);
-  z-index: 21; display: none;
+/* 검색결과 닫기 버튼 */
+.map-search-close-inner {
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--sand);
+  flex-shrink: 0;
+}
+.map-search-close-inner button {
   width: 32px; height: 32px; border-radius: 50%;
   border: 2px solid var(--sand); background: var(--white);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink3);
-  align-items: center; justify-content: center;
-  transition: background .14s, color .14s;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .14s;
 }
-#map-search-close-btn:hover { background: var(--stone); color: var(--ink); }
-#map-search-close-btn.show { display: flex; }
+.map-search-close-inner button:hover { background: var(--stone); color: var(--ink); }
+/* 구버전 호환 */
+#map-search-close-btn { display: none !important; }
 
 /* 섹션 헤더 */
 .msr-section-title {
@@ -4582,18 +4587,11 @@ function renderSearchResults(top, resultsEl, activeMap) {
     resultsEl.appendChild(item);
   });
 
-  // 닫기 버튼을 결과창 바로 아래에 띄움
-  requestAnimationFrame(() => {
-    const closeBtn = document.getElementById('map-search-close-btn');
-    if (!closeBtn) return;
-    const resultsRect = resultsEl.getBoundingClientRect();
-    const wrapRect = resultsEl.closest('#map-search-wrap')?.getBoundingClientRect();
-    if (wrapRect) {
-      const bottom = resultsRect.bottom - wrapRect.top + 8;
-      closeBtn.style.top = bottom + 'px';
-    }
-    closeBtn.classList.add('show');
-  });
+  // 결과창 맨 아래에 닫기 버튼 추가
+  const closeDom = document.createElement('div');
+  closeDom.className = 'map-search-close-inner';
+  closeDom.innerHTML = '<button onclick="closeMapSearchResults()" title="닫기">✕</button>';
+  resultsEl.appendChild(closeDom);
 }
 
 // 장소 상세 카드
