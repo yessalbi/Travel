@@ -511,6 +511,14 @@ html, body {
 .item-body  { flex: 1; min-width: 0; }
 .item-time  { font-size: 11px; color: var(--ink3); }
 .item-name  { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 다음 장소까지 소요시간 배지 */
+.item-travel-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; color: var(--ink3);
+  background: var(--stone); border-radius: 10px;
+  padding: 2px 7px; margin-top: 4px;
+  white-space: nowrap;
+}
 .item-desc  { font-size: 12px; color: var(--ink3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 메모 인라인 편집 */
 .item-memo-wrap { margin-top: 6px; }
@@ -3355,6 +3363,7 @@ function renderScheduleList() {
         <div class="item-name">${item.name}</div>
         <div class="item-desc">${item.desc || ''}</div>
         ${hasLoc ? '<div class="item-has-loc">📍 위치 등록됨</div>' : ''}
+        <div id="item-travel-${currentDay}-${idx}"></div>
         <div class="item-memo-wrap" id="memo-wrap-${currentDay}-${idx}">
           ${hasMemo ? `<div class="item-memo-text" id="memo-text-${currentDay}-${idx}">${item.memo}</div>` : ''}
         </div>
@@ -3456,6 +3465,9 @@ function fetchDirections(from, to, mode, fromIdx) {
         <span class="transit-time">약 ${durTxt}</span>
         <span class="transit-sep">·</span>
         <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
+      // 출발 일정 카드에도 소요시간 배지 표시
+      const badge = document.getElementById(`item-travel-${currentDay}-${fromIdx}`);
+      if (badge) badge.innerHTML = `<span class="item-travel-badge">${modeInfo.icon} 다음까지 ${durTxt}</span>`;
 
     } else if (status === google.maps.DirectionsStatus.ZERO_RESULTS && mode === 'transit') {
       // 대중교통 정보 없는 지역 → 자동차 기준으로 폴백
@@ -3473,6 +3485,8 @@ function fetchDirections(from, to, mode, fromIdx) {
             <span class="transit-time">약 ${leg.duration.text}</span>
             <span class="transit-sep">·</span>
             <span style="font-size:11px;color:var(--red)">🚌 이 구간 대중교통 정보 없음 (자동차 기준)</span>`;
+          const badge = document.getElementById(`item-travel-${currentDay}-${fromIdx}`);
+          if (badge) badge.innerHTML = `<span class="item-travel-badge">🚗 다음까지 ${leg.duration.text}</span>`;
         } else {
           infoEl.innerHTML = `<span class="transit-no-loc">🚌 이 구간 대중교통 정보가 없어요</span>`;
         }
