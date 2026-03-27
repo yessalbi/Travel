@@ -244,9 +244,11 @@ html, body {
   display: flex; align-items: center; gap: 16px;
   padding: 0 24px;
 }
+/* travel. 로고 — 항상 표시 */
+#header-logo { display: block; flex-shrink: 0; }
 #header h1 {
   font-family: 'Playfair Display', serif;
-  font-size: 22px; font-weight: 700;
+  font-size: 18px; font-weight: 700;
   color: var(--ink); flex: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -1306,9 +1308,6 @@ html, body {
 .day-weather-badge.rainy { background: #EAF0FE; color: #185FA5; }
 .day-weather-badge.cloudy { background: #F1EFE8; color: #5F5E5A; }
 
-/* PC/태블릿: travel. 로고 헤더에 표시 */
-#header-logo { display: block; flex-shrink: 0; }
-/* 모바일에서 h1 숨기고 travel. 크게 */
 /* PC: 목록 버튼 작게 유지 */
 #btn-back-list { flex-shrink: 0; }
 #pin-mode-banner {
@@ -1920,9 +1919,11 @@ html, body {
         <div class="info-grid">
           <button id="duration-badge" onclick="openTripSetup()">
             <span class="icon">🏖️</span>
-            <div>
+            <div style="flex:1;min-width:0;">
+              <div id="duration-title" style="font-size:17px;font-weight:700;margin-bottom:3px;display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
               <div id="duration-text">날짜를 선택하세요</div>
               <div class="sub" id="duration-nights">—</div>
+              <div id="duration-note" class="sub" style="margin-top:2px;display:none;"></div>
             </div>
             <span class="edit-hint">✏️ 편집</span>
           </button>
@@ -1932,13 +1933,6 @@ html, body {
           <input type="hidden" id="trip-end" />
           <input type="hidden" id="trip-note" />
           <input type="hidden" id="trip-author" />
-        </div>
-        <!-- 여행 정보 요약 표시 -->
-        <div id="trip-summary" style="margin-top:12px;display:none;">
-          <div style="background:var(--stone);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;">
-            <div id="summary-title" style="font-size:14px;font-weight:600;color:var(--ink);"></div>
-            <div id="summary-note"  style="font-size:12px;color:var(--ink3);"></div>
-          </div>
         </div>
 
         <!-- 날씨 위젯 -->
@@ -5364,15 +5358,20 @@ function setupFinish() {
 function updateTripSummary() {
   const title = document.getElementById('trip-title').value;
   const note  = document.getElementById('trip-note').value;
-  const summary = document.getElementById('trip-summary');
   document.title = title ? `${getTitleEmoji(title)}${title} 계획판` : '여행 계획판';
-  if (title) {
-    document.getElementById('summary-title').textContent = title;
-    document.getElementById('summary-note').textContent  = note || '';
-    summary.style.display = 'block';
-  } else {
-    summary.style.display = 'none';
+
+  // duration-badge 안에 제목/메모 통합 표시
+  const titleEl = document.getElementById('duration-title');
+  const noteEl  = document.getElementById('duration-note');
+  if (titleEl) {
+    titleEl.textContent = title || '';
+    titleEl.style.display = title ? 'block' : 'none';
   }
+  if (noteEl) {
+    noteEl.textContent = note || '';
+    noteEl.style.display = note ? 'block' : 'none';
+  }
+
   if (title) {
     const icon = detectDomestic(title) ? '🇰🇷' : '✈';
     document.getElementById('trip-title-display').innerHTML = title + ` <span>${icon}</span>`;
