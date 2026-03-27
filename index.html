@@ -4431,6 +4431,30 @@ function openMapPlaceCard(place, idx) {
   }, (d, s) => renderMapPlaceCard(s === google.maps.places.PlacesServiceStatus.OK ? d : place, place));
 }
 
+function openGoogleMaps(placeId, name, lat, lng) {
+  // iOS: 구글맵 앱 스킴 시도 → 실패시 웹 fallback
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isIOS    = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (isIOS && placeId) {
+    // iOS 구글맵 앱: comgooglemaps 스킴
+    const appUrl = `comgooglemaps://?q=${encodeURIComponent(name)}&center=${lat},${lng}&zoom=16`;
+    const webUrl = `https://maps.google.com/maps?q=${encodeURIComponent(name)}&ll=${lat},${lng}&z=16`;
+    // 앱 스킴 시도 후 실패하면 웹으로
+    const start = Date.now();
+    window.location.href = appUrl;
+    setTimeout(() => {
+      if (Date.now() - start < 1500) window.open(webUrl, '_blank');
+    }, 1000);
+  } else if (isMobile && placeId) {
+    // Android
+    window.open(`https://maps.google.com/maps?q=${encodeURIComponent(name)}&ll=${lat},${lng}&z=16`, '_blank');
+  } else {
+    // PC: place_id URL
+    window.open(`https://www.google.com/maps/place/?q=place_id:${placeId}`, '_blank');
+  }
+}
+
 function renderMapPlaceCard(d, fb) {
   const card = document.getElementById('map-place-card');
   const pid = fb.place_id || '';
@@ -4505,7 +4529,7 @@ function renderMapPlaceCard(d, fb) {
       </div>
     </div>
     <div class="mpc-actions">
-      <button class="mpc-action-btn" onclick="window.open('https://www.google.com/maps/place/?q=place_id:${pid}','_blank')">🗺️ 구글맵</button>
+      <button class="mpc-action-btn" onclick="openGoogleMaps('${pid}','${name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0})">🗺️ 구글맵</button>
       ${d.website ? `<button class="mpc-action-btn" onclick="window.open('${d.website}','_blank')">🌐 웹사이트</button>` : ''}
       ${d.international_phone_number||d.formatted_phone_number ? `<button class="mpc-action-btn" onclick="window.open('tel:${d.international_phone_number||d.formatted_phone_number}')">📞 전화</button>` : ''}
     </div>
