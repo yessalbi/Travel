@@ -4607,7 +4607,8 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
     language: 'ko',
   }, (place, status) => {
     if (status !== google.maps.places.PlacesServiceStatus.OK || !place) return;
-    renderMapPlaceCard(place, place);
+    // 모바일 지도탭: Day전체 버튼 + 저장 버튼 표시
+    renderMapPlaceCard(place, { ...place, _overlayMap: true });
     // 카드(바텀시트 ~78vh) 높이만큼 위로 오프셋해서 장소가 카드 위에 보이게
     if (targetMap) {
       setTimeout(() => {
@@ -4746,15 +4747,22 @@ function renderMapPlaceCard(d, fb) {
         ? `<img src="${photoUrl}" class="mpc-photo" style="height:180px;width:100%;object-fit:cover;" />`
         : `<div class="mpc-photo" style="height:180px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--stone);">🗺️</div>`}
       <button class="mpc-back" onclick="closeMapPlaceCard()">←</button>
-      ${fb._extraDayBtns ? (() => {
+      ${(fb._extraDayBtns || fb._overlayMap || sessionStorage.getItem('panelTab') === '0') ? (() => {
+        const lat_ = d.geometry?.location?.lat()||0;
+        const lng_ = d.geometry?.location?.lng()||0;
         let btns = '<div style="position:absolute;top:10px;right:10px;z-index:2;display:flex;flex-direction:column;gap:4px;align-items:flex-end;">';
         for (let i = 1; i <= totalDays; i++) {
-          btns += `<button onclick="addPlaceToDay(${i},'${name.replace(/'/g,"\\'")}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0})"
+          btns += `<button onclick="addPlaceToDay(${i},'${name.replace(/'/g,"\\'")}',${lat_},${lng_})"
             style="background:rgba(255,255,255,0.92);border:none;border-radius:20px;
               padding:5px 10px;font-size:11px;font-weight:700;color:var(--accent2);
               cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,0.2);white-space:nowrap;">＋ Day${i}</button>`;
         }
-        btns += '</div>';
+        if (!fb._extraDayBtns) {
+          btns += `<button onclick="savePoiToPlaces('${name.replace(/'/g,"\\'")}',${lat_},${lng_},'${photoUrl||''}','${pid}')"
+            style="background:rgba(255,255,255,0.92);border:none;border-radius:20px;
+              padding:5px 10px;font-size:11px;font-weight:700;color:var(--accent);
+              cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,0.2);white-space:nowrap;">🍴 저장</button>`;
+        }        btns += '</div>';
         return btns;
       })() : `
       <button onclick="addPoiToSchedule('${name.replace(/'/g,"\\'")}',${d.geometry?.location?.lat()||0},${d.geometry?.location?.lng()||0})"
@@ -5598,15 +5606,18 @@ function deletePlaceChip(name) {
 function addPlaceToDay(dayNum, name, lat, lng) {
   closeMapPlaceCard();
   currentDay = dayNum;
-  // 일별 일정 탭으로 전환
-  switchPanelTab(1);
-  // 일정 추가 팝업 열기 (장소 정보 미리 채움)
+  sessionStorage.setItem('currentDay', dayNum);
+  // 모바일 지도탭이면 먼저 닫고 일별일정으로
+  if (sessionStorage.getItem('panelTab') === 'map') {
+    closeMapOverlay(1); // 일별일정 탭으로
+  } else {
+    switchPanelTab(1);
+  }
+  renderDayTabs();
+  renderScheduleList();
   setTimeout(() => {
     addPoiToSchedule(name, lat, lng);
-    // 팝업 타이틀 업데이트
-    const title = document.querySelector('#schedule-overlay .popup-title');
-    if (title) title.textContent = `Day${dayNum} 일정 추가`;
-  }, 100);
+  }, 150);
 }
 function openGoogleMapsPlace() {
   if (!currentPlaceForMaps) return;
