@@ -244,15 +244,10 @@ html, body {
   display: flex; align-items: center; gap: 16px;
   padding: 0 24px;
 }
-/* travel. 로고 — 항상 표시 */
+/* travel. 로고 — 항상 표시, 중앙 */
 #header-logo { display: block; flex-shrink: 0; }
-#header h1 {
-  font-family: 'Playfair Display', serif;
-  font-size: 18px; font-weight: 700;
-  color: var(--ink); flex: 1;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-#header h1 span { color: var(--accent); }
+/* h1 PC에서도 숨김 — travel.로 대체 */
+#header h1 { display: none; }
 .header-btn {
   border: none; cursor: pointer; border-radius: 8px;
   font-family: inherit; font-size: 13px; font-weight: 500;
@@ -1139,9 +1134,9 @@ html, body {
     font-size: 22px !important;
     text-align: center;
     width: 100%;
-    padding-left: 0;
+    flex: 1 !important;
   }
-  /* 여행 제목 — 모바일에서 숨김 (travel. 로 대체) */
+  /* 여행 제목 숨김 (모바일 이미 none) */
   #header h1 { display: none; }
 
   /* 2줄: 버튼들 가로 정렬 */
@@ -1284,18 +1279,19 @@ html, body {
   padding: 10px 14px 0; letter-spacing: 0.3px;
 }
 #weather-days {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   gap: 6px; padding: 10px 12px 12px;
 }
 .weather-day-card {
   background: var(--stone); border-radius: 10px;
-  padding: 10px 6px; text-align: center;
+  padding: 10px 4px 12px; text-align: center;
+  min-height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
-.weather-day-label { font-size: 10px; color: var(--ink3); margin-bottom: 4px; }
-.weather-day-icon  { font-size: 22px; margin-bottom: 2px; }
-.weather-day-temp  { font-size: 14px; font-weight: 700; color: var(--ink); }
-.weather-day-range { font-size: 10px; color: var(--ink3); margin-top: 1px; }
-.weather-day-rain  { font-size: 10px; margin-top: 3px; }
+.weather-day-label { font-size: 10px; color: var(--ink3); margin-bottom: 5px; line-height: 1.3; }
+.weather-day-icon  { font-size: 24px; margin-bottom: 4px; line-height: 1; }
+.weather-day-temp  { font-size: 15px; font-weight: 700; color: var(--ink); }
+.weather-day-range { font-size: 10px; color: var(--ink3); margin-top: 2px; }
+.weather-day-rain  { font-size: 10px; margin-top: 4px; }
 #weather-note { font-size: 11px; color: var(--ink3); padding: 0 12px 10px; text-align: center; line-height: 1.5; }
 
 /* Day 탭 날씨 뱃지 */
@@ -1865,11 +1861,11 @@ html, body {
     onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
     onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">← 목록</button>
 
-  <!-- PC/태블릿: travel. 로고 -->
-  <div id="header-logo" class="logo" style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--ink);flex-shrink:0;">travel<span style="color:var(--accent);">.</span></div>
+  <!-- PC/태블릿: travel. 로고 중앙 -->
+  <div id="header-logo" style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--ink);flex:1;text-align:center;">travel<span style="color:var(--accent);">.</span></div>
 
-  <!-- 여행 제목 -->
-  <h1 id="trip-title-display" style="flex:1;">여행 계획판 <span>✈</span></h1>
+  <!-- 여행 제목 (숨김 — 주황카드에 표시) -->
+  <h1 id="trip-title-display" style="display:none;">여행 계획판 <span>✈</span></h1>
 
   <!-- 우측 버튼들 -->
   <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
@@ -2820,21 +2816,22 @@ let currentPdfItemId = null;
 // IndexedDB PDF 저장/로드 (offlineSave 재사용, 키 prefix 'pdf-')
 async function savePdfToLocal(itemId, base64) {
   pdfData[itemId] = base64;
-  try { await window.offlineSave('pdf-' + itemId, { base64 }); } catch(e) {}
+  try { await window.offlineSave('pdf-' + TRIP_ID + '-' + itemId, { base64 }); } catch(e) {}
 }
 async function loadPdfFromLocal(itemId) {
   try {
-    const snap = await window.offlineLoad('pdf-' + itemId);
+    const snap = await window.offlineLoad('pdf-' + TRIP_ID + '-' + itemId);
     return snap?.data?.base64 || null;
   } catch(e) { return null; }
 }
 async function deletePdfFromLocal(itemId) {
   delete pdfData[itemId];
-  try { await window.offlineDelete('pdf-' + itemId); } catch(e) {}
+  try { await window.offlineDelete('pdf-' + TRIP_ID + '-' + itemId); } catch(e) {}
 }
 
 // 앱 시작 시 저장된 PDF 목록 로드
 async function loadAllPdfs() {
+  pdfData = {}; // 여행 전환 시 초기화
   const allItems = [...VOUCHER_ITEMS, ...customVoucherItems];
   await Promise.all(allItems.map(async item => {
     const b64 = await loadPdfFromLocal(item.id);
