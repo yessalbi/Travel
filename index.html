@@ -5977,8 +5977,56 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// 항공사 색상 매핑
+const AIRLINE_COLORS = {
+  // 한국
+  '대한항공': '#003876', 'ke': '#003876',
+  '아시아나': '#E51937', 'oz': '#E51937',
+  '제주항공': '#F37021', '7c': '#F37021',
+  '진에어': '#C8102E', 'lj': '#C8102E',
+  '티웨이': '#E2001A', 'tw': '#E2001A',
+  '에어서울': '#003DA5', 'rs': '#003DA5',
+  '에어부산': '#003087', 'bu': '#003087',
+  '이스타': '#E60012', 'zt': '#E60012',
+  '플라이강원': '#0054A6', 'ko': '#0054A6',
+  // 일본
+  'jal': '#E60026', '일본항공': '#E60026',
+  'ana': '#13417C', '전일본': '#13417C',
+  '피치': '#FF5588', 'mm': '#FF5588',
+  '바닐라': '#FF8200', 'jw': '#FF8200',
+  '집에어': '#FF8200',
+  '솔라시도': '#00A0E9', '6j': '#00A0E9',
+  // 국제
+  '싱가포르': '#0052A5', 'sq': '#0052A5',
+  '캐세이': '#006564', 'cx': '#006564',
+  '에미레이트': '#D71921', 'ek': '#D71921',
+  '에티하드': '#BE8A3B', 'ey': '#BE8A3B',
+  '카타르': '#5C0632', 'qr': '#5C0632',
+  '터키항공': '#E81932', 'tk': '#E81932',
+  '루프트한자': '#05164D', 'lh': '#05164D',
+  '에어프랑스': '#002157', 'af': '#002157',
+  '영국항공': '#075AAA', 'ba': '#075AAA',
+  '델타': '#E01933', 'dl': '#E01933',
+  '유나이티드': '#003580', 'ua': '#003580',
+  '아메리칸': '#B0173F', 'aa': '#B0173F',
+  '스쿠트': '#FFCC00', 'tr': '#195a1e',
+  '비엣젯': '#E2001A', 'vj': '#E2001A',
+  '에어아시아': '#E40520', 'ak': '#E40520',
+};
+
+function getAirlineColor(airlineStr) {
+  if (!airlineStr) return null;
+  const lower = airlineStr.toLowerCase();
+  for (const [key, color] of Object.entries(AIRLINE_COLORS)) {
+    if (lower.includes(key)) return color;
+  }
+  // 항공편 코드 2자리 추출 (예: KE701 → ke)
+  const code = airlineStr.match(/^([A-Z]{2})\d/i)?.[1]?.toLowerCase();
+  if (code && AIRLINE_COLORS[code]) return AIRLINE_COLORS[code];
+  return null;
+}
+
 function updateAirlineLogo() {
-  const el = document.getElementById('airline-logo');
   if (!el) return;
   const v = document.getElementById('flight-airline')?.value || '';
   el.textContent = v ? v.slice(0,2).toUpperCase() : '✈';
@@ -6009,6 +6057,12 @@ function updateTicketDisplay() {
 
   const dAirlineEl = document.getElementById('depart-airline-display');
   if (dAirlineEl) dAirlineEl.textContent = fa || '항공사를 입력해주세요';
+  // 출국편 헤더 색상
+  const dHeader = document.querySelector('#depart-ticket .ticket-header');
+  if (dHeader) {
+    const dColor = getAirlineColor(fa);
+    dHeader.style.background = dColor || '#1A1A18';
+  }
   const dFromEl = document.getElementById('depart-from-display');
   if (dFromEl) dFromEl.textContent = ff || 'ICN';
   const dToEl = document.getElementById('depart-to-display');
@@ -6029,6 +6083,12 @@ function updateTicketDisplay() {
 
   const rAirlineEl = document.getElementById('return-airline-display');
   if (rAirlineEl) rAirlineEl.textContent = ra || '항공사를 입력해주세요';
+  // 귀국편 헤더 색상
+  const rHeader = document.querySelector('#return-ticket .ticket-header');
+  if (rHeader) {
+    const rColor = getAirlineColor(ra);
+    rHeader.style.background = rColor || '#2c2c2a';
+  }
   const rFromEl = document.getElementById('return-from-display');
   if (rFromEl) rFromEl.textContent = rf || 'NRT';
   const rToEl = document.getElementById('return-to-display');
