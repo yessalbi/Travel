@@ -1123,17 +1123,18 @@ html, body {
 .ov-tab.active { color: var(--accent2); font-weight: 600; }
 
 @media (max-width: 768px) {
-  html, body { overflow: hidden; }
+  html { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  body { overflow: visible; }
   #main { overflow: visible; }
   /* iOS 확대 방지: 16px 필수. 패딩 줄여서 시각적으로 작아 보이게 */
   input, select, textarea { font-size: 16px !important; }
-  #main { flex-direction: column; height: 100vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-top: 0; }
+  #main { flex-direction: column; height: auto; overflow: visible; padding-top: 0; }
   #left-panel {
     width: 100%; border-right: none;
     border-bottom: 1px solid var(--sand);
     overflow: visible; min-height: 0; flex-shrink: 0;
   }
-  .panel-page { overflow: visible; }
+  .panel-page { overflow: visible; min-height: 0; }
   #map-wrapper { height: 60vw; min-height: 300px; flex-shrink: 0; }
   .popup { padding: 20px; }
   .map-tab-mobile { display: flex; }
@@ -4373,7 +4374,7 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
   }, (place, status) => {
     if (status !== google.maps.places.PlacesServiceStatus.OK || !place) return;
     if (targetMap) targetMap.panTo(place.geometry.location);
-    renderMapPlaceCard(place);
+    renderMapPlaceCard(place, place); // fb = place itself
   });
 }
 
