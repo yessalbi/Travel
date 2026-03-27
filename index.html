@@ -4477,15 +4477,32 @@ function runPlacesTextSearch(q) {
 
   const mapCenter = activeMap ? activeMap.getCenter() : null;
   const mapBounds = activeMap ? activeMap.getBounds() : null;
-  const isNearby  = /근처|주변|가까운|인근|nearby/i.test(q);
+  const isNearby  = /근처|주변|가까운|인근|nearby|near/i.test(q);
 
   if (isNearby && mapCenter) {
-    const keyword = q.replace(/근처|주변|가까운|인근|nearby/gi, '').trim();
-    svc.nearbySearch({ location: mapCenter, radius: 1500, keyword, language: 'ko' }, (results, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && results.length) {
+    const keyword = q.replace(/근처|주변|가까운|인근|nearby|near/gi, '').trim();
+    // 반경을 지도 줌 레벨에 따라 동적으로 조정
+    const zoom = activeMap?.getZoom() || 14;
+    const radius = zoom >= 16 ? 500 : zoom >= 14 ? 1000 : zoom >= 12 ? 3000 : 5000;
+
+    svc.nearbySearch({
+      location: mapCenter,
+      radius,
+      keyword,
+      language: 'ko',
+      rankBy: undefined, // radius 있을 때 rankBy 사용 불가
+    }, (results, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results.length >= 3) {
         renderSearchResults(results.slice(0, 20), resultsEl, activeMap);
       } else {
-        runTextSearchRaw(q, svc, resultsEl, activeMap, mapCenter, mapBounds);
+        // 결과 적으면 반경 넓혀서 재시도
+        svc.nearbySearch({ location: mapCenter, radius: radius * 3, keyword, language: 'ko' }, (r2, s2) => {
+          if (s2 === google.maps.places.PlacesServiceStatus.OK && r2.length) {
+            renderSearchResults(r2.slice(0, 20), resultsEl, activeMap);
+          } else {
+            runTextSearchRaw(q, svc, resultsEl, activeMap, mapCenter, mapBounds);
+          }
+        });
       }
     });
   } else {
@@ -4495,14 +4512,31 @@ function runPlacesTextSearch(q) {
 
 function runTextSearchRaw(q, svc, resultsEl, activeMap, mapCenter, mapBounds) {
   const req = { query: q, language: 'ko' };
-  if (mapBounds) req.bounds = mapBounds;
-  else if (mapCenter) req.location = mapCenter;
+  // bounds 우선, 없으면 현재 지도 중심 + 동적 반경
+  if (mapBounds) {
+    req.bounds = mapBounds;
+  } else if (mapCenter) {
+    req.location = mapCenter;
+  }
+
   svc.textSearch(req, (results, status) => {
-    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
-      resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요</div>`;
-      return;
+    if (status === google.maps.places.PlacesServiceStatus.OK && results.length) {
+      renderSearchResults(results.slice(0, 20), resultsEl, activeMap);
+    } else {
+      // 폴백 1: bounds 없애고 재검색
+      if (mapBounds) {
+        const req2 = { query: q, language: 'ko', location: mapCenter };
+        svc.textSearch(req2, (r2, s2) => {
+          if (s2 === google.maps.places.PlacesServiceStatus.OK && r2.length) {
+            renderSearchResults(r2.slice(0, 20), resultsEl, activeMap);
+          } else {
+            resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요 — 더 넓은 지역에서 검색해 보세요</div>`;
+          }
+        });
+      } else {
+        resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요 — 검색어를 바꾸거나 지도를 이동 후 다시 검색해보세요</div>`;
+      }
     }
-    renderSearchResults(results.slice(0, 20), resultsEl, activeMap);
   });
 }
 
@@ -5858,16 +5892,48 @@ function mapOverlaySearch() {
   clearMapSearchMarkers();
 
   const bounds = overlayMap.getBounds();
-  const req = { query: q, language: 'ko' };
-  if (bounds) req.bounds = bounds;
+  const center = overlayMap.getCenter();
+  const zoom   = overlayMap.getZoom() || 14;
+  const isNearby = /근처|주변|가까운|인근|nearby|near/i.test(q);
 
-  svc.textSearch(req, (results, status) => {
-    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
-      resultsEl.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#aaa;">결과가 없어요</div>';
+  const doTextSearch = (req) => {
+    svc.textSearch(req, (results, status) => {
+      if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+        // 폴백: bounds 제거하고 재시도
+        if (req.bounds) {
+          svc.textSearch({ query: q, language: 'ko', location: center }, (r2, s2) => {
+            renderOverlayResults(s2 === google.maps.places.PlacesServiceStatus.OK ? r2 : []);
+          });
+        } else {
+          renderOverlayResults([]);
+        }
+        return;
+      }
+      renderOverlayResults(results.slice(0, 10));
+    });
+  };
+
+  if (isNearby && center) {
+    const keyword = q.replace(/근처|주변|가까운|인근|nearby|near/gi, '').trim();
+    const radius = zoom >= 16 ? 500 : zoom >= 14 ? 1000 : zoom >= 12 ? 3000 : 5000;
+    svc.nearbySearch({ location: center, radius, keyword, language: 'ko' }, (results, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results.length >= 3) {
+        renderOverlayResults(results.slice(0, 10));
+      } else {
+        doTextSearch({ query: q, language: 'ko', ...(bounds ? { bounds } : { location: center }) });
+      }
+    });
+  } else {
+    doTextSearch({ query: q, language: 'ko', ...(bounds ? { bounds } : { location: center }) });
+  }
+
+  function renderOverlayResults(results) {
+    if (!results.length) {
+      resultsEl.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#aaa;">결과가 없어요 — 지도를 이동하거나 검색어를 바꿔보세요</div>';
       return;
     }
     resultsEl.innerHTML = '';
-    results.slice(0, 10).forEach((place, i) => {
+    results.forEach((place, i) => {
       const marker = new google.maps.Marker({
         map: overlayMap,
         position: place.geometry.location,
@@ -5925,13 +5991,15 @@ function mapOverlaySearch() {
 
     if (results.length > 1) {
       const b = new google.maps.LatLngBounds();
-      results.slice(0,10).forEach(p => b.extend(p.geometry.location));
+      results.forEach(p => b.extend(p.geometry.location));
       overlayMap.fitBounds(b, { top:60, bottom:40, left:20, right:20 });
-    } else {
+    } else if (results.length === 1) {
       overlayMap.setCenter(results[0].geometry.location);
       overlayMap.setZoom(16);
     }
-  });
+    resultsEl.style.display = 'flex';
+    resultsEl.style.flexDirection = 'column';
+  } // end renderOverlayResults
 }
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#map-overlay-search')) {
