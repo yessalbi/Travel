@@ -425,7 +425,116 @@ html, body {
   padding: 16px 20px;
   border-bottom: 1px solid var(--stone);
 }
-/* 국내여행 카드 */
+/* 티켓 디자인 */
+.ticket-card {
+  background: var(--white);
+  border-radius: 16px;
+  border: 1px solid var(--sand);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.ticket-card:last-child { margin-bottom: 0; }
+.ticket-header {
+  background: var(--ink);
+  padding: 11px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ticket-header-left { display: flex; flex-direction: column; gap: 2px; }
+.ticket-header-tag { font-size: 10px; font-weight: 500; color: #888; letter-spacing: 0.8px; }
+.ticket-header-airline { font-size: 14px; font-weight: 500; color: #fff; min-height: 20px; }
+.ticket-header-icon { font-size: 20px; }
+.ticket-body { padding: 14px 16px 0; }
+.ticket-route {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.ticket-city { flex: none; }
+.ticket-iata {
+  font-size: 28px; font-weight: 700; color: var(--ink);
+  letter-spacing: -1px; font-family: 'DM Sans', sans-serif;
+  min-width: 48px; border: none; background: transparent;
+  outline: none; padding: 0; width: 72px;
+}
+.ticket-iata::placeholder { color: var(--sand); font-weight: 400; font-size: 22px; }
+.ticket-iata:focus { color: var(--accent2); }
+.ticket-city-name { font-size: 10px; color: var(--ink3); margin-top: 1px; }
+.ticket-mid {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.ticket-mid-icon { font-size: 16px; }
+.ticket-mid-line {
+  width: 100%; height: 1px; background: var(--sand); position: relative;
+}
+.ticket-mid-line::before, .ticket-mid-line::after {
+  content: ''; position: absolute; top: -3px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--sand);
+}
+.ticket-mid-line::before { left: 0; }
+.ticket-mid-line::after { right: 0; }
+.ticket-divider {
+  border: none; border-top: 1.5px dashed var(--sand);
+  margin: 0 -16px; position: relative;
+}
+.ticket-divider::before, .ticket-divider::after {
+  content: ''; position: absolute; top: -7px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--stone); border: 1px solid var(--sand);
+}
+.ticket-divider::before { left: -7px; }
+.ticket-divider::after { right: -7px; }
+.ticket-times {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px; padding: 12px 0 14px;
+}
+.ticket-time-item { display: flex; flex-direction: column; gap: 3px; }
+.ticket-time-label { font-size: 10px; color: var(--ink3); font-weight: 500; letter-spacing: 0.3px; }
+.ticket-time-value { font-size: 13px; font-weight: 600; color: var(--ink); }
+.ticket-time-item.center { align-items: center; }
+.ticket-edit-row {
+  border-top: 1px solid var(--stone);
+  padding: 0;
+}
+.ticket-edit-btn-full {
+  width: 100%; padding: 10px; text-align: center;
+  font-size: 12px; color: var(--ink3); font-family: inherit;
+  border: none; background: var(--stone); cursor: pointer;
+  transition: background .13s; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.ticket-edit-btn-full:hover { background: var(--sand); }
+/* 편집 패널 */
+.ticket-edit-panel {
+  display: none; padding: 12px 16px 14px;
+  border-top: 1px solid var(--stone);
+  flex-direction: column; gap: 8px;
+  background: var(--stone);
+}
+.ticket-edit-panel.open { display: flex; }
+.ticket-field-row { display: flex; align-items: center; gap: 8px; }
+.ticket-field-lbl { font-size: 11px; color: var(--ink3); width: 44px; flex-shrink: 0; }
+.ticket-field-row input {
+  flex: 1; border: 1.5px solid var(--sand); border-radius: 7px;
+  padding: 7px 10px; font-family: inherit; font-size: 13px;
+  background: var(--white); outline: none; transition: border-color .18s;
+}
+.ticket-field-row input:focus { border-color: var(--accent2); }
+.ticket-field-row input.iata-input { width: 68px; flex: none; }
+/* 미입력 상태 */
+.ticket-empty {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 22px 16px; gap: 6px;
+}
+.ticket-empty-text { font-size: 13px; color: var(--ink3); }
+.ticket-empty-btn {
+  margin-top: 4px; padding: 6px 16px;
+  font-size: 12px; color: var(--ink3); font-family: inherit;
+  border: 1px solid var(--sand); border-radius: 20px;
+  background: none; cursor: pointer; transition: all .13s;
+}
+.ticket-empty-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+/* 기존 flight-card (국내용 등 참조 방지) */
+.flight-card { display: none; }
+.flight-row { display: none; }
+
 .domestic-card {
   background: var(--stone);
   border-radius: var(--r2);
@@ -1970,41 +2079,135 @@ html, body {
       <!-- 항공편 -->
       <div id="flight-section">
         <div class="section-label">항공편</div>
-        <div class="flight-card">
-          <div class="flight-row">
-            <span class="lbl">항공사</span>
-            <div class="airline-logo" id="airline-logo">✈</div>
-            <input type="text" id="flight-airline" placeholder="예: 대한항공 KE701" oninput="updateAirlineLogo()" />
+
+        <!-- 출국편 티켓 -->
+        <div class="ticket-card" id="depart-ticket">
+          <div class="ticket-header">
+            <div class="ticket-header-left">
+              <span class="ticket-header-tag">DEPARTURE · 출국편</span>
+              <div class="ticket-header-airline" id="depart-airline-display">항공사를 입력해주세요</div>
+            </div>
+            <div class="ticket-header-icon">✈️</div>
           </div>
-          <div class="flight-row">
-            <span class="lbl">출발</span>
-            <div class="time-picker" id="tp-flight-depart"></div>
-            <input type="text" id="flight-from" placeholder="ICN" style="width:70px;flex:none;" />
+          <div class="ticket-body" id="depart-ticket-body">
+            <div class="ticket-route">
+              <div class="ticket-city">
+                <div class="ticket-iata" id="depart-from-display">ICN</div>
+                <div class="ticket-city-name" id="depart-from-name"></div>
+              </div>
+              <div class="ticket-mid">
+                <div class="ticket-mid-icon">✈</div>
+                <div class="ticket-mid-line"></div>
+              </div>
+              <div class="ticket-city" style="text-align:right;">
+                <div class="ticket-iata" id="depart-to-display" style="text-align:right;">NRT</div>
+                <div class="ticket-city-name" id="depart-to-name" style="text-align:right;"></div>
+              </div>
+            </div>
+            <div class="ticket-divider"></div>
+            <div class="ticket-times">
+              <div class="ticket-time-item">
+                <span class="ticket-time-label">출발</span>
+                <span class="ticket-time-value" id="depart-time-display">--:--</span>
+              </div>
+              <div class="ticket-time-item center">
+                <span class="ticket-time-label">항공편</span>
+                <span class="ticket-time-value" id="depart-flightno-display" style="font-size:11px;">-</span>
+              </div>
+              <div class="ticket-time-item" style="align-items:flex-end;">
+                <span class="ticket-time-label">도착</span>
+                <span class="ticket-time-value" id="depart-arrive-display">--:--</span>
+              </div>
+            </div>
           </div>
-          <div class="flight-row">
-            <span class="lbl">도착</span>
-            <div class="time-picker" id="tp-flight-arrive"></div>
-            <input type="text" id="flight-to" placeholder="NRT" style="width:70px;flex:none;" />
+          <div class="ticket-edit-row">
+            <button class="ticket-edit-btn-full" onclick="toggleTicketEdit('depart')">
+              <span>✏️</span><span>편집</span>
+            </button>
           </div>
-          <!-- 귀국편 -->
-          <div style="border-top:1px solid var(--sand);margin:4px 0;padding-top:8px;">
-            <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">귀국편</div>
-          </div>
-          <div class="flight-row">
-            <span class="lbl">항공사</span>
-            <input type="text" id="return-airline" placeholder="예: 아시아나 OZ102" />
-          </div>
-          <div class="flight-row">
-            <span class="lbl">출발</span>
-            <div class="time-picker" id="tp-return-depart"></div>
-            <input type="text" id="return-from" placeholder="NRT" style="width:70px;flex:none;" />
-          </div>
-          <div class="flight-row">
-            <span class="lbl">도착</span>
-            <div class="time-picker" id="tp-return-arrive"></div>
-            <input type="text" id="return-to" placeholder="ICN" style="width:70px;flex:none;" />
+          <div class="ticket-edit-panel" id="depart-edit-panel">
+            <div class="ticket-field-row">
+              <span class="ticket-field-lbl">항공사</span>
+              <input type="text" id="flight-airline" placeholder="예: 제주항공 7C1601" oninput="updateTicketDisplay()" />
+            </div>
+            <div class="ticket-field-row">
+              <span class="ticket-field-lbl">출발</span>
+              <div class="time-picker" id="tp-flight-depart"></div>
+              <input type="text" id="flight-from" placeholder="ICN" class="iata-input" oninput="updateTicketDisplay()" />
+            </div>
+            <div class="ticket-field-row">
+              <span class="ticket-field-lbl">도착</span>
+              <div class="time-picker" id="tp-flight-arrive"></div>
+              <input type="text" id="flight-to" placeholder="NRT" class="iata-input" oninput="updateTicketDisplay()" />
+            </div>
           </div>
         </div>
+
+        <!-- 귀국편 티켓 -->
+        <div class="ticket-card" id="return-ticket">
+          <div class="ticket-header" style="background:#2c2c2a;">
+            <div class="ticket-header-left">
+              <span class="ticket-header-tag">RETURN · 귀국편</span>
+              <div class="ticket-header-airline" id="return-airline-display">항공사를 입력해주세요</div>
+            </div>
+            <div class="ticket-header-icon">🛬</div>
+          </div>
+          <div class="ticket-body" id="return-ticket-body">
+            <div class="ticket-route">
+              <div class="ticket-city">
+                <div class="ticket-iata" id="return-from-display">NRT</div>
+                <div class="ticket-city-name" id="return-from-name"></div>
+              </div>
+              <div class="ticket-mid">
+                <div class="ticket-mid-icon">✈</div>
+                <div class="ticket-mid-line"></div>
+              </div>
+              <div class="ticket-city" style="text-align:right;">
+                <div class="ticket-iata" id="return-to-display" style="text-align:right;">ICN</div>
+                <div class="ticket-city-name" id="return-to-name" style="text-align:right;"></div>
+              </div>
+            </div>
+            <div class="ticket-divider"></div>
+            <div class="ticket-times">
+              <div class="ticket-time-item">
+                <span class="ticket-time-label">출발</span>
+                <span class="ticket-time-value" id="return-time-display">--:--</span>
+              </div>
+              <div class="ticket-time-item center">
+                <span class="ticket-time-label">항공편</span>
+                <span class="ticket-time-value" id="return-flightno-display" style="font-size:11px;">-</span>
+              </div>
+              <div class="ticket-time-item" style="align-items:flex-end;">
+                <span class="ticket-time-label">도착</span>
+                <span class="ticket-time-value" id="return-arrive-display">--:--</span>
+              </div>
+            </div>
+          </div>
+          <div class="ticket-edit-row">
+            <button class="ticket-edit-btn-full" onclick="toggleTicketEdit('return')">
+              <span>✏️</span><span>편집</span>
+            </button>
+          </div>
+          <div class="ticket-edit-panel" id="return-edit-panel">
+            <div class="ticket-field-row">
+              <span class="ticket-field-lbl">항공사</span>
+              <input type="text" id="return-airline" placeholder="예: 아시아나 OZ102" oninput="updateTicketDisplay()" />
+            </div>
+            <div class="ticket-field-row">
+              <span class="ticket-field-lbl">출발</span>
+              <div class="time-picker" id="tp-return-depart"></div>
+              <input type="text" id="return-from" placeholder="NRT" class="iata-input" oninput="updateTicketDisplay()" />
+            </div>
+            <div class="ticket-field-row">
+              <span class="ticket-field-lbl">도착</span>
+              <div class="time-picker" id="tp-return-arrive"></div>
+              <input type="text" id="return-to" placeholder="ICN" class="iata-input" oninput="updateTicketDisplay()" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 숨김 필드 (airline-logo 참조 코드 호환) -->
+        <div id="airline-logo" style="display:none;">✈</div>
       </div>
 
       <!-- 맛집 핀 -->
@@ -2747,6 +2950,7 @@ function applyTripData(data) {
   // (저장된 mapCenter는 사용자가 직접 이동한 거라 덮어쓰지 않음 — 핀 기준 우선)
   fitSchedulePins(data.title);
   updateAirlineLogo();
+  updateTicketDisplay();
 }
 
 // ── 챙겨야할 것 ───────────────────────────────────────────────
@@ -3901,6 +4105,7 @@ function tpSelect(prefix, role, val, onChange) {
   syncTpPopup(prefix);
   updateTpDisplay(prefix);
   if (onChange) onChange();
+  if (typeof updateTicketDisplay === 'function') updateTicketDisplay();
 }
 
 // 선택기 렌더링 (디스플레이 버튼 + 팝업)
@@ -5775,8 +5980,77 @@ document.addEventListener('DOMContentLoaded', () => {
 function updateAirlineLogo() {
   const el = document.getElementById('airline-logo');
   if (!el) return;
-  const v = document.getElementById('flight-airline').value;
+  const v = document.getElementById('flight-airline')?.value || '';
   el.textContent = v ? v.slice(0,2).toUpperCase() : '✈';
+  updateTicketDisplay();
+}
+
+function toggleTicketEdit(type) {
+  const panel = document.getElementById(`${type}-edit-panel`);
+  if (!panel) return;
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open', !isOpen);
+  const btn = panel.previousElementSibling?.querySelector('.ticket-edit-btn-full span:last-child');
+  if (btn) btn.textContent = isOpen ? '편집' : '완료';
+  if (!isOpen) {
+    // 열릴 때 time picker 초기화
+    setTimeout(() => updateTicketDisplay(), 50);
+  } else {
+    autoSave();
+    updateTicketDisplay();
+  }
+}
+
+function updateTicketDisplay() {
+  // 출국편
+  const fa = document.getElementById('flight-airline')?.value?.trim() || '';
+  const ff = document.getElementById('flight-from')?.value?.trim() || '';
+  const ft = document.getElementById('flight-to')?.value?.trim() || '';
+  const fd = getTimePicker('tp-flight-depart');
+  const fa2 = getTimePicker('tp-flight-arrive');
+
+  const dAirlineEl = document.getElementById('depart-airline-display');
+  if (dAirlineEl) dAirlineEl.textContent = fa || '항공사를 입력해주세요';
+  const dFromEl = document.getElementById('depart-from-display');
+  if (dFromEl) dFromEl.textContent = ff || 'ICN';
+  const dToEl = document.getElementById('depart-to-display');
+  if (dToEl) dToEl.textContent = ft || 'NRT';
+  const dTimeEl = document.getElementById('depart-time-display');
+  if (dTimeEl) dTimeEl.textContent = fd ? fmtTime(fd) : '--:--';
+  const dArrEl = document.getElementById('depart-arrive-display');
+  if (dArrEl) dArrEl.textContent = fa2 ? fmtTime(fa2) : '--:--';
+  // 편명 (항공사에서 영숫자 코드 추출)
+  const fno = fa.match(/[A-Z0-9]{2,3}\d{3,4}/i)?.[0] || fa.split(' ').slice(-1)[0] || '-';
+  const dFlightEl = document.getElementById('depart-flightno-display');
+  if (dFlightEl) dFlightEl.textContent = fno;
+
+  // 귀국편
+  const ra = document.getElementById('return-airline')?.value?.trim() || '';
+  const rf = document.getElementById('return-from')?.value?.trim() || '';
+  const rt = document.getElementById('return-to')?.value?.trim() || '';
+  const rd = getTimePicker('tp-return-depart');
+  const ra2 = getTimePicker('tp-return-arrive');
+
+  const rAirlineEl = document.getElementById('return-airline-display');
+  if (rAirlineEl) rAirlineEl.textContent = ra || '항공사를 입력해주세요';
+  const rFromEl = document.getElementById('return-from-display');
+  if (rFromEl) rFromEl.textContent = rf || 'NRT';
+  const rToEl = document.getElementById('return-to-display');
+  if (rToEl) rToEl.textContent = rt || 'ICN';
+  const rTimeEl = document.getElementById('return-time-display');
+  if (rTimeEl) rTimeEl.textContent = rd ? fmtTime(rd) : '--:--';
+  const rArrEl = document.getElementById('return-arrive-display');
+  if (rArrEl) rArrEl.textContent = ra2 ? fmtTime(ra2) : '--:--';
+  const rno = ra.match(/[A-Z0-9]{2,3}\d{3,4}/i)?.[0] || ra.split(' ').slice(-1)[0] || '-';
+  const rFlightEl = document.getElementById('return-flightno-display');
+  if (rFlightEl) rFlightEl.textContent = rno;
+}
+
+function getTimePicker(id) {
+  const el = document.getElementById(id);
+  if (!el) return '';
+  const sel = el.querySelector('select');
+  return sel ? sel.value : '';
 }
 
 // ── 국내/해외 여행 자동 감지 ─────────────────────────────────
