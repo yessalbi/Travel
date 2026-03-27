@@ -1123,19 +1123,25 @@ html, body {
     height: auto;
     flex-direction: column;
     align-items: stretch;
-    padding: 10px 16px 8px;
-    gap: 6px;
+    padding: 10px 14px 8px;
+    gap: 4px;
   }
-  /* 1줄: 제목 중앙 */
-  #header h1 {
-    font-size: 18px;
+  /* 1줄: 목록버튼(좌) + travel.(중앙) + 빈공간(우) */
+  #header > #btn-back-list {
+    position: absolute;
+    top: 12px; left: 14px;
+    font-size: 12px; padding: 4px 8px;
+  }
+  /* travel. 로고 — 모바일에서 중앙 크게 */
+  #header-logo {
+    font-size: 22px !important;
     text-align: center;
-    flex: none;
     width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    padding-left: 0;
   }
+  /* 여행 제목 — 모바일에서 숨김 (travel. 로 대체) */
+  #header h1 { display: none; }
+
   /* 2줄: 버튼들 가로 정렬 */
   #header-btn-row {
     display: flex !important;
@@ -1144,28 +1150,16 @@ html, body {
     gap: 8px;
     width: 100%;
   }
-  /* 리프레시 버튼 모바일 크기 */
-  #header-btn-row button[onclick="location.reload()"] {
-    font-size: 16px; padding: 4px 6px;
-  }
-  /* 배지 그룹 */
-  #header-badge-group {
-    flex-direction: column; gap: 1px;
-  }
-  #header h1 span { color: var(--accent); }
-  /* 오프라인 저장 버튼 텍스트 줄이기 */
+  #header-badge-group { flex-direction: column; gap: 1px; }
   #save-btn { font-size: 12px; padding: 6px 10px; }
   #share-btn { font-size: 12px; padding: 6px 10px; }
 
   /* 헤더 높이만큼 패딩 조정 */
   #main { padding-top: 110px; }
 
-  /* 토스트 — 헤더 아래쪽으로 */
+  /* 토스트 */
   #toast { bottom: auto; top: 130px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-  /* 제목 살짝 키우기 */
-  #header h1 { font-size: 20px; }
 }
 
 @media (max-width: 480px) {
@@ -1277,7 +1271,46 @@ html, body {
   transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 8px;
 }
 #btn-new-trip:hover { border-color: var(--accent2); color: var(--accent2); background: #EBF3FE; }
-/* 핀 찍기 모드 */
+/* 날씨 위젯 */
+#weather-section {
+  margin-top: 12px; border-radius: 14px;
+  border: 1px solid var(--sand); overflow: hidden;
+  background: var(--white);
+}
+#weather-section-title {
+  font-size: 11px; font-weight: 600; color: var(--ink3);
+  padding: 10px 14px 0; letter-spacing: 0.3px;
+}
+#weather-days {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px; padding: 10px 12px 12px;
+}
+.weather-day-card {
+  background: var(--stone); border-radius: 10px;
+  padding: 10px 6px; text-align: center;
+}
+.weather-day-label { font-size: 10px; color: var(--ink3); margin-bottom: 4px; }
+.weather-day-icon  { font-size: 22px; margin-bottom: 2px; }
+.weather-day-temp  { font-size: 14px; font-weight: 700; color: var(--ink); }
+.weather-day-range { font-size: 10px; color: var(--ink3); margin-top: 1px; }
+.weather-day-rain  { font-size: 10px; margin-top: 3px; }
+#weather-note { font-size: 11px; color: var(--ink3); padding: 0 12px 10px; text-align: center; line-height: 1.5; }
+
+/* Day 탭 날씨 뱃지 */
+.day-weather-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #EAF3DE; border-radius: 20px;
+  padding: 4px 10px; font-size: 11px;
+  color: #27500A; font-weight: 500; white-space: nowrap;
+}
+.day-weather-badge.rainy { background: #EAF0FE; color: #185FA5; }
+.day-weather-badge.cloudy { background: #F1EFE8; color: #5F5E5A; }
+
+/* PC/태블릿: travel. 로고 헤더에 표시 */
+#header-logo { display: block; flex-shrink: 0; }
+/* 모바일에서 h1 숨기고 travel. 크게 */
+/* PC: 목록 버튼 작게 유지 */
+#btn-back-list { flex-shrink: 0; }
 #pin-mode-banner {
   position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
   z-index: 300;
@@ -1825,13 +1858,21 @@ html, body {
 
 <!-- 헤더 -->
 <div id="header">
-  <button onclick="goToTripList()" title="여행 목록"
+  <!-- 목록 버튼 (항상 왼쪽 구석) -->
+  <button onclick="goToTripList()" title="여행 목록" id="btn-back-list"
     style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
            font-size:13px;padding:5px 10px;border-radius:8px;
            transition:all .14s;color:var(--ink3);white-space:nowrap;flex-shrink:0;"
     onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
     onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">← 목록</button>
-  <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
+
+  <!-- PC/태블릿: travel. 로고 -->
+  <div id="header-logo" class="logo" style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--ink);flex-shrink:0;">travel<span style="color:var(--accent);">.</span></div>
+
+  <!-- 여행 제목 -->
+  <h1 id="trip-title-display" style="flex:1;">여행 계획판 <span>✈</span></h1>
+
+  <!-- 우측 버튼들 -->
   <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
     <button onclick="location.reload()" title="새로고침"
       style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
@@ -1899,6 +1940,13 @@ html, body {
             <div id="summary-note"  style="font-size:12px;color:var(--ink3);"></div>
           </div>
         </div>
+
+        <!-- 날씨 위젯 -->
+        <div id="weather-section" style="display:none;">
+          <div id="weather-section-title">여행 기간 예상 날씨</div>
+          <div id="weather-days"></div>
+          <div id="weather-note"></div>
+        </div>
       </div>
 
       <!-- 항공편 -->
@@ -1954,7 +2002,10 @@ html, body {
     <div class="panel-page" id="panel-page-1">
       <div id="schedule-section" style="flex:1;padding:16px 20px;">
         <div class="section-label">일별 일정</div>
-        <div class="day-tabs" id="day-tabs"></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0;">
+          <div class="day-tabs" id="day-tabs" style="flex:1;min-width:0;"></div>
+          <div id="day-weather-badge-wrap" style="flex-shrink:0;"></div>
+        </div>
         <div class="schedule-list" id="schedule-list"></div>
         <button id="add-schedule-btn" onclick="openSchedulePopup()">
           <span>＋</span> 일정 추가
@@ -3288,6 +3339,15 @@ function renderDayTabs() {
       } else {
         drawDayRoutes();
         fitDayBounds(i);
+      }
+      // Day 탭 날씨 뱃지 갱신
+      const startDate = document.getElementById('trip-start').value;
+      if (startDate) {
+        const cacheKey = Object.keys(weatherCache)[0];
+        if (cacheKey) {
+          const { data } = weatherCache[cacheKey];
+          if (data?.daily) updateDayWeatherBadge(data.daily.time || [], data.daily, startDate);
+        }
       }
     };
     c.appendChild(btn);
@@ -5305,7 +5365,6 @@ function updateTripSummary() {
   const title = document.getElementById('trip-title').value;
   const note  = document.getElementById('trip-note').value;
   const summary = document.getElementById('trip-summary');
-  // 브라우저 탭 제목 업데이트
   document.title = title ? `${getTitleEmoji(title)}${title} 계획판` : '여행 계획판';
   if (title) {
     document.getElementById('summary-title').textContent = title;
@@ -5314,11 +5373,148 @@ function updateTripSummary() {
   } else {
     summary.style.display = 'none';
   }
-  // 헤더 제목도 업데이트
   if (title) {
     const icon = detectDomestic(title) ? '🇰🇷' : '✈';
     document.getElementById('trip-title-display').innerHTML = title + ` <span>${icon}</span>`;
   }
+  // 날씨 업데이트
+  loadWeather();
+}
+
+// ── 날씨 (Open-Meteo) ─────────────────────────────────────────
+let weatherCache = {};   // { dateStr: weatherData }
+
+function getWeatherIcon(code, rain) {
+  if (rain >= 60) return '🌧️';
+  if (rain >= 30) return '🌦️';
+  if (code <= 1)  return '☀️';
+  if (code <= 3)  return '⛅';
+  if (code <= 48) return '🌫️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '❄️';
+  if (code <= 82) return '🌧️';
+  return '⛈️';
+}
+
+function getWeatherBadgeClass(code, rain) {
+  if (rain >= 40 || (code >= 51 && code <= 82)) return 'rainy';
+  if (code >= 2)  return 'cloudy';
+  return '';
+}
+
+async function loadWeather() {
+  const startDate = document.getElementById('trip-start').value;
+  const endDate   = document.getElementById('trip-end').value;
+  const section   = document.getElementById('weather-section');
+  if (!startDate || !endDate || !map) { if (section) section.style.display = 'none'; return; }
+
+  // 지도 중심 좌표 사용 (여행지)
+  const center = map.getCenter();
+  const lat = center.lat().toFixed(4);
+  const lng = center.lng().toFixed(4);
+
+  const cacheKey = `${lat},${lng},${startDate},${endDate}`;
+  if (weatherCache[cacheKey]) {
+    renderWeatherSection(weatherCache[cacheKey], startDate, endDate);
+    return;
+  }
+
+  try {
+    const today   = new Date(); today.setHours(0,0,0,0);
+    const tripStart = new Date(startDate);
+    const daysUntil = Math.round((tripStart - today) / 86400000);
+    const isForecast = daysUntil <= 7 && daysUntil >= -1;
+
+    let url, data;
+    if (isForecast) {
+      // 실시간 예보 (7일 이내)
+      url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}`
+          + `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max`
+          + `&timezone=auto&start_date=${startDate}&end_date=${endDate}`;
+    } else {
+      // 과거 기후 평균 (climatology) — 해당 날짜 ±15일 평균
+      url = `https://climate-api.open-meteo.com/v1/climate?latitude=${lat}&longitude=${lng}`
+          + `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum`
+          + `&start_date=${startDate}&end_date=${endDate}&models=EC_Earth3P_HR`;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API 오류');
+    data = await res.json();
+    weatherCache[cacheKey] = { data, isForecast };
+    renderWeatherSection({ data, isForecast }, startDate, endDate);
+  } catch(e) {
+    console.warn('날씨 로드 실패:', e);
+    if (section) section.style.display = 'none';
+  }
+}
+
+function renderWeatherSection({ data, isForecast }, startDate, endDate) {
+  const section  = document.getElementById('weather-section');
+  const daysEl   = document.getElementById('weather-days');
+  const noteEl   = document.getElementById('weather-note');
+  if (!section || !daysEl || !data?.daily) return;
+
+  const daily = data.daily;
+  const dates = daily.time || [];
+  if (!dates.length) { section.style.display = 'none'; return; }
+
+  daysEl.innerHTML = '';
+  const dayLabels = ['일','월','화','수','목','금','토'];
+
+  dates.forEach((dateStr, i) => {
+    const d    = new Date(dateStr + 'T00:00:00');
+    const dow  = dayLabels[d.getDay()];
+    const label = `${d.getMonth()+1}/${d.getDate()} ${dow}`;
+    const max  = Math.round(daily.temperature_2m_max?.[i] ?? 0);
+    const min  = Math.round(daily.temperature_2m_min?.[i] ?? 0);
+    const avg  = Math.round((max + min) / 2);
+    const rain = Math.round(daily.precipitation_probability_max?.[i] ?? (daily.precipitation_sum?.[i] > 2 ? 70 : 10));
+    const code = daily.weathercode?.[i] ?? (rain >= 50 ? 61 : 1);
+    const icon = getWeatherIcon(code, rain);
+    const rainColor = rain >= 50 ? '#E24B4A' : rain >= 20 ? '#378ADD' : '#888780';
+
+    const card = document.createElement('div');
+    card.className = 'weather-day-card';
+    card.innerHTML = `
+      <div class="weather-day-label">${label}</div>
+      <div class="weather-day-icon">${icon}</div>
+      <div class="weather-day-temp">${avg}°</div>
+      <div class="weather-day-range">${min}° / ${max}°</div>
+      <div class="weather-day-rain" style="color:${rainColor}">💧${rain}%</div>`;
+    daysEl.appendChild(card);
+  });
+
+  noteEl.textContent = isForecast
+    ? '실시간 예보 · Open-Meteo'
+    : '⚠️ 출발까지 7일 이상 남아 실제 예보가 아닌 과거 기후 평균값이에요';
+  section.style.display = 'block';
+
+  // Day 탭 뱃지 업데이트
+  updateDayWeatherBadge(dates, daily, startDate);
+}
+
+function updateDayWeatherBadge(dates, daily, tripStartDate) {
+  const wrap = document.getElementById('day-weather-badge-wrap');
+  if (!wrap) return;
+  // currentDay 기준 날짜 계산
+  const tripStart = new Date(tripStartDate + 'T00:00:00');
+  const dayDate = new Date(tripStart);
+  dayDate.setDate(tripStart.getDate() + currentDay - 1);
+  const dateStr = dayDate.toISOString().split('T')[0];
+
+  const idx = dates.indexOf(dateStr);
+  if (idx === -1) { wrap.innerHTML = ''; return; }
+
+  const max  = Math.round(daily.temperature_2m_max?.[idx] ?? 0);
+  const min  = Math.round(daily.temperature_2m_min?.[idx] ?? 0);
+  const avg  = Math.round((max + min) / 2);
+  const rain = Math.round(daily.precipitation_probability_max?.[idx] ?? (daily.precipitation_sum?.[idx] > 2 ? 70 : 10));
+  const code = daily.weathercode?.[idx] ?? (rain >= 50 ? 61 : 1);
+  const icon = getWeatherIcon(code, rain);
+  const cls  = getWeatherBadgeClass(code, rain);
+
+  wrap.innerHTML = `<div class="day-weather-badge ${cls}">${icon} ${avg}° · 💧${rain}%</div>`;
 }
 
 // 날짜 입력 시 미리보기
