@@ -552,12 +552,13 @@ html, body {
 }
 .tl-card.past-trip:hover { opacity: 1; }
 .tl-archive-btn {
-  flex-shrink: 0; font-size: 11px; padding: 5px 10px;
-  border-radius: 8px; border: 1.5px solid var(--sand);
-  background: var(--stone); cursor: pointer; color: var(--ink3);
-  transition: all .13s; white-space: nowrap; opacity: 1;
+  flex-shrink: 0; font-size: 11px; font-weight: 600;
+  padding: 5px 10px; border-radius: 20px;
+  border: 1.5px solid var(--sand);
+  background: var(--stone); cursor: pointer;
+  color: var(--ink3); transition: all .13s; white-space: nowrap;
 }
-.tl-archive-btn:hover { border-color: var(--accent); color: var(--accent); background: #fff8f0; }
+.tl-archive-btn:hover { border-color: var(--green); color: var(--green); background: #f0faf0; }
 
 
 /* 일정 아이템 액션 버튼들 */
@@ -2349,7 +2350,7 @@ async function showTripListScreen() {
           <div class="tl-card-dates">${dateRange}</div>
           ${ddayText ? `<div class="tl-card-dday ${ddayClass}">${ddayText}</div>` : ''}
         </div>
-        ${`<button class="tl-archive-btn" title="지난 여행으로 이동">갔다온 여행</button>`}
+        ${`<button class="tl-archive-btn" title="여행 완료로 표시">✓ 완료</button>`}
         <div class="tl-card-arrow">›</div>
         ${isAdminMode ? '<button class="tl-card-del" title="삭제">🗑️</button>' : ''}`;
 
