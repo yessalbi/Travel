@@ -440,7 +440,7 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
 }
 .ticket-header-left { display: flex; flex-direction: column; gap: 2px; }
-.ticket-header-tag { font-size: 10px; font-weight: 500; color: #888; letter-spacing: 0.8px; }
+.ticket-header-tag { font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.55); letter-spacing: 0.8px; }
 .ticket-header-airline { font-size: 14px; font-weight: 500; color: #fff; min-height: 20px; }
 .ticket-header-icon { font-size: 20px; }
 .ticket-body { padding: 14px 16px 0; }
@@ -5978,10 +5978,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // 항공사 색상 매핑
 const AIRLINE_COLORS = {
   // 한국
-  '대한항공': '#003876', 'ke': '#003876',
+  '대한항공': '#051766', 'ke': '#051766',
   '아시아나': '#E51937', 'oz': '#E51937',
-  '제주항공': '#F37021', '7c': '#F37021',
-  '진에어': '#C8102E', 'lj': '#C8102E',
+  '제주항공': '#f05a22', '7c': '#f05a22',
+  '진에어': '#cbdb2f', 'lj': '#cbdb2f',
   '티웨이': '#E2001A', 'tw': '#E2001A',
   '에어서울': '#003DA5', 'rs': '#003DA5',
   '에어부산': '#003087', 'bu': '#003087',
@@ -5991,8 +5991,8 @@ const AIRLINE_COLORS = {
   'jal': '#E60026', '일본항공': '#E60026',
   'ana': '#13417C', '전일본': '#13417C',
   '피치': '#FF5588', 'mm': '#FF5588',
-  '바닐라': '#FF8200', 'jw': '#FF8200',
-  '집에어': '#FF8200',
+  '바닐라': '#ecc116', 'jw': '#ecc116',
+  '집에어': '#ecc116',
   '솔라시도': '#00A0E9', '6j': '#00A0E9',
   // 국제
   '싱가포르': '#0052A5', 'sq': '#0052A5',
