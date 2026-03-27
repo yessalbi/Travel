@@ -555,14 +555,9 @@ html, body {
   flex-shrink: 0; font-size: 11px; padding: 5px 10px;
   border-radius: 8px; border: 1.5px solid var(--sand);
   background: var(--stone); cursor: pointer; color: var(--ink3);
-  transition: all .13s; white-space: nowrap;
+  transition: all .13s; white-space: nowrap; opacity: 1;
 }
 .tl-archive-btn:hover { border-color: var(--accent); color: var(--accent); background: #fff8f0; }
-/* 모바일에서 항상 표시 */
-@media (max-width: 768px) {
-  .tl-card-del { opacity: 1 !important; }
-  .tl-archive-btn { opacity: 1; }
-}
 
 
 /* 일정 아이템 액션 버튼들 */
@@ -2442,6 +2437,7 @@ async function showTripListScreen() {
     container.innerHTML = '<div style="color:var(--ink3);font-size:13px;text-align:center;padding:32px;">목록을 불러올 수 없어요</div>';
   }
 }
+const TRIP_LIST_KEY  = 'tripList';
 const PAST_TRIPS_KEY = 'pastTripList';
 
 function getTripList() {
