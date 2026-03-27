@@ -4880,6 +4880,8 @@ document.addEventListener('click', (e) => {
   if (e.target === btn || btn?.contains(e.target)) return;
   // 지도 영역 클릭은 결과 닫지 않음
   if (e.target.closest('#map') || e.target.closest('#map-overlay-map')) return;
+  // 맛집&장소 칩 클릭은 무시 (showPlacePopup이 카드를 열어줌)
+  if (e.target.closest('.place-chip')) return;
   if (!e.target.closest('#map-search-wrap') && !e.target.closest('#map-place-card')) {
     closeMapSearchResults();
     if (card && !card.contains(e.target)) {
