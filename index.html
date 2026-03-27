@@ -4581,8 +4581,17 @@ function closeMapPlaceCard() {
       try { m.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 12 }); } catch(e) {}
     });
   }
+  // PC 검색결과 복원
   const q = document.getElementById('map-search-input')?.value.trim();
   if (q && mapSearchMarkers.length) document.getElementById('map-search-results')?.classList.add('show');
+
+  // 오버레이(모바일 지도탭) 검색결과 복원
+  const ovQ = document.getElementById('map-overlay-search-input')?.value.trim();
+  const ovResults = document.getElementById('map-overlay-search-results');
+  if (ovQ && ovResults && ovResults.children.length > 0) {
+    ovResults.style.display = 'flex';
+    ovResults.style.flexDirection = 'column';
+  }
 }
 function clearMapSearchMarkers() { mapSearchMarkers.forEach(m => { try { m.setMap(null); } catch(e) {} }); mapSearchMarkers = []; }
 function closeMapSearchResults() {
@@ -5350,6 +5359,8 @@ function mapOverlaySearch() {
       };
       resultsEl.appendChild(item);
     });
+    resultsEl.style.display = 'flex';
+    resultsEl.style.flexDirection = 'column';
 
     if (results.length > 1) {
       const b = new google.maps.LatLngBounds();
