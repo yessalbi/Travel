@@ -5547,11 +5547,11 @@ function renderWeatherSection({ data, isForecast }, startDate, endDate) {
 function updateDayWeatherBadge(dates, daily, tripStartDate) {
   const wrap = document.getElementById('day-weather-badge-wrap');
   if (!wrap) return;
-  // currentDay 기준 날짜 계산
-  const tripStart = new Date(tripStartDate + 'T00:00:00');
-  const dayDate = new Date(tripStart);
-  dayDate.setDate(tripStart.getDate() + currentDay - 1);
-  const dateStr = dayDate.toISOString().split('T')[0];
+
+  // 날짜 문자열 직접 계산 (타임존 문제 방지)
+  const [y, m, d] = tripStartDate.split('-').map(Number);
+  const dayDate = new Date(y, m - 1, d + currentDay - 1);
+  const dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth()+1).padStart(2,'0')}-${String(dayDate.getDate()).padStart(2,'0')}`;
 
   const idx = dates.indexOf(dateStr);
   if (idx === -1) { wrap.innerHTML = ''; return; }
