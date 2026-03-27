@@ -543,12 +543,17 @@ html, body {
 }
 .tl-card.past-trip:hover { opacity: 1; }
 .tl-archive-btn {
-  flex-shrink: 0; font-size: 11px; padding: 4px 8px;
-  border-radius: 6px; border: 1px solid var(--sand);
-  background: none; cursor: pointer; color: var(--ink3);
-  transition: all .13s;
+  flex-shrink: 0; font-size: 11px; padding: 5px 10px;
+  border-radius: 8px; border: 1.5px solid var(--sand);
+  background: var(--stone); cursor: pointer; color: var(--ink3);
+  transition: all .13s; white-space: nowrap;
 }
-.tl-archive-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+.tl-archive-btn:hover { border-color: var(--accent); color: var(--accent); background: #fff8f0; }
+/* 모바일에서 항상 표시 */
+@media (max-width: 768px) {
+  .tl-card-del { opacity: 1 !important; }
+  .tl-archive-btn { opacity: 1; }
+}
 
 
 /* 일정 아이템 액션 버튼들 */
@@ -949,6 +954,19 @@ html, body {
   max-height: calc(100% - 90px);
 }
 #map-place-card.show { display: flex; }
+
+/* 모바일: 하단에서 올라오는 바텀시트 */
+@media (max-width: 768px) {
+  #map-place-card {
+    position: fixed !important;
+    top: auto !important; bottom: 0; left: 0; right: 0;
+    width: 100% !important;
+    border-radius: 20px 20px 0 0;
+    max-height: 78vh;
+    z-index: 1100;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+  }
+}
 
 /* 상단 사진 */
 .mpc-photo {
@@ -1968,6 +1986,8 @@ html, body {
   </div><!-- /left-panel -->
 
   <!-- 지도 -->
+    <div id="map-place-card"></div>
+
   <div id="map-wrapper">
     <div id="map"></div>
     <!-- 오프라인 지도 대체 레이어 -->
@@ -1999,7 +2019,6 @@ html, body {
       <div id="map-search-results"></div>
       <button id="map-search-close-btn" onclick="closeMapSearchResults()" title="검색 결과 닫기">✕</button>
     </div>
-    <div id="map-place-card"></div>
     <div id="route-controls">
       <button class="route-btn" id="btn-route-mode" onclick="toggleRouteMode()">🛣️ 경로 추가 모드</button>
       <button class="route-btn" id="btn-clear-route" onclick="clearRoute()">🗑️ 경로 삭제</button>
