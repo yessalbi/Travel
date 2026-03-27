@@ -6284,40 +6284,132 @@ function switchFlightSection(domestic) {
   } else {
     section.innerHTML = `
       <div class="section-label">항공편</div>
-      <div class="flight-card">
-        <div class="flight-row">
-          <span class="lbl">항공사</span>
-          <div class="airline-logo" id="airline-logo">✈</div>
-          <input type="text" id="flight-airline" placeholder="예: 대한항공 KE701" oninput="updateAirlineLogo()" />
+
+      <div class="ticket-card" id="depart-ticket">
+        <div class="ticket-header">
+          <div class="ticket-header-left">
+            <span class="ticket-header-tag">DEPARTURE · 출국편</span>
+            <div class="ticket-header-airline" id="depart-airline-display">항공사를 입력해주세요</div>
+          </div>
+          <div class="ticket-header-icon">✈️</div>
         </div>
-        <div class="flight-row">
-          <span class="lbl">출발</span>
-          <div class="time-picker" id="tp-flight-depart"></div>
-          <input type="text" id="flight-from" placeholder="ICN" style="width:70px;flex:none;" />
+        <div class="ticket-body">
+          <div class="ticket-route">
+            <div class="ticket-city">
+              <div class="ticket-iata" id="depart-from-display">ICN</div>
+              <div class="ticket-city-name" id="depart-from-name"></div>
+            </div>
+            <div class="ticket-mid">
+              <div class="ticket-mid-icon">✈</div>
+              <div class="ticket-mid-line"></div>
+            </div>
+            <div class="ticket-city" style="text-align:right;">
+              <div class="ticket-iata" id="depart-to-display" style="text-align:right;">NRT</div>
+              <div class="ticket-city-name" id="depart-to-name" style="text-align:right;"></div>
+            </div>
+          </div>
+          <div class="ticket-divider"></div>
+          <div class="ticket-times">
+            <div class="ticket-time-item">
+              <span class="ticket-time-label">출발</span>
+              <span class="ticket-time-value" id="depart-time-display">--:--</span>
+            </div>
+            <div class="ticket-time-item center">
+              <span class="ticket-time-label">항공편</span>
+              <span class="ticket-time-value" id="depart-flightno-display" style="font-size:11px;">-</span>
+            </div>
+            <div class="ticket-time-item" style="align-items:flex-end;">
+              <span class="ticket-time-label">도착</span>
+              <span class="ticket-time-value" id="depart-arrive-display">--:--</span>
+            </div>
+          </div>
         </div>
-        <div class="flight-row">
-          <span class="lbl">도착</span>
-          <div class="time-picker" id="tp-flight-arrive"></div>
-          <input type="text" id="flight-to" placeholder="NRT" style="width:70px;flex:none;" />
+        <div class="ticket-edit-row">
+          <button class="ticket-edit-btn-full" onclick="toggleTicketEdit('depart')">
+            <span>✏️</span><span>편집</span>
+          </button>
         </div>
-        <div style="border-top:1px solid var(--sand);margin:4px 0;padding-top:8px;">
-          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">귀국편</div>
+        <div class="ticket-edit-panel" id="depart-edit-panel">
+          <div class="ticket-field-row">
+            <span class="ticket-field-lbl">항공사</span>
+            <input type="text" id="flight-airline" placeholder="예: 제주항공 7C1601" oninput="updateTicketDisplay()" />
+          </div>
+          <div class="ticket-field-row">
+            <span class="ticket-field-lbl">출발</span>
+            <div class="time-picker" id="tp-flight-depart"></div>
+            <input type="text" id="flight-from" placeholder="ICN" class="iata-input" oninput="updateTicketDisplay()" />
+          </div>
+          <div class="ticket-field-row">
+            <span class="ticket-field-lbl">도착</span>
+            <div class="time-picker" id="tp-flight-arrive"></div>
+            <input type="text" id="flight-to" placeholder="NRT" class="iata-input" oninput="updateTicketDisplay()" />
+          </div>
         </div>
-        <div class="flight-row">
-          <span class="lbl">항공사</span>
-          <input type="text" id="return-airline" placeholder="예: 아시아나 OZ102" />
+      </div>
+
+      <div class="ticket-card" id="return-ticket">
+        <div class="ticket-header" style="background:#2c2c2a;">
+          <div class="ticket-header-left">
+            <span class="ticket-header-tag">RETURN · 귀국편</span>
+            <div class="ticket-header-airline" id="return-airline-display">항공사를 입력해주세요</div>
+          </div>
+          <div class="ticket-header-icon">🛬</div>
         </div>
-        <div class="flight-row">
-          <span class="lbl">출발</span>
-          <div class="time-picker" id="tp-return-depart"></div>
-          <input type="text" id="return-from" placeholder="NRT" style="width:70px;flex:none;" />
+        <div class="ticket-body">
+          <div class="ticket-route">
+            <div class="ticket-city">
+              <div class="ticket-iata" id="return-from-display">NRT</div>
+              <div class="ticket-city-name" id="return-from-name"></div>
+            </div>
+            <div class="ticket-mid">
+              <div class="ticket-mid-icon">✈</div>
+              <div class="ticket-mid-line"></div>
+            </div>
+            <div class="ticket-city" style="text-align:right;">
+              <div class="ticket-iata" id="return-to-display" style="text-align:right;">ICN</div>
+              <div class="ticket-city-name" id="return-to-name" style="text-align:right;"></div>
+            </div>
+          </div>
+          <div class="ticket-divider"></div>
+          <div class="ticket-times">
+            <div class="ticket-time-item">
+              <span class="ticket-time-label">출발</span>
+              <span class="ticket-time-value" id="return-time-display">--:--</span>
+            </div>
+            <div class="ticket-time-item center">
+              <span class="ticket-time-label">항공편</span>
+              <span class="ticket-time-value" id="return-flightno-display" style="font-size:11px;">-</span>
+            </div>
+            <div class="ticket-time-item" style="align-items:flex-end;">
+              <span class="ticket-time-label">도착</span>
+              <span class="ticket-time-value" id="return-arrive-display">--:--</span>
+            </div>
+          </div>
         </div>
-        <div class="flight-row">
-          <span class="lbl">도착</span>
-          <div class="time-picker" id="tp-return-arrive"></div>
-          <input type="text" id="return-to" placeholder="ICN" style="width:70px;flex:none;" />
+        <div class="ticket-edit-row">
+          <button class="ticket-edit-btn-full" onclick="toggleTicketEdit('return')">
+            <span>✏️</span><span>편집</span>
+          </button>
         </div>
-      </div>`;
+        <div class="ticket-edit-panel" id="return-edit-panel">
+          <div class="ticket-field-row">
+            <span class="ticket-field-lbl">항공사</span>
+            <input type="text" id="return-airline" placeholder="예: 아시아나 OZ102" oninput="updateTicketDisplay()" />
+          </div>
+          <div class="ticket-field-row">
+            <span class="ticket-field-lbl">출발</span>
+            <div class="time-picker" id="tp-return-depart"></div>
+            <input type="text" id="return-from" placeholder="NRT" class="iata-input" oninput="updateTicketDisplay()" />
+          </div>
+          <div class="ticket-field-row">
+            <span class="ticket-field-lbl">도착</span>
+            <div class="time-picker" id="tp-return-arrive"></div>
+            <input type="text" id="return-to" placeholder="ICN" class="iata-input" oninput="updateTicketDisplay()" />
+          </div>
+        </div>
+      </div>
+      <div id="airline-logo" style="display:none;">✈</div>`;
+
     // 타임피커 재초기화
     if (window.buildTimePicker) {
       buildTimePicker('tp-flight-depart', 'fdep', true);
@@ -6325,7 +6417,7 @@ function switchFlightSection(domestic) {
       buildTimePicker('tp-return-depart', 'rdep', true);
       buildTimePicker('tp-return-arrive', 'rarr', true);
     }
-    updateAirlineLogo();
+    updateTicketDisplay();
   }
 }
 
