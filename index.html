@@ -4647,7 +4647,7 @@ function openMapPlaceCard(place, idx) {
     placeId: place.place_id,
     fields: ['name','formatted_address','formatted_phone_number','international_phone_number',
              'rating','user_ratings_total','opening_hours','website','types',
-             'photos','reviews','price_level'],
+             'photos','reviews','price_level','geometry','place_id'],
     language: 'ko'
   }, (d, s) => renderMapPlaceCard(s === google.maps.places.PlacesServiceStatus.OK ? d : place, place));
 }
