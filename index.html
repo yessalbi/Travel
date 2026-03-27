@@ -4628,8 +4628,6 @@ function openMapPlaceCard(place, idx) {
     m.setZIndex(i===idx ? 1000 : 999);
   });
   map.panTo(place.geometry.location);
-  document.getElementById('map-search-results').classList.remove('show');
-  document.getElementById('map-search-close-btn')?.classList.remove('show');
 
   // 로딩 상태 먼저 표시
   const card = document.getElementById('map-place-card');
