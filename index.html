@@ -1080,11 +1080,14 @@ html, body {
 
 /* 장소 상세 카드 */
 #map-place-card {
-  position: absolute; top: 70px; left: 16px; z-index: 10;
+  position: fixed;
+  top: 80px;
+  left: calc(380px + 16px); /* 왼쪽 패널 너비 + 여백 */
+  z-index: 200;
   width: 340px; background: var(--white); border-radius: 16px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.18);
   display: none; flex-direction: column; overflow: hidden;
-  max-height: calc(100% - 90px);
+  max-height: calc(100vh - 100px);
 }
 #map-place-card.show { display: flex; }
 
@@ -4629,8 +4632,16 @@ function openMapPlaceCard(place, idx) {
   });
   map.panTo(place.geometry.location);
 
-  // 로딩 상태 먼저 표시
+  // PC: 지도 기준으로 카드 위치 설정
   const card = document.getElementById('map-place-card');
+  const mapWrapper = document.getElementById('map-wrapper');
+  if (card && mapWrapper && window.innerWidth > 768) {
+    const rect = mapWrapper.getBoundingClientRect();
+    card.style.left = (rect.left + 16) + 'px';
+    card.style.top  = (rect.top  + 16) + 'px';
+  }
+
+  // 로딩 상태 먼저 표시
   card.innerHTML = `
     <div style="position:relative;">
       <div class="mpc-photo" style="display:flex;align-items:center;justify-content:center;font-size:40px;height:180px;background:var(--stone);">🗺️</div>
@@ -5445,6 +5456,14 @@ function showPlacePopup(place) {
 
   const card = document.getElementById('map-place-card');
   if (!card) return;
+
+  // PC: 지도 영역 기준으로 카드 위치 동적 설정
+  const mapWrapper = document.getElementById('map-wrapper');
+  if (mapWrapper && window.innerWidth > 768) {
+    const rect = mapWrapper.getBoundingClientRect();
+    card.style.left = (rect.left + 16) + 'px';
+    card.style.top  = (rect.top  + 16) + 'px';
+  }
 
   // Day 추가 버튼 생성 (1~totalDays)
   let dayBtns = '';
