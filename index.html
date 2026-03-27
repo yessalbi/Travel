@@ -852,9 +852,17 @@ html, body {
 .route-btn:hover { background: var(--accent); color: #fff; }
 .route-btn.active { background: var(--accent2); color: #fff; }
 /* 지도 위치 검색창 */
+/* 지도 검색바 */
 #map-search-wrap {
   position: absolute; top: 16px; left: 16px; z-index: 10;
   width: 300px;
+}
+/* 모바일: map-fab 숨기기, 검색바 축소 */
+@media (max-width: 768px) {
+  #map-fab { display: none !important; }
+  #map-search-wrap { width: calc(100% - 32px); top: 10px; left: 16px; }
+  #map-search-bar { height: 38px; padding: 0 4px 0 12px; }
+  #map-search-input { font-size: 13px; }
 }
 #map-search-bar {
   display: flex; align-items: center;
@@ -1115,7 +1123,7 @@ html, body {
 .ov-tab.active { color: var(--accent2); font-weight: 600; }
 
 @media (max-width: 768px) {
-  html, body { overflow: auto; }
+  html, body { overflow: hidden; }
   #main { overflow: visible; }
   /* iOS 확대 방지: 16px 필수. 패딩 줄여서 시각적으로 작아 보이게 */
   input, select, textarea { font-size: 16px !important; }
@@ -2083,10 +2091,7 @@ html, body {
       <div id="map-search-results"></div>
       <button id="map-search-close-btn" onclick="closeMapSearchResults()" title="검색 결과 닫기">✕</button>
     </div>
-    <div id="route-controls">
-      <button class="route-btn" id="btn-route-mode" onclick="toggleRouteMode()">🛣️ 경로 추가 모드</button>
-      <button class="route-btn" id="btn-clear-route" onclick="clearRoute()">🗑️ 경로 삭제</button>
-    </div>
+    <div id="route-controls" style="display:none;"></div>
     <div id="map-fab">
       <button class="fab-btn" onclick="mapZoom(1)" title="확대">＋</button>
       <button class="fab-btn" onclick="mapZoom(-1)" title="축소">－</button>
@@ -5195,8 +5200,6 @@ function switchToMapTab() {
   const overlayMapEl = document.getElementById('map-overlay-map');
   // 지도 + FAB + 경로버튼 같이 이동
   overlayMapEl.appendChild(document.getElementById('map'));
-  overlayMapEl.appendChild(document.getElementById('map-fab'));
-  overlayMapEl.appendChild(document.getElementById('route-controls'));
 
   setTimeout(() => {
     if (window.google && map) google.maps.event.trigger(map, 'resize');
@@ -5267,7 +5270,6 @@ function closeMapOverlay(tabIdx) {
   const mapWrapper = document.getElementById('map-wrapper');
   mapWrapper.appendChild(document.getElementById('map'));
   mapWrapper.appendChild(document.getElementById('map-fab'));
-  mapWrapper.appendChild(document.getElementById('route-controls'));
 
   setTimeout(() => {
     if (window.google && map) google.maps.event.trigger(map, 'resize');
