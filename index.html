@@ -1081,21 +1081,21 @@ html, body {
 /* 장소 상세 카드 */
 #map-place-card {
   position: fixed;
-  top: 80px;
-  left: calc(380px + 16px); /* 왼쪽 패널 너비 + 여백 */
+  top: 76px;
+  left: calc(var(--panel-w, 380px) + 16px);
   z-index: 200;
   width: 340px; background: var(--white); border-radius: 16px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.18);
   display: none; flex-direction: column; overflow: hidden;
-  max-height: calc(100vh - 100px);
+  max-height: calc(100vh - 96px);
 }
 #map-place-card.show { display: flex; }
 
-/* 모바일: 하단에서 올라오는 바텀시트 */
+/* 모바일: 바텀시트 */
 @media (max-width: 768px) {
   #map-place-card {
     position: fixed !important;
-    top: auto !important; bottom: 0; left: 0; right: 0;
+    top: auto !important; bottom: 0; left: 0 !important; right: 0;
     width: 100% !important;
     border-radius: 20px 20px 0 0;
     max-height: 78vh;
@@ -2816,6 +2816,14 @@ function generateId() {
 
 // ── 초기화 ────────────────────────────────────────────────────
 async function init() {
+  // 왼쪽 패널 너비를 CSS 변수로 설정 (map-place-card 위치 계산용)
+  const syncPanelW = () => {
+    const lp = document.getElementById('left-panel');
+    if (lp) document.documentElement.style.setProperty('--panel-w', lp.offsetWidth + 'px');
+  };
+  syncPanelW();
+  window.addEventListener('resize', syncPanelW);
+
   const fromUrl = getTripIdFromUrl();
 
   // trip ID 없으면 목록 화면
@@ -5399,11 +5407,14 @@ function getGooglePhotoUrl(name) {
 function renderPlaceChips() {
   const c = document.getElementById('place-chips');
   c.innerHTML = '';
-  placesData.forEach(p => {
+  placesData.forEach((p, idx) => {
     const chip = document.createElement('button');
     chip.className = 'place-chip';
     chip.innerHTML = `<span class="dot"></span>${p.name}`;
-    chip.onclick = () => showPlacePopup(p);
+    chip.onclick = () => {
+      highlightPlaceMarker(idx);
+      showPlacePopup(p);
+    };
     c.appendChild(chip);
   });
 }
@@ -5413,26 +5424,63 @@ function renderMapMarkers() {
   markers = [];
   if (!map) return;
   renderDomHotelPin();
-  placesData.forEach(p => {
+
+  // 여행정보 탭(0)일 때만 맛집&장소 마커 표시
+  const activeTab = sessionStorage.getItem('panelTab');
+  const showPlaceMarkers = activeTab === '0' || activeTab === null;
+
+  placesData.forEach((p, idx) => {
+    const normalSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="30" viewBox="0 0 24 30">
+      <ellipse cx="12" cy="28" rx="5" ry="2" fill="rgba(0,0,0,0.15)"/>
+      <path d="M12 1 C6.1 1 1.5 5.6 1.5 11.5 C1.5 19 12 29 12 29 C12 29 22.5 19 22.5 11.5 C22.5 5.6 17.9 1 12 1Z"
+            fill="#E07A3A" stroke="#fff" stroke-width="1.5"/>
+      <circle cx="12" cy="11.5" r="5" fill="#fff" opacity=".9"/>
+      <text x="12" y="15" text-anchor="middle" font-size="7" fill="#E07A3A">🍴</text>
+    </svg>`;
+
     const marker = new google.maps.Marker({
       position: { lat: p.lat, lng: p.lng },
-      map,
+      map: showPlaceMarkers ? map : null,
       title: p.name,
       icon: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
-            <ellipse cx="18" cy="41" rx="7" ry="3" fill="rgba(0,0,0,0.15)"/>
-            <path d="M18 2 C9.16 2 2 9.16 2 18 C2 28.5 18 42 18 42 C18 42 34 28.5 34 18 C34 9.16 26.84 2 18 2Z"
-                  fill="#E07A3A" stroke="#fff" stroke-width="2"/>
-            <circle cx="18" cy="18" r="7" fill="#fff" opacity=".9"/>
-            <text x="18" y="22" text-anchor="middle" font-size="10" fill="#E07A3A">🍴</text>
-          </svg>`),
-        scaledSize: new google.maps.Size(36, 44),
-        anchor: new google.maps.Point(18, 44),
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(normalSvg),
+        scaledSize: new google.maps.Size(24, 30),
+        anchor: new google.maps.Point(12, 30),
       },
     });
+    marker._placeIdx = idx;
+    marker._normalSvg = normalSvg;
     marker.addListener('click', () => showPlacePopup(p));
     markers.push(marker);
+  });
+}
+
+function highlightPlaceMarker(idx) {
+  markers.forEach((m, i) => {
+    if (!m._normalSvg) return;
+    if (i === idx) {
+      // 하이라이트 — 크게 + 흰 테두리 강조
+      const hiSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 24 30">
+        <ellipse cx="12" cy="28" rx="6" ry="2.5" fill="rgba(0,0,0,0.25)"/>
+        <path d="M12 1 C6.1 1 1.5 5.6 1.5 11.5 C1.5 19 12 29 12 29 C12 29 22.5 19 22.5 11.5 C22.5 5.6 17.9 1 12 1Z"
+              fill="#FF3D00" stroke="#fff" stroke-width="2.5"/>
+        <circle cx="12" cy="11.5" r="5" fill="#fff"/>
+        <text x="12" y="15" text-anchor="middle" font-size="7" fill="#FF3D00">🍴</text>
+      </svg>`;
+      m.setIcon({
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(hiSvg),
+        scaledSize: new google.maps.Size(32, 40),
+        anchor: new google.maps.Point(16, 40),
+      });
+      m.setZIndex(1000);
+    } else {
+      m.setIcon({
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(m._normalSvg),
+        scaledSize: new google.maps.Size(24, 30),
+        anchor: new google.maps.Point(12, 30),
+      });
+      m.setZIndex(1);
+    }
   });
 }
 
@@ -5451,19 +5499,10 @@ function savePoiToPlaces(name, lat, lng, img) {
 }
 
 function showPlacePopup(place) {
-  // 지도를 해당 장소로 이동
   if (map && place.lat && place.lng) map.panTo({ lat: place.lat, lng: place.lng });
 
   const card = document.getElementById('map-place-card');
   if (!card) return;
-
-  // PC: 지도 영역 기준으로 카드 위치 동적 설정
-  const mapWrapper = document.getElementById('map-wrapper');
-  if (mapWrapper && window.innerWidth > 768) {
-    const rect = mapWrapper.getBoundingClientRect();
-    card.style.left = (rect.left + 16) + 'px';
-    card.style.top  = (rect.top  + 16) + 'px';
-  }
 
   // Day 추가 버튼 생성 (1~totalDays)
   let dayBtns = '';
@@ -5538,11 +5577,19 @@ function switchPanelTab(idx) {
   if (idx === 0 && map) {
     fitAllPins();
     drawAllDayRoutes();
+    // 맛집&장소 마커 표시
+    markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(map); });
   }
   if (idx === 1 && map) {
-    clearAllDayRoutes(); // 전체 경로 지우고
+    clearAllDayRoutes();
     clearDayRoutes();
-    drawDayRoutes();     // 현재 Day만
+    drawDayRoutes();
+    // 맛집&장소 마커 숨기기
+    markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(null); });
+  }
+  if (idx === 2 && map) {
+    // 챙겨야할 것 탭 — 마커 숨기기
+    markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(null); });
   }
 }
 
