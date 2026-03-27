@@ -1890,6 +1890,7 @@ html, body {
           <input type="hidden" id="trip-start" />
           <input type="hidden" id="trip-end" />
           <input type="hidden" id="trip-note" />
+          <input type="hidden" id="trip-author" />
         </div>
         <!-- 여행 정보 요약 표시 -->
         <div id="trip-summary" style="margin-top:12px;display:none;">
@@ -2159,6 +2160,10 @@ html, body {
         <input type="text" id="setup-title" placeholder="예: 도쿄 여행 2025 🗼" />
       </div>
       <div class="popup-field">
+        <label>작성자 이름 <small style="color:var(--ink3)">(선택)</small></label>
+        <input type="text" id="setup-author" placeholder="예: 홍길동" />
+      </div>
+      <div class="popup-field">
         <label>여행 메모 <small style="color:var(--ink3)">(선택)</small></label>
         <input type="text" id="setup-note" placeholder="예: 친구 3명, 자유여행" />
       </div>
@@ -2338,6 +2343,7 @@ async function showTripListScreen() {
       const ddayClass = getDDayClass(startDate, endDate);
       const dateRange = formatDateRange(startDate, endDate);
       const isMine    = myList.includes(tripId);
+      const author    = meta.author || '';
 
       const card = document.createElement('div');
       card.className = 'tl-card';
@@ -2349,6 +2355,7 @@ async function showTripListScreen() {
           </div>
           <div class="tl-card-dates">${dateRange}</div>
           ${ddayText ? `<div class="tl-card-dday ${ddayClass}">${ddayText}</div>` : ''}
+          ${author ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;">작성자 : ${author}</div>` : ''}
         </div>
         ${`<button class="tl-archive-btn" title="여행 완료로 표시">✓ 완료</button>`}
         <div class="tl-card-arrow">›</div>
@@ -2399,10 +2406,11 @@ async function showTripListScreen() {
       container.appendChild(sectionTitle);
 
       archivedTrips.forEach(meta => {
-        const tripId  = meta.id;
-        const title   = meta.title || '제목 없는 여행';
-        const emoji   = getTitleEmoji(title).trim() || '✈️';
+        const tripId    = meta.id;
+        const title     = meta.title || '제목 없는 여행';
+        const emoji     = getTitleEmoji(title).trim() || '✈️';
         const dateRange = formatDateRange(meta.startDate, meta.endDate);
+        const author    = meta.author || '';
 
         const card = document.createElement('div');
         card.className = 'tl-card past-trip';
@@ -2412,6 +2420,7 @@ async function showTripListScreen() {
             <div class="tl-card-title">${title}</div>
             <div class="tl-card-dates">${dateRange}</div>
             <div class="tl-card-dday past">여행 완료</div>
+            ${author ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;">작성자 : ${author}</div>` : ''}
           </div>
           <button class="tl-archive-btn" title="현재 목록으로 복원">↩ 복원</button>
           <div class="tl-card-arrow">›</div>`;
@@ -2621,6 +2630,7 @@ function applyTripData(data) {
   setVal('trip-start',    data.startDate);
   setVal('trip-end',      data.endDate);
   setVal('trip-note',     data.note);
+  setVal('trip-author',   data.author || '');
 
   // 국내/해외 카드 전환 먼저
   const domestic = data.isDomestic ?? detectDomestic(data.title || '');
@@ -3047,6 +3057,7 @@ function buildPayload() {
     startDate:     getVal('trip-start'),
     endDate:       getVal('trip-end'),
     note:          getVal('trip-note'),
+    author:        getVal('trip-author'),
     isDomestic,
     flightAirline: getVal('flight-airline'),
     flightDepart:  tpToTime('fdep'),
@@ -5219,8 +5230,9 @@ let currentSetupStep = 1;
 
 function openTripSetup() {
   // 현재 값을 위자드에 미리 채움
-  document.getElementById('setup-title').value = document.getElementById('trip-title').value || '';
-  document.getElementById('setup-note').value  = document.getElementById('trip-note').value  || '';
+  document.getElementById('setup-title').value  = document.getElementById('trip-title').value  || '';
+  document.getElementById('setup-author').value = document.getElementById('trip-author').value || '';
+  document.getElementById('setup-note').value   = document.getElementById('trip-note').value   || '';
   document.getElementById('setup-start').value = document.getElementById('trip-start').value || '';
   document.getElementById('setup-end').value   = document.getElementById('trip-end').value   || '';
   goSetupStep(1);
@@ -5265,16 +5277,17 @@ function setupNext(from) {
 function setupBack(from) { goSetupStep(from - 1); }
 
 function setupFinish() {
-  const title = document.getElementById('setup-title').value.trim();
-  const note  = document.getElementById('setup-note').value.trim();
-  const start = document.getElementById('setup-start').value;
-  const end   = document.getElementById('setup-end').value;
+  const title  = document.getElementById('setup-title').value.trim();
+  const author = document.getElementById('setup-author').value.trim();
+  const note   = document.getElementById('setup-note').value.trim();
+  const start  = document.getElementById('setup-start').value;
+  const end    = document.getElementById('setup-end').value;
 
-  // 숨김 필드에 값 저장
-  document.getElementById('trip-title').value = title;
-  document.getElementById('trip-note').value  = note;
-  document.getElementById('trip-start').value = start;
-  document.getElementById('trip-end').value   = end;
+  document.getElementById('trip-title').value  = title;
+  document.getElementById('trip-author').value = author;
+  document.getElementById('trip-note').value   = note;
+  document.getElementById('trip-start').value  = start;
+  document.getElementById('trip-end').value    = end;
 
   closeOverlay('trip-setup-overlay');
   updateDuration();
