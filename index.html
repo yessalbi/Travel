@@ -1173,7 +1173,7 @@ html, body {
   #header-badge-group { flex-direction: column; gap: 1px; }
   #save-btn { font-size: 12px; padding: 6px 10px; }
   #share-btn { font-size: 12px; padding: 6px 10px; }
-  #main { padding-top: 115px; }
+  #main { padding-top: 0; } /* JS로 동적 설정 */
   #toast { bottom: auto; top: 125px; transform: translateX(-50%) translateY(-20px); opacity: 0; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
@@ -6086,6 +6086,17 @@ function showToast(msg) {
 
 // ── 시작 ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', init);
+
+// 모바일에서 헤더 높이에 맞춰 main padding 동적 조정
+function adjustMainPadding() {
+  const header = document.getElementById('header');
+  const main   = document.getElementById('main');
+  if (!header || !main) return;
+  main.style.paddingTop = header.offsetHeight + 'px';
+}
+window.addEventListener('DOMContentLoaded', adjustMainPadding);
+window.addEventListener('resize', adjustMainPadding);
+setTimeout(adjustMainPadding, 100); // 렌더링 후 한 번 더
 
 // ESC 키 — 레이어 순서대로 닫기
 document.addEventListener('keydown', (e) => {
