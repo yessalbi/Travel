@@ -4340,16 +4340,29 @@ function renderSearchResults(top, resultsEl, activeMap) {
       </div>`;
     // 호버 시 마커 하이라이트
     item.addEventListener('mouseenter', () => {
-      highlightMarker(i, true);
-      item.querySelector('.msr-result-num').style.background = '#E53935';
+      if (window._selectedSearchIdx !== i) highlightMarker(i, true);
       item.querySelector('.msr-result-num').style.transform = 'scale(1.2)';
     });
     item.addEventListener('mouseleave', () => {
-      highlightMarker(i, false);
-      item.querySelector('.msr-result-num').style.background = '';
+      if (window._selectedSearchIdx !== i) {
+        highlightMarker(i, false);
+        item.querySelector('.msr-result-num').style.background = '';
+      }
       item.querySelector('.msr-result-num').style.transform = '';
     });
-    item.addEventListener('click', () => openMapPlaceCard(place, i));
+    item.addEventListener('click', () => {
+      // 이전 선택 해제
+      if (window._selectedSearchIdx !== undefined && window._selectedSearchIdx !== i) {
+        highlightMarker(window._selectedSearchIdx, false);
+        const prevItem = resultsEl.children[window._selectedSearchIdx];
+        if (prevItem) prevItem.querySelector('.msr-result-num').style.background = '';
+      }
+      // 현재 선택 고정
+      window._selectedSearchIdx = i;
+      highlightMarker(i, true);
+      item.querySelector('.msr-result-num').style.background = '#E53935';
+      openMapPlaceCard(place, i);
+    });
     resultsEl.appendChild(item);
   });
 
@@ -4607,6 +4620,8 @@ function addPoiToSchedule(name, lat, lng) {
 function closeMapPlaceCard() {
   document.getElementById('map-place-card')?.classList.remove('show');
   mapCurrentPlace = null;
+  window._selectedSearchIdx = undefined;
+  window._selectedOverlayIdx = undefined;
   if (window.google) {
     mapSearchMarkers.forEach(m => {
       try { m.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 12 }); } catch(e) {}
@@ -5379,10 +5394,31 @@ function mapOverlaySearch() {
           <div style="font-weight:600;color:#333;font-size:13px;">${place.name}</div>
           <div style="font-size:11px;color:#999;margin-top:2px;">${place.vicinity||place.formatted_address||''}</div>
         </div>`;
-      item.onmouseenter = () => item.style.background = '#f5f3f0';
-      item.onmouseleave = () => item.style.background = '';
+      const numBadge = item.querySelector('span');
+      item.onmouseenter = () => {
+        if (window._selectedOverlayIdx !== i) {
+          marker.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#E53935', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5, scale: 13 });
+        }
+        item.style.background = '#f5f3f0';
+      };
+      item.onmouseleave = () => {
+        if (window._selectedOverlayIdx !== i) {
+          marker.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 10 });
+        }
+        item.style.background = '';
+      };
       item.onclick = () => {
-        overlayMap.setCenter(place.geometry.location);
+        // 이전 선택 해제
+        if (window._selectedOverlayIdx !== undefined && window._selectedOverlayIdx !== i) {
+          const prev = mapSearchMarkers[window._selectedOverlayIdx];
+          if (prev) prev.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#4A90E2', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 10 });
+          const prevItem = resultsEl.children[window._selectedOverlayIdx + 1]; // +1 for header if any
+        }
+        // 선택 고정
+        window._selectedOverlayIdx = i;
+        marker.setIcon({ path: google.maps.SymbolPath.CIRCLE, fillColor: '#E53935', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3, scale: 14 });
+        marker.setZIndex(1000);
+        if (numBadge) numBadge.style.background = '#E53935';
         overlayMap.setZoom(16);
         document.getElementById('map-overlay-search-input').value = place.name;
         resultsEl.style.display = 'none';
