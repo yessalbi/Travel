@@ -6025,6 +6025,7 @@ function getAirlineColor(airlineStr) {
 }
 
 function updateAirlineLogo() {
+  const el = document.getElementById('airline-logo');
   if (!el) return;
   const v = document.getElementById('flight-airline')?.value || '';
   el.textContent = v ? v.slice(0,2).toUpperCase() : '✈';
