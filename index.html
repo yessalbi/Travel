@@ -531,11 +531,12 @@ html, body {
 }
 .item-memo-input:focus { border-color: var(--accent2); background: var(--white); }
 .item-act-btn-memo {
-  font-size: 11px; color: var(--ink3); border: none; background: none;
-  cursor: pointer; padding: 2px 4px; border-radius: 4px;
-  transition: background .13s;
+  font-size: 11px; color: var(--accent2); border: 1.5px solid var(--accent2);
+  background: none; cursor: pointer; padding: 3px 8px; border-radius: 6px;
+  transition: all .13s; font-family: inherit; font-weight: 500;
 }
-.item-act-btn-memo:hover { background: var(--stone); color: var(--accent2); }
+.item-act-btn-memo:hover { background: var(--accent2); color: #fff; }
+.item-act-btn-memo.active { background: var(--accent2); color: #fff; }
 
 /* 지난 여행 섹션 */
 .tl-section-title {
@@ -2305,22 +2306,24 @@ async function showTripListScreen() {
       trips = all.filter(t => !t.isArchived);
       archivedTrips = all.filter(t => t.isArchived);
     } else {
-      const myList = getTripList();
-      const allMeta = await window.fbGetAllTrips();
-      // Firebase isArchived 기준으로 분리
-      const activeIds = new Set();
-      const archivedIds = new Set();
-      allMeta.forEach(t => {
-        if (t.isArchived) archivedIds.add(t.id);
-        else activeIds.add(t.id);
-      });
-      // 내가 방문한 것 중 active
-      trips = myList
-        .filter(id => !archivedIds.has(id))
-        .map(id => allMeta.find(t => t.id === id))
-        .filter(Boolean);
-      // 전체 아카이브 (내 것 + 공유받은 것)
-      archivedTrips = allMeta.filter(t => t.isArchived);
+      // 내가 방문한 trip 개별 로드 (fbGetAllTrips 오류 영향 없게)
+      if (myList.length) {
+        const metas = await Promise.all(
+          myList.map(id => window.fbGetTripMeta(id).catch(() => null))
+        );
+        metas.forEach(meta => {
+          if (!meta || !meta.title) return;
+          if (meta.isArchived) archivedTrips.push(meta);
+          else trips.push(meta);
+        });
+      }
+      // 지난 여행 중 내 목록에 없는 것도 추가 (다른 기기에서 아카이브된 것)
+      try {
+        const all = await window.fbGetAllTrips();
+        all.filter(t => t.isArchived).forEach(t => {
+          if (!archivedTrips.find(a => a.id === t.id)) archivedTrips.push(t);
+        });
+      } catch(e) {}
     }
 
     if (!trips.length && !archivedTrips.length) {
@@ -3302,44 +3305,54 @@ const MODE_LIST = [
 ];
 
 function toggleMemoEdit(idx) {
-  const day = currentDay;
+  const day  = currentDay;
   const wrap = document.getElementById(`memo-wrap-${day}-${idx}`);
+  const btn  = wrap?.closest('.schedule-item')?.querySelector('.item-act-btn-memo');
   if (!wrap) return;
   const item = (scheduleData[day] || [])[idx];
   if (!item) return;
 
-  // 이미 textarea가 열려있으면 저장하고 닫기
   const existing = wrap.querySelector('.item-memo-input');
+
+  // 이미 열려있으면 → 저장 후 닫기
   if (existing) {
     item.memo = existing.value.trim();
     autoSave();
     wrap.innerHTML = item.memo
       ? `<div class="item-memo-text">${item.memo}</div>` : '';
+    if (btn) btn.classList.remove('active');
     return;
   }
 
-  // textarea 열기
+  // 닫혀있으면 → 열기
   const ta = document.createElement('textarea');
   ta.className = 'item-memo-input';
   ta.rows = 3;
-  ta.placeholder = '메모를 입력하세요 (예약번호, 주의사항 등)';
+  ta.placeholder = '예약번호, 주의사항, 메모 등 (Shift+Enter 줄바꿈)';
   ta.value = item.memo || '';
   wrap.innerHTML = '';
   wrap.appendChild(ta);
   ta.focus();
+  if (btn) btn.classList.add('active');
 
-  // 바깥 클릭 시 자동 저장
-  ta.addEventListener('blur', () => {
+  const saveMemo = () => {
     item.memo = ta.value.trim();
     autoSave();
     wrap.innerHTML = item.memo
       ? `<div class="item-memo-text">${item.memo}</div>` : '';
-  });
-  // Enter+Shift는 줄바꿈, Enter만 저장
+    if (btn) btn.classList.remove('active');
+  };
+
+  ta.addEventListener('blur', saveMemo);
+
   ta.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      ta.blur();
+      saveMemo();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      saveMemo();
     }
   });
 }
@@ -3369,7 +3382,7 @@ function renderScheduleList() {
         </div>
       </div>
       <div class="item-actions">
-        <button class="item-act-btn-memo" onclick="toggleMemoEdit(${idx})" title="메모">📝</button>
+        <button class="item-act-btn-memo" onclick="toggleMemoEdit(${idx})" title="메모">메모</button>
         <button class="item-act-btn item-edit" onclick="openEditSchedule(${idx})">편집</button>
         <button class="item-act-btn item-del"  onclick="deleteScheduleItem(${idx})">✕</button>
       </div>`;
