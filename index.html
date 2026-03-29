@@ -609,25 +609,29 @@ html, body {
   background: var(--stone); border-radius: var(--r2);
   padding: 12px 14px;
   display: flex; align-items: flex-start; gap: 10px;
-  border-left: 3px solid transparent;
+  border-left: 5px solid transparent;
   transition: border-color .16s, box-shadow .16s;
   cursor: pointer;
   position: relative;
 }
-.schedule-item:hover { box-shadow: var(--shadow2); border-left-color: var(--accent); }
-.schedule-item.type-food   { border-left-color: var(--accent); }
-.schedule-item.type-sight  { border-left-color: var(--accent2); }
-.schedule-item.type-hotel  { border-left-color: var(--green); }
-.schedule-item.type-move   { border-left-color: var(--ink3); }
+.schedule-item:hover { box-shadow: var(--shadow2); }
+.schedule-item.type-food   { border-left-color: #E8430A; }
+.schedule-item.type-sight  { border-left-color: #1565C0; }
+.schedule-item.type-hotel  { border-left-color: #2E7D32; }
+.schedule-item.type-move   { border-left-color: #888780; }
+.schedule-item.type-cafe   { border-left-color: #AD6B2F; }
+.schedule-item.type-shop   { border-left-color: #7B1FA2; }
 .item-icon {
-  width: 32px; height: 32px; border-radius: 8px;
+  width: 34px; height: 34px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 15px; flex-shrink: 0;
+  font-size: 16px; flex-shrink: 0;
 }
-.type-food  .item-icon { background: #FEF0E6; }
-.type-sight .item-icon { background: #E6F1FE; }
-.type-hotel .item-icon { background: #E6F7EF; }
-.type-move  .item-icon { background: var(--sand); }
+.type-food  .item-icon { background: #FEE8DF; }
+.type-sight .item-icon { background: #DDEEFF; }
+.type-hotel .item-icon { background: #DDF3E4; }
+.type-move  .item-icon { background: #EBEBEB; }
+.type-cafe  .item-icon { background: #F5E6D0; }
+.type-shop  .item-icon { background: #F3E5F5; }
 .item-body  { flex: 1; min-width: 0; }
 .item-time  { font-size: 11px; color: var(--ink3); }
 .item-name  { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1364,8 +1368,17 @@ html, body {
   display: flex; align-items: center; gap: 16px;
   transition: transform .15s, box-shadow .15s;
   border: 1.5px solid transparent;
+  border-left: 5px solid #E0DDD8;
+  overflow: hidden;
 }
-.tl-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,0.12); border-color: var(--accent2); }
+.tl-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,0.12); }
+.tl-card[data-color="red"]    { border-left-color: #E8430A; }
+.tl-card[data-color="blue"]   { border-left-color: #1565C0; }
+.tl-card[data-color="green"]  { border-left-color: #2E7D32; }
+.tl-card[data-color="purple"] { border-left-color: #6A1B9A; }
+.tl-card[data-color="amber"]  { border-left-color: #F57F17; }
+.tl-card[data-color="pink"]   { border-left-color: #AD1457; }
+.tl-card[data-color="teal"]   { border-left-color: #00695C; }
 .tl-card-emoji { font-size: 32px; flex-shrink: 0; }
 .tl-card-body { flex: 1; min-width: 0; }
 .tl-card-title {
@@ -1380,6 +1393,19 @@ html, body {
 }
 .tl-card-dday.past { color: var(--ink3); }
 .tl-card-arrow { font-size: 18px; color: var(--sand); flex-shrink: 0; }
+.tl-color-picker {
+  display: flex; gap: 6px; padding: 8px 12px;
+  background: var(--white); border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  position: absolute; z-index: 100;
+}
+.tl-color-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent;
+  transition: transform .12s, border-color .12s;
+}
+.tl-color-dot:hover { transform: scale(1.2); }
+.tl-color-dot.sel { border-color: var(--ink); }
 .tl-card-del {
   width: 32px; height: 32px; border-radius: 8px;
   border: none; background: none; cursor: pointer;
@@ -2323,11 +2349,17 @@ html, body {
         <div class="type-opt sel" data-type="food"  onclick="selectType(this,'food')">
           <span class="ico">🍜</span>맛집
         </div>
+        <div class="type-opt" data-type="cafe" onclick="selectType(this,'cafe')">
+          <span class="ico">☕</span>카페
+        </div>
         <div class="type-opt" data-type="sight" onclick="selectType(this,'sight')">
           <span class="ico">🏛️</span>관광
         </div>
         <div class="type-opt" data-type="hotel" onclick="selectType(this,'hotel')">
           <span class="ico">🏨</span>숙소
+        </div>
+        <div class="type-opt" data-type="shop" onclick="selectType(this,'shop')">
+          <span class="ico">🛍️</span>쇼핑
         </div>
         <div class="type-opt" data-type="move"  onclick="selectType(this,'move')">
           <span class="ico">🚆</span>이동
@@ -2554,7 +2586,57 @@ function closeAdminPw() {
   document.getElementById('admin-pw-error').style.display = 'none';
 }
 
-async function showTripListScreen() {
+async function showColorPicker(e, btn, tripId) {
+  // 기존 팝업 제거
+  document.querySelectorAll('.tl-color-picker').forEach(el => el.remove());
+
+  const colors = [
+    { key: '',       hex: '#E0DDD8', label: '기본' },
+    { key: 'red',    hex: '#E8430A' },
+    { key: 'blue',   hex: '#1565C0' },
+    { key: 'green',  hex: '#2E7D32' },
+    { key: 'purple', hex: '#6A1B9A' },
+    { key: 'amber',  hex: '#F57F17' },
+    { key: 'pink',   hex: '#AD1457' },
+    { key: 'teal',   hex: '#00695C' },
+  ];
+
+  const card = btn.closest('.tl-card');
+  const currentColor = card?.dataset.color || '';
+
+  const picker = document.createElement('div');
+  picker.className = 'tl-color-picker';
+  picker.style.cssText = `top:${btn.offsetTop + btn.offsetHeight + 4}px; right:12px;`;
+
+  colors.forEach(({ key, hex }) => {
+    const dot = document.createElement('div');
+    dot.className = 'tl-color-dot' + (key === currentColor ? ' sel' : '');
+    dot.style.background = hex;
+    dot.onclick = async (ev) => {
+      ev.stopPropagation();
+      if (card) {
+        if (key) card.dataset.color = key;
+        else delete card.dataset.color;
+      }
+      picker.remove();
+      // Firebase에 color 저장
+      try {
+        await window.fbUpdateTrip(tripId, { color: key });
+      } catch(e) {}
+    };
+    picker.appendChild(dot);
+  });
+
+  // 바깥 클릭 시 닫기
+  setTimeout(() => {
+    document.addEventListener('click', () => picker.remove(), { once: true });
+  }, 0);
+
+  card?.style.setProperty('position', 'relative');
+  card?.appendChild(picker);
+}
+
+function showTripListScreen() {
   document.getElementById('trip-list-screen').classList.add('show');
   // 관리자 버튼 표시 + 상태 복원
   const adminBtn = document.getElementById('btn-admin');
@@ -2635,6 +2717,8 @@ async function showTripListScreen() {
 
       const card = document.createElement('div');
       card.className = 'tl-card';
+      const savedColor = meta.color || '';
+      if (savedColor) card.dataset.color = savedColor;
       card.innerHTML = `
         <div class="tl-card-emoji">${emoji}</div>
         <div class="tl-card-body">
@@ -2646,6 +2730,7 @@ async function showTripListScreen() {
           ${author ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;">작성자 : ${author}</div>` : ''}
           ${updatedAt ? `<div style="font-size:10px;color:var(--ink3);margin-top:4px;opacity:0.7;">수정 ${updatedAt}</div>` : ''}
         </div>
+        <button class="tl-color-btn" title="색상 테마" style="background:none;border:none;cursor:pointer;font-size:14px;padding:4px;flex-shrink:0;opacity:0.5;" onclick="event.stopPropagation();showColorPicker(event,this,'${tripId}')">🎨</button>
         ${`<button class="tl-archive-btn" title="여행 완료로 표시">✓ 완료</button>`}
         <div class="tl-card-arrow">›</div>
         ${isAdminMode ? '<button class="tl-card-del" title="삭제">🗑️</button>' : ''}`;
@@ -3685,7 +3770,7 @@ function renderScheduleList() {
   const list = document.getElementById('schedule-list');
   const items = scheduleData[currentDay] || [];
   list.innerHTML = '';
-  const typeIcon = { food:'🍜', sight:'🏛️', hotel:'🏨', move:'🚆' };
+  const typeIcon = { food:'🍜', cafe:'☕', sight:'🏛️', hotel:'🏨', shop:'🛍️', move:'🚆' };
 
   items.forEach((item, idx) => {
     // ── 일정 카드
@@ -3907,7 +3992,7 @@ function onScheduleItemClick(idx) {
   map.panTo({ lat: item.lat, lng: item.lng });
   map.setZoom(15);
   // 지도 위 카드 표시
-  const typeIcon = { food:'🍜', sight:'🏛️', hotel:'🏨', move:'🚆' };
+  const typeIcon = { food:'🍜', cafe:'☕', sight:'🏛️', hotel:'🏨', shop:'🛍️', move:'🚆' };
   document.getElementById('smc-icon').textContent = typeIcon[item.type] || '📌';
   document.getElementById('smc-time').textContent = item.time ? fmtTime(item.time) : '';
   document.getElementById('smc-name').textContent = item.name;
