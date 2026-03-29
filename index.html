@@ -1985,10 +1985,20 @@ html, body {
   <div id="trip-list-header">
     <div class="tl-logo">travel<span>.</span></div>
     <div class="tl-sub" id="tl-sub-text">나의 여행 계획</div>
+    <div onclick="toggleLang()" title="언어 전환 / 言語切替"
+      style="display:flex;align-items:center;border:1.5px solid #ddd;
+             border-radius:20px;overflow:hidden;cursor:pointer;flex-shrink:0;
+             font-size:11px;font-weight:700;line-height:1;user-select:none;margin-left:auto;">
+      <span id="tl-lang-ja-label"
+        style="padding:5px 9px;transition:all .18s;background:#fff;color:#888;">日本語</span>
+      <span style="width:1px;background:#ddd;align-self:stretch;"></span>
+      <span id="tl-lang-ko-label"
+        style="padding:5px 9px;transition:all .18s;background:#003DA5;color:#fff;">한국어</span>
+    </div>
   </div>
   <div id="trip-list-cards"></div>
   <button id="btn-new-trip" onclick="createNewTrip()">
-    <span style="font-size:20px;">＋</span> 새 여행 만들기
+    <span style="font-size:20px;">＋</span> <span id="new-trip-text">새 여행 만들기</span>
   </button>
 </div>
 
@@ -2471,14 +2481,14 @@ html, body {
 
     <!-- Step 1: 여행지 & 제목 -->
     <div class="setup-page active" id="setup-page-1">
-      <div class="setup-page-title">어디로 여행을 떠나시나요? 🌏</div>
+      <div class="setup-page-title" id="setup-title-1">어디로 여행을 떠나시나요? 🌏</div>
       <div class="setup-page-sub">여행의 제목을 정해주세요</div>
       <div class="popup-field">
         <label>여행지 / 제목</label>
         <input type="text" id="setup-title" placeholder="예: 도쿄 여행 2025 🗼" />
       </div>
       <div class="popup-field">
-        <label>작성자 이름 <small style="color:var(--ink3)">(선택)</small></label>
+        <label id="setup-author-label">작성자 이름 <small id="setup-author-optional" style="color:var(--ink3)">(선택)</small></label>
         <input type="text" id="setup-author" placeholder="예: 홍길동" />
       </div>
       <div class="popup-field">
@@ -2487,13 +2497,13 @@ html, body {
       </div>
       <div class="setup-nav">
         <button class="btn-cancel" onclick="closeOverlay('trip-setup-overlay')">취소</button>
-        <button class="btn-next" onclick="setupNext(1)">다음 →</button>
+        <button class="btn-next" id="setup-btn-next-1" onclick="setupNext(1)">다음 →</button>
       </div>
     </div>
 
     <!-- Step 2: 날짜 -->
     <div class="setup-page" id="setup-page-2">
-      <div class="setup-page-title">언제 떠나시나요? 📅</div>
+      <div class="setup-page-title" id="setup-title-2">언제 떠나시나요? 📅</div>
       <div class="setup-page-sub">출발일과 귀국일을 선택해주세요</div>
       <div class="popup-field">
         <label>출발일</label>
@@ -2507,23 +2517,23 @@ html, body {
         ✈️ <span id="setup-dur-text"></span>
       </div>
       <div class="setup-nav">
-        <button class="btn-back" onclick="setupBack(2)">← 이전</button>
-        <button class="btn-next" onclick="setupNext(2)">다음 →</button>
+        <button class="btn-back" id="setup-btn-back-2" onclick="setupBack(2)">← 이전</button>
+        <button class="btn-next" id="setup-btn-next-2" onclick="setupNext(2)">다음 →</button>
       </div>
     </div>
 
     <!-- Step 3: 확인 -->
     <div class="setup-page" id="setup-page-3">
       <div class="setup-page-title">여행 준비 완료! 🎉</div>
-      <div class="setup-page-sub">아래 내용으로 여행 계획을 시작합니다</div>
+      <div class="setup-page-sub" id="setup-sub-3">아래 내용으로 여행 계획을 시작합니다</div>
       <div style="background:linear-gradient(135deg,var(--accent),#f0954a);border-radius:14px;padding:20px;color:#fff;display:flex;flex-direction:column;gap:8px;">
         <div style="font-size:20px;font-weight:700;" id="confirm-title"></div>
         <div style="font-size:14px;opacity:.9;" id="confirm-dates"></div>
         <div style="font-size:13px;opacity:.75;" id="confirm-note"></div>
       </div>
       <div class="setup-nav">
-        <button class="btn-back" onclick="setupBack(3)">← 이전</button>
-        <button class="btn-finish" onclick="setupFinish()">🚀 시작하기</button>
+        <button class="btn-back" id="setup-btn-back-3" onclick="setupBack(3)">← 이전</button>
+        <button class="btn-finish" id="setup-btn-finish" onclick="setupFinish()">🚀 시작하기</button>
       </div>
     </div>
   </div>
@@ -2688,6 +2698,15 @@ const LANG_MAP = {
     itemMemo:'메모', itemEdit:'편집',
     memoPlaceholder:'예약번호, 주의사항, 메모 등 (Shift+Enter 줄바꿈)',
     travelNext:'다음까지',
+    setupTitle1:'어디로 여행을 떠나시나요? 🌏',
+    setupTitle2:'언제 떠나시나요? 📅',
+    setupTitle3:'여행 준비 완료! 🎉',
+    setupSub3:'아래 내용으로 여행 계획을 시작합니다',
+    setupAuthorLabel2:'작성자 이름',
+    setupAuthorOptional:'(선택)',
+    btnNext:'다음 →', btnBack:'← 이전', btnStart:'🚀 시작하기',
+    btnBackList:'목록',
+    newTripBtnFull:'＋ 새 여행 만들기',
     airlinePlaceholderText:'항공사를 입력해주세요',
     dateSelectText:'날짜를 선택하세요',
     editHint:'✏️ 편집', editSpanLabel:'편집', doneSpanLabel:'완료',
@@ -2767,6 +2786,15 @@ const LANG_MAP = {
     itemMemo:'メモ', itemEdit:'編集',
     memoPlaceholder:'予約番号・注意事項・メモなど（Shift+Enterで改行）',
     travelNext:'次まで',
+    setupTitle1:'どこへ旅行しますか？ 🌏',
+    setupTitle2:'いつ出発しますか？ 📅',
+    setupTitle3:'旅行の準備完了！ 🎉',
+    setupSub3:'以下の内容で旅行プランを開始します',
+    setupAuthorLabel2:'作成者名',
+    setupAuthorOptional:'（任意）',
+    btnNext:'次へ →', btnBack:'← 戻る', btnStart:'🚀 開始する',
+    btnBackList:'一覧',
+    newTripBtnFull:'＋ 新しい旅行を作成',
     airlinePlaceholderText:'航空会社を入力してください',
     dateSelectText:'日付を選択してください',
     editHint:'✏️ 編集', editSpanLabel:'編集', doneSpanLabel:'完了',
@@ -2815,18 +2843,21 @@ function applyLang(lang) {
   currentLang = lang;
   localStorage.setItem('appLang', lang);
 
-  // 토글 스위치
+  // 토글 스위치 (헤더 + 여행 목록 화면)
   const jaLabel = document.getElementById('lang-ja-label');
   const koLabel = document.getElementById('lang-ko-label');
-  if (jaLabel && koLabel) {
+  const tlJaLabel = document.getElementById('tl-lang-ja-label');
+  const tlKoLabel = document.getElementById('tl-lang-ko-label');
+  [['ja', jaLabel, koLabel], ['tl-ja', tlJaLabel, tlKoLabel]].forEach(([, ja, ko]) => {
+    if (!ja || !ko) return;
     if (lang === 'ja') {
-      jaLabel.style.background = '#C8102E'; jaLabel.style.color = '#fff';
-      koLabel.style.background = 'var(--white)'; koLabel.style.color = 'var(--ink3)';
+      ja.style.background = '#C8102E'; ja.style.color = '#fff';
+      ko.style.background = '#fff'; ko.style.color = '#888';
     } else {
-      jaLabel.style.background = 'var(--white)'; jaLabel.style.color = 'var(--ink3)';
-      koLabel.style.background = 'var(--accent2)'; koLabel.style.color = '#fff';
+      ja.style.background = '#fff'; ja.style.color = '#888';
+      ko.style.background = '#003DA5'; ko.style.color = '#fff';
     }
-  }
+  });
 
   // 탭
   const tabs = document.querySelectorAll('.panel-tab');
@@ -3017,6 +3048,37 @@ function applyLang(lang) {
   document.querySelectorAll('.item-travel-badge').forEach(el => {
     el.innerHTML = el.innerHTML.replace(/다음까지|次まで/, t.travelNext);
   });
+
+  // 위자드 제목/부제
+  const st1 = document.getElementById('setup-title-1'); if (st1) st1.textContent = t.setupTitle1;
+  const st2 = document.getElementById('setup-title-2'); if (st2) st2.textContent = t.setupTitle2;
+  const ss3 = document.getElementById('setup-sub-3');   if (ss3) ss3.textContent = t.setupSub3;
+
+  // 작성자 라벨 + (선택)
+  const authorLabelEl = document.getElementById('setup-author-label');
+  if (authorLabelEl) {
+    const optional = document.getElementById('setup-author-optional');
+    if (authorLabelEl.childNodes[0]) authorLabelEl.childNodes[0].textContent = t.setupAuthorLabel2 + ' ';
+    if (optional) optional.textContent = t.setupAuthorOptional;
+  }
+
+  // 위자드 버튼
+  ['setup-btn-next-1','setup-btn-next-2'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = t.btnNext;
+  });
+  ['setup-btn-back-2','setup-btn-back-3'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = t.btnBack;
+  });
+  const btnFinish = document.getElementById('setup-btn-finish');
+  if (btnFinish) btnFinish.textContent = t.btnStart;
+
+  // 새 여행 만들기 버튼
+  const newTripText = document.getElementById('new-trip-text');
+  if (newTripText) newTripText.textContent = t.newTripBtnFull;
+
+  // 목록 버튼 (좌측 상단) — title 속성
+  const btnBackList = document.getElementById('btn-back-list');
+  if (btnBackList) btnBackList.title = t.btnBackList;
 }
 
 function toggleLang() {
