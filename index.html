@@ -2285,7 +2285,7 @@ html, body {
         <div>
           <div class="check-section-header">
             <div class="section-label" data-i18n="secChecklist">여행 준비물</div>
-            <button class="btn-check-add" onclick="showCheckInlineForm('check-group','checklist')">＋ 추가</button>
+            <button class="btn-check-add" id="checklist-add-btn" onclick="showCheckInlineForm('check-group','checklist')">＋ 추가</button>
           </div>
           <div class="check-group" id="check-group"></div>
         </div>
@@ -2294,7 +2294,7 @@ html, body {
         <div>
           <div class="check-section-header">
             <div class="section-label" data-i18n="secVoucher">바우처 / 티켓</div>
-            <button class="btn-check-add" onclick="showCheckInlineForm('voucher-group','voucher')">＋ 추가</button>
+            <button class="btn-check-add" id="voucher-add-btn" onclick="showCheckInlineForm('voucher-group','voucher')">＋ 추가</button>
           </div>
           <div class="check-group" id="voucher-group"></div>
         </div>
@@ -2681,6 +2681,13 @@ const LANG_MAP = {
     depart:'DEPARTURE 출국편', ret:'RETURN 귀국편',
     voucherPdfView:'PDF 보기', voucherPdfAdd:'PDF 추가',
     voucherPdfViewShort:'📄 보기', voucherPdfAddShort:'보기',
+    schPopupEdit:'일정 편집',
+    btnPlaceSearch:'🔍 장소 검색',
+    btnCheckAdd:'＋ 추가',
+    hasLoc:'📍 위치 등록됨',
+    itemMemo:'메모', itemEdit:'편집',
+    memoPlaceholder:'예약번호, 주의사항, 메모 등 (Shift+Enter 줄바꿈)',
+    travelNext:'다음까지',
     airlinePlaceholderText:'항공사를 입력해주세요',
     dateSelectText:'날짜를 선택하세요',
     editHint:'✏️ 편집', editSpanLabel:'편집', doneSpanLabel:'완료',
@@ -2753,6 +2760,13 @@ const LANG_MAP = {
     depart:'DEPARTURE 出国便', ret:'RETURN 帰国便',
     voucherPdfView:'PDF 閲覧', voucherPdfAdd:'PDF 追加',
     voucherPdfViewShort:'📄 表示', voucherPdfAddShort:'表示',
+    schPopupEdit:'予定編集',
+    btnPlaceSearch:'🔍 場所検索',
+    btnCheckAdd:'＋ 追加',
+    hasLoc:'📍 位置登録済み',
+    itemMemo:'メモ', itemEdit:'編集',
+    memoPlaceholder:'予約番号・注意事項・メモなど（Shift+Enterで改行）',
+    travelNext:'次まで',
     airlinePlaceholderText:'航空会社を入力してください',
     dateSelectText:'日付を選択してください',
     editHint:'✏️ 編集', editSpanLabel:'編集', doneSpanLabel:'完了',
@@ -2973,6 +2987,35 @@ function applyLang(lang) {
   ['depart-airline-display','return-airline-display'].forEach(id => {
     const el = document.getElementById(id);
     if (el && /항공사를|航空会社を/.test(el.textContent)) el.textContent = t.airlinePlaceholderText;
+  });
+
+  // 항공편 편집 버튼 span
+  document.querySelectorAll('.edit-span-label').forEach(el => { el.textContent = t.editSpanLabel; });
+
+  // 일정 팝업 편집 제목
+  const schEditTitle = document.querySelector('#schedule-overlay .popup-title');
+  if (schEditTitle && /편집|編集/.test(schEditTitle.textContent)) schEditTitle.textContent = t.schPopupEdit || t.schPopupTitle;
+
+  // 장소 검색 버튼
+  const placeSearchBtn = document.getElementById('btn-place-search');
+  if (placeSearchBtn) placeSearchBtn.textContent = t.btnPlaceSearch;
+
+  // 체크리스트/바우처 ＋추가 버튼
+  document.querySelectorAll('.btn-check-add').forEach(btn => { btn.textContent = t.btnCheckAdd; });
+  document.querySelectorAll('textarea[placeholder*="예약번호"], textarea[placeholder*="予約"]').forEach(el => {
+    el.placeholder = t.memoPlaceholder;
+  });
+
+  // 일정 카드 내 메모/편집 버튼 (렌더된 것들)
+  document.querySelectorAll('.item-act-btn-memo').forEach(el => { el.textContent = t.itemMemo; });
+  document.querySelectorAll('.item-act-btn.item-edit').forEach(el => { el.textContent = t.itemEdit; });
+
+  // 위치 등록됨 텍스트
+  document.querySelectorAll('.item-has-loc').forEach(el => { el.textContent = t.hasLoc; });
+
+  // 이동 시간 뱃지 "다음까지 N분"
+  document.querySelectorAll('.item-travel-badge').forEach(el => {
+    el.innerHTML = el.innerHTML.replace(/다음까지|次まで/, t.travelNext);
   });
 }
 
@@ -4096,7 +4139,7 @@ function toggleMemoEdit(idx) {
   const ta = document.createElement('textarea');
   ta.className = 'item-memo-input';
   ta.rows = 3;
-  ta.placeholder = '예약번호, 주의사항, 메모 등 (Shift+Enter 줄바꿈)';
+  ta.placeholder = (LANG_MAP[currentLang]||LANG_MAP.ko).memoPlaceholder;
   ta.value = item.memo || '';
   wrap.innerHTML = '';
   wrap.appendChild(ta);
@@ -4143,15 +4186,15 @@ function renderScheduleList() {
         <div class="item-time">${item.time ? fmtTime(item.time) : ''}</div>
         <div class="item-name">${item.name}</div>
         <div class="item-desc">${item.desc || ''}</div>
-        ${hasLoc ? '<div class="item-has-loc">📍 위치 등록됨</div>' : ''}
+        ${hasLoc ? `<div class="item-has-loc">${(LANG_MAP[currentLang]||LANG_MAP.ko).hasLoc}</div>` : ''}
         <div id="item-travel-${currentDay}-${idx}"></div>
         <div class="item-memo-wrap" id="memo-wrap-${currentDay}-${idx}">
           ${hasMemo ? `<div class="item-memo-text" id="memo-text-${currentDay}-${idx}">${item.memo}</div>` : ''}
         </div>
       </div>
       <div class="item-actions">
-        <button class="item-act-btn-memo" onclick="toggleMemoEdit(${idx})" title="메모">메모</button>
-        <button class="item-act-btn item-edit" onclick="openEditSchedule(${idx})">편집</button>
+        <button class="item-act-btn-memo" onclick="toggleMemoEdit(${idx})" title="${(LANG_MAP[currentLang]||LANG_MAP.ko).itemMemo}">${(LANG_MAP[currentLang]||LANG_MAP.ko).itemMemo}</button>
+        <button class="item-act-btn item-edit" onclick="openEditSchedule(${idx})">${(LANG_MAP[currentLang]||LANG_MAP.ko).itemEdit}</button>
         <button class="item-act-btn item-del"  onclick="deleteScheduleItem(${idx})">✕</button>
       </div>`;
     list.appendChild(div);
@@ -4248,7 +4291,7 @@ function fetchDirections(from, to, mode, fromIdx) {
         <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
       // 출발 일정 카드에도 소요시간 배지 표시
       const badge = document.getElementById(`item-travel-${currentDay}-${fromIdx}`);
-      if (badge) badge.innerHTML = `<span class="item-travel-badge">${modeInfo.icon} 다음까지 ${durTxt}</span>`;
+      if (badge) badge.innerHTML = `<span class="item-travel-badge">${modeInfo.icon} ${(LANG_MAP[currentLang]||LANG_MAP.ko).travelNext} ${durTxt}</span>`;
 
     } else if (status === google.maps.DirectionsStatus.ZERO_RESULTS && mode === 'transit') {
       // 대중교통 정보 없는 지역 → 자동차 기준으로 폴백
@@ -4267,7 +4310,7 @@ function fetchDirections(from, to, mode, fromIdx) {
             <span class="transit-sep">·</span>
             <span style="font-size:11px;color:var(--red)">🚌 이 구간 대중교통 정보 없음 (자동차 기준)</span>`;
           const badge = document.getElementById(`item-travel-${currentDay}-${fromIdx}`);
-          if (badge) badge.innerHTML = `<span class="item-travel-badge">🚗 다음까지 ${leg.duration.text}</span>`;
+          if (badge) badge.innerHTML = `<span class="item-travel-badge">🚗 ${(LANG_MAP[currentLang]||LANG_MAP.ko).travelNext} ${leg.duration.text}</span>`;
         } else {
           infoEl.innerHTML = `<span class="transit-no-loc">🚌 이 구간 대중교통 정보가 없어요</span>`;
         }
@@ -4404,7 +4447,7 @@ function openEditSchedule(idx) {
   if (item.time) timeToTp('scht', item.time);
   else { tpState['scht'] = { h: '1', m: '00', ap: 'AM' }; updateTpDisplay('scht'); syncTpPopup('scht'); }
   selectTypeByValue(item.type || 'food');
-  document.querySelector('#schedule-overlay .popup-title').textContent = '일정 편집';
+  document.querySelector('#schedule-overlay .popup-title').textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).schPopupEdit;
   document.querySelector('#schedule-overlay .btn-save').textContent = '저장';
   openOverlay('schedule-overlay');
 }
