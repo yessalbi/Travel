@@ -2636,7 +2636,7 @@ async function showColorPicker(e, btn, tripId) {
   card?.appendChild(picker);
 }
 
-function showTripListScreen() {
+async function showTripListScreen() {
   document.getElementById('trip-list-screen').classList.add('show');
   // 관리자 버튼 표시 + 상태 복원
   const adminBtn = document.getElementById('btn-admin');
