@@ -2040,6 +2040,16 @@ html, body {
 
   <!-- 우측 버튼들 -->
   <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
+    <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替"
+      style="display:flex;align-items:center;border:1.5px solid var(--sand);
+             border-radius:20px;overflow:hidden;cursor:pointer;flex-shrink:0;
+             font-size:11px;font-weight:700;line-height:1;user-select:none;">
+      <span id="lang-ja-label"
+        style="padding:5px 9px;transition:all .18s;background:var(--white);color:var(--ink3);">日本語</span>
+      <span style="width:1px;background:var(--sand);align-self:stretch;"></span>
+      <span id="lang-ko-label"
+        style="padding:5px 9px;transition:all .18s;background:var(--accent2);color:#fff;">한국어</span>
+    </div>
     <button onclick="location.reload()" title="새로고침"
       style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
              font-size:15px;padding:5px 9px;border-radius:8px;
@@ -2635,6 +2645,117 @@ async function showColorPicker(e, btn, tripId) {
   card?.style.setProperty('position', 'relative');
   card?.appendChild(picker);
 }
+
+// ── 언어 전환 (한국어 ↔ 일본어) ──────────────────────────────
+const LANG_MAP = {
+  ko: {
+    tab0: '✈️ 여행 정보', tab1: '📅 일별 일정', tab2: '🎒 챙겨야할 것', tab3: '🗺️ 지도',
+    saveBtn: '📥 오프라인 저장', shareBtn: '🔗 공유',
+    addSchedule: '＋ 일정 추가',
+    secInfo: '여행 기본 정보', secFlight: '항공편', secPlaces: '맛집 & 장소', secChecklist: '챙겨야할 것', secVoucher: '바우처',
+    typeFood: '맛집', typeCafe: '카페', typeSight: '관광', typeHotel: '숙소', typeShop: '쇼핑', typeMove: '이동',
+    searchPlaceholder: 'Google 지도 검색',
+    schName: '장소 또는 일정 이름',
+    btnAddDay: '＋ Day 추가', btnSave: '저장', btnCancel: '취소',
+    depart: 'DEPARTURE 출국편', ret: 'RETURN 귀국편',
+    archiveBtn: '✓ 완료',
+  },
+  ja: {
+    tab0: '✈️ 旅行情報', tab1: '📅 日程', tab2: '🎒 持ち物', tab3: '🗺️ 地図',
+    saveBtn: '📥 オフライン保存', shareBtn: '🔗 共有',
+    addSchedule: '＋ 予定追加',
+    secInfo: '旅行基本情報', secFlight: '航空便', secPlaces: 'グルメ＆スポット', secChecklist: '持ち物リスト', secVoucher: 'バウチャー',
+    typeFood: 'グルメ', typeCafe: 'カフェ', typeSight: '観光', typeHotel: '宿泊', typeShop: 'ショッピング', typeMove: '移動',
+    searchPlaceholder: 'Google マップ検索',
+    schName: '場所または予定の名前',
+    btnAddDay: '＋ Day 追加', btnSave: '保存', btnCancel: 'キャンセル',
+    depart: 'DEPARTURE 出国便', ret: 'RETURN 帰国便',
+    archiveBtn: '✓ 完了',
+  }
+};
+
+let currentLang = localStorage.getItem('appLang') || 'ko';
+
+function applyLang(lang) {
+  const t = LANG_MAP[lang];
+  currentLang = lang;
+  localStorage.setItem('appLang', lang);
+
+  // 토글 스위치 업데이트
+  const jaLabel = document.getElementById('lang-ja-label');
+  const koLabel = document.getElementById('lang-ko-label');
+  if (jaLabel && koLabel) {
+    if (lang === 'ja') {
+      jaLabel.style.background = '#C8102E';
+      jaLabel.style.color = '#fff';
+      koLabel.style.background = 'var(--white)';
+      koLabel.style.color = 'var(--ink3)';
+    } else {
+      jaLabel.style.background = 'var(--white)';
+      jaLabel.style.color = 'var(--ink3)';
+      koLabel.style.background = 'var(--accent2)';
+      koLabel.style.color = '#fff';
+    }
+  }
+
+  // 탭
+  const tabs = document.querySelectorAll('.panel-tab');
+  if (tabs[0]) tabs[0].textContent = t.tab0;
+  if (tabs[1]) tabs[1].textContent = t.tab1;
+  if (tabs[2]) tabs[2].textContent = t.tab2;
+  const mapTab = document.querySelector('.panel-tab.map-tab-mobile');
+  if (mapTab) mapTab.textContent = t.tab3;
+
+  // 버튼
+  const saveBtn = document.getElementById('save-btn');
+  if (saveBtn) saveBtn.textContent = t.saveBtn;
+  const shareBtn = document.getElementById('share-btn');
+  if (shareBtn) shareBtn.textContent = t.shareBtn;
+  const addSchBtn = document.getElementById('add-schedule-btn');
+  if (addSchBtn) addSchBtn.innerHTML = t.addSchedule;
+
+  // 검색 placeholder
+  const searchInput = document.getElementById('map-search-input');
+  if (searchInput) searchInput.placeholder = t.searchPlaceholder;
+  const ovSearchInput = document.getElementById('map-overlay-search-input');
+  if (ovSearchInput) ovSearchInput.placeholder = t.searchPlaceholder;
+
+  // 일정 추가 팝업 타입 버튼
+  const typeOpts = document.querySelectorAll('.type-opt');
+  typeOpts.forEach(opt => {
+    const type = opt.dataset.type;
+    const ico = opt.querySelector('.ico')?.outerHTML || '';
+    const labels = { food: t.typeFood, cafe: t.typeCafe, sight: t.typeSight, hotel: t.typeHotel, shop: t.typeShop, move: t.typeMove };
+    if (labels[type]) opt.innerHTML = `${ico}${labels[type]}`;
+  });
+
+  // 일정 추가 팝업 input placeholder
+  const schNameInput = document.getElementById('sch-name');
+  if (schNameInput) schNameInput.placeholder = t.schName;
+
+  // 섹션 라벨
+  document.querySelectorAll('.section-label').forEach(el => {
+    const txt = el.textContent.trim();
+    if (txt.includes('여행 기본') || txt.includes('旅行基本')) el.textContent = t.secInfo;
+    if (txt.includes('항공편') || txt.includes('航空')) el.textContent = t.secFlight;
+    if (txt.includes('맛집') || txt.includes('グルメ')) el.textContent = t.secPlaces;
+  });
+
+  // 항공편 헤더 태그
+  document.querySelectorAll('.ticket-header-tag').forEach(el => {
+    if (el.textContent.includes('DEPARTURE') || el.textContent.includes('출국')) el.textContent = t.depart;
+    if (el.textContent.includes('RETURN') || el.textContent.includes('귀국')) el.textContent = t.ret;
+  });
+}
+
+function toggleLang() {
+  applyLang(currentLang === 'ko' ? 'ja' : 'ko');
+}
+
+// 초기 언어 적용 (저장된 언어가 있을 때)
+document.addEventListener('DOMContentLoaded', () => {
+  if (currentLang === 'ja') applyLang('ja');
+});
 
 async function showTripListScreen() {
   document.getElementById('trip-list-screen').classList.add('show');
