@@ -7113,11 +7113,13 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// 배포된 파일에서 빌드 해시를 읽어와 표시
-// GitHub Pages에 실제 반영된 시점의 해시만 표시됨
+// 빌드 배지: 커밋 해시 + GitHub Pages 배포 완료 여부 표시
 (async () => {
+  const badge = document.getElementById('build-badge');
+  if (!badge) return;
+
   try {
-    // 1. GitHub API에서 최신 커밋 해시 가져오기
+    // 1. 최신 커밋 정보
     const apiRes = await fetch(
       'https://api.github.com/repos/yessalbi/Travel/commits/main',
       { headers: { Accept: 'application/vnd.github.v3+json' } }
@@ -7125,44 +7127,32 @@ document.addEventListener('keydown', (e) => {
     if (!apiRes.ok) return;
     const apiData = await apiRes.json();
     const latestHash = apiData.sha?.slice(0, 7);
+    const commitTime = new Date(apiData.commit?.committer?.date || apiData.commit?.author?.date);
+    if (!latestHash) return;
 
-    // 2. 실제 배포된 index.html에서 현재 반영된 해시 읽기
-    // cache-bust 파라미터로 CDN 캐시 우회
-    const pageRes = await fetch(
-      'https://yessalbi.github.io/Travel/index.html?_=' + Date.now(),
-      { cache: 'no-store' }
+    // 2. 배포된 파일의 Last-Modified 시각 확인 (HEAD 요청)
+    const headRes = await fetch(
+      'https://yessalbi.github.io/Travel/index.html',
+      { method: 'HEAD', cache: 'no-store' }
     );
-    if (!pageRes.ok) return;
-    const html = await pageRes.text();
+    const lastModified = headRes.headers.get('last-modified');
+    const deployTime = lastModified ? new Date(lastModified) : null;
 
-    // 배포된 파일 안의 build-badge 해시 추출
-    const match = html.match(/Build\s*:\s*([a-f0-9]{7})/);
-    const deployedHash = match?.[1];
-
-    const badge = document.getElementById('build-badge');
-    if (!badge) return;
-
-    if (!deployedHash || !latestHash) {
-      if (latestHash) badge.textContent = 'Build : ' + latestHash + ' (배포 확인 중)';
-      return;
-    }
-
-    if (deployedHash === latestHash) {
-      // 배포 완료 — 해시 표시
-      badge.textContent = 'Build : ' + deployedHash;
+    if (deployTime && deployTime >= commitTime) {
+      // 배포 완료
+      badge.textContent = 'Build : ' + latestHash;
       badge.style.color = '';
     } else {
-      // 아직 배포 중
-      badge.textContent = 'Build : ' + deployedHash + ' → ' + latestHash + ' 배포 중…';
+      // 배포 중
+      badge.textContent = 'Build : ' + latestHash + ' ⏳';
       badge.style.color = '#F59E0B';
 
       // 30초마다 재확인
       const check = setInterval(async () => {
         try {
-          const r = await fetch('https://yessalbi.github.io/Travel/index.html?_=' + Date.now(), { cache: 'no-store' });
-          const h = await r.text();
-          const m = h.match(/Build\s*:\s*([a-f0-9]{7})/);
-          if (m?.[1] === latestHash) {
+          const r = await fetch('https://yessalbi.github.io/Travel/index.html', { method: 'HEAD', cache: 'no-store' });
+          const lm = r.headers.get('last-modified');
+          if (lm && new Date(lm) >= commitTime) {
             badge.textContent = 'Build : ' + latestHash;
             badge.style.color = '#27AE60';
             setTimeout(() => { badge.style.color = ''; }, 3000);
@@ -7171,7 +7161,7 @@ document.addEventListener('keydown', (e) => {
         } catch(e) {}
       }, 30000);
     }
-  } catch(e) { /* 오프라인이거나 API 실패 시 무시 */ }
+  } catch(e) {}
 })();
 </script>
 <!-- 모바일 지도 전체화면 오버레이 -->
