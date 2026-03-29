@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>여행 계획판</title>
+  <title data-i18n="pageTitle">여행 계획판</title>
 
   <!-- iOS PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2092,17 +2092,17 @@ html, body {
 
       <!-- 여행 기본 정보 -->
       <div id="trip-info">
-        <div class="section-label">여행 기본 정보</div>
+        <div class="section-label" data-i18n="secInfo">여행 기본 정보</div>
         <div class="info-grid">
           <button id="duration-badge" onclick="openTripSetup()">
             <span class="icon">🏖️</span>
             <div style="flex:1;min-width:0;">
               <div id="duration-title" style="font-size:17px;font-weight:700;margin-bottom:3px;display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-              <div id="duration-text">날짜를 선택하세요</div>
+              <div id="duration-text" data-i18n-key="dateSelectText">날짜를 선택하세요</div>
               <div class="sub" id="duration-nights">—</div>
               <div id="duration-note" class="sub" style="margin-top:2px;display:none;"></div>
             </div>
-            <span class="edit-hint">✏️ 편집</span>
+            <span class="edit-hint" data-i18n-key="editHint">✏️ 편집</span>
           </button>
           <!-- 숨김 필드 (데이터용) -->
           <input type="hidden" id="trip-title" />
@@ -2114,7 +2114,7 @@ html, body {
 
         <!-- 날씨 위젯 -->
         <div id="weather-section" style="display:none;">
-          <div id="weather-section-title">여행 기간 예상 날씨</div>
+          <div id="weather-section-title" data-i18n="secWeather">여행 기간 예상 날씨</div>
           <div id="weather-days"></div>
           <div id="weather-note"></div>
         </div>
@@ -2122,14 +2122,14 @@ html, body {
 
       <!-- 항공편 -->
       <div id="flight-section">
-        <div class="section-label">항공편</div>
+        <div class="section-label" data-i18n="secFlight">항공편</div>
 
         <!-- 출국편 티켓 -->
         <div class="ticket-card" id="depart-ticket">
           <div class="ticket-header">
             <div class="ticket-header-left">
               <span class="ticket-header-tag">DEPARTURE · 출국편</span>
-              <div class="ticket-header-airline" id="depart-airline-display">항공사를 입력해주세요</div>
+              <div class="ticket-header-airline" id="depart-airline-display" data-i18n-key="airlinePlaceholderText">항공사를 입력해주세요</div>
             </div>
             <div class="ticket-header-icon">✈️</div>
           </div>
@@ -2155,7 +2155,7 @@ html, body {
                 <span class="ticket-time-value" id="depart-time-display">--:--</span>
               </div>
               <div class="ticket-time-item center">
-                <span class="ticket-time-label">항공편</span>
+                <span class="ticket-time-label" data-i18n="secFlight">항공편</span>
                 <span class="ticket-time-value" id="depart-flightno-display" style="font-size:11px;">-</span>
               </div>
               <div class="ticket-time-item" style="align-items:flex-end;">
@@ -2192,7 +2192,7 @@ html, body {
           <div class="ticket-header" style="background:#2c2c2a;">
             <div class="ticket-header-left">
               <span class="ticket-header-tag">RETURN · 귀국편</span>
-              <div class="ticket-header-airline" id="return-airline-display">항공사를 입력해주세요</div>
+              <div class="ticket-header-airline" id="return-airline-display" data-i18n-key="airlinePlaceholderText">항공사를 입력해주세요</div>
             </div>
             <div class="ticket-header-icon">🛬</div>
           </div>
@@ -2218,7 +2218,7 @@ html, body {
                 <span class="ticket-time-value" id="return-time-display">--:--</span>
               </div>
               <div class="ticket-time-item center">
-                <span class="ticket-time-label">항공편</span>
+                <span class="ticket-time-label" data-i18n="secFlight">항공편</span>
                 <span class="ticket-time-value" id="return-flightno-display" style="font-size:11px;">-</span>
               </div>
               <div class="ticket-time-item" style="align-items:flex-end;">
@@ -2256,7 +2256,7 @@ html, body {
 
       <!-- 맛집 핀 -->
       <div id="places-section">
-        <div class="section-label">📍 맛집 &amp; 장소</div>
+        <div class="section-label" data-i18n="secPlaces">📍 맛집 &amp; 장소</div>
         <div class="place-chips" id="place-chips"></div>
       </div>
 
@@ -2265,7 +2265,7 @@ html, body {
     <!-- 탭 2: 일별 일정 -->
     <div class="panel-page" id="panel-page-1">
       <div id="schedule-section" style="flex:1;padding:16px 20px;">
-        <div class="section-label">일별 일정</div>
+        <div class="section-label" data-i18n="secSchedule">일별 일정</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0;">
           <div class="day-tabs" id="day-tabs" style="flex:1;min-width:0;"></div>
           <div id="day-weather-badge-wrap" style="flex-shrink:0;"></div>
@@ -2284,7 +2284,7 @@ html, body {
         <!-- 여행 준비물 -->
         <div>
           <div class="check-section-header">
-            <div class="section-label">여행 준비물</div>
+            <div class="section-label" data-i18n="secChecklist">여행 준비물</div>
             <button class="btn-check-add" onclick="showCheckInlineForm('check-group','checklist')">＋ 추가</button>
           </div>
           <div class="check-group" id="check-group"></div>
@@ -2293,7 +2293,7 @@ html, body {
         <!-- 바우처 / 티켓 -->
         <div>
           <div class="check-section-header">
-            <div class="section-label">바우처 / 티켓</div>
+            <div class="section-label" data-i18n="secVoucher">바우처 / 티켓</div>
             <button class="btn-check-add" onclick="showCheckInlineForm('voucher-group','voucher')">＋ 추가</button>
           </div>
           <div class="check-group" id="voucher-group"></div>
@@ -2649,28 +2649,148 @@ async function showColorPicker(e, btn, tripId) {
 // ── 언어 전환 (한국어 ↔ 일본어) ──────────────────────────────
 const LANG_MAP = {
   ko: {
-    tab0: '✈️ 여행 정보', tab1: '📅 일별 일정', tab2: '🎒 챙겨야할 것', tab3: '🗺️ 지도',
-    saveBtn: '📥 오프라인 저장', shareBtn: '🔗 공유',
-    addSchedule: '＋ 일정 추가',
-    secInfo: '여행 기본 정보', secFlight: '항공편', secPlaces: '맛집 & 장소', secChecklist: '챙겨야할 것', secVoucher: '바우처',
-    typeFood: '맛집', typeCafe: '카페', typeSight: '관광', typeHotel: '숙소', typeShop: '쇼핑', typeMove: '이동',
-    searchPlaceholder: 'Google 지도 검색',
-    schName: '장소 또는 일정 이름',
-    btnAddDay: '＋ Day 추가', btnSave: '저장', btnCancel: '취소',
-    depart: 'DEPARTURE 출국편', ret: 'RETURN 귀국편',
-    archiveBtn: '✓ 완료',
+    tab0:'✈️ 여행 정보', tab1:'📅 일별 일정', tab2:'🎒 챙겨야할 것', tab3:'🗺️ 지도',
+    saveBtn:'📥 오프라인 저장', shareBtn:'🔗 공유', addSchedule:'＋ 일정 추가',
+    secInfo:'여행 기본 정보', secFlight:'항공편', secPlaces:'📍 맛집 & 장소',
+    secSchedule:'일별 일정', secChecklist:'여행 준비물', secVoucher:'바우처 / 티켓',
+    secDomestic:'🚗 국내 여행', secWeather:'여행 기간 예상 날씨',
+    typeFood:'맛집', typeCafe:'카페', typeSight:'관광', typeHotel:'숙소', typeShop:'쇼핑', typeMove:'이동',
+    searchPlaceholder:'Google 지도 검색',
+    schPopupTitle:'일정 추가', schName:'장소 또는 일정 이름', schMemo:'간단한 메모를 입력하세요',
+    schPickBtn:'📍 지도에서 위치 클릭하기',
+    labelType:'유형', labelName:'이름', labelTime:'시간', labelMemo:'메모', labelLocation:'위치',
+    btnAdd:'추가', btnSave:'저장', btnCancel:'취소', btnEdit:'편집', btnClose:'닫기', btnConfirm:'확인',
+    labelDepart:'출발', labelArrive:'도착',
+    flightAirlinePh:'예: 제주항공 7C1601', returnAirlinePh:'예: 아시아나 OZ102',
+    ticketEditLabel:'편집', ticketDoneLabel:'완료',
+    setupStep1Sub:'여행의 제목을 정해주세요', setupStep2Sub:'출발일과 귀국일을 선택해주세요',
+    setupTitleLabel:'여행지 / 제목', setupTitlePh:'예: 도쿄 여행 2025 🗼',
+    setupAuthorLabel:'작성자', setupAuthorPh:'예: 홍길동',
+    setupNoteLabel:'여행 메모', setupNotePh:'예: 친구 3명, 자유여행',
+    setupStartLabel:'출발일', setupEndLabel:'귀국일', setupDoneTitle:'여행 준비 완료! 🎉',
+    myTrips:'나의 여행 계획', allTrips:'전체 여행 계획 (관리자)',
+    archiveBtn:'✓ 완료', unarchiveBtn:'↩ 복원', pastTrip:'여행 완료', newTripBtn:'＋ 새 여행 만들기',
+    domHotelName:'숙소명', domHotelAddr:'주소',
+    domHotelNamePh:'예: 롯데호텔 서울', domHotelAddrPh:'예: 서울 중구 을지로 30',
+    checkPh:'항목 이름 입력...', plNamePh:'예: 이치란 라멘 신주쿠점', plDescPh:'예: 예약 필수, 런치 추천',
+    transitDriving:'렌트카', transitTransit:'대중교통', transitWalking:'도보', transitBicycling:'자전거',
+    weatherNote:'7일 이후는 과거 기후 평균이에요',
+    searchLoading:'검색 중…', searchNoResult:'결과가 없어요', infoLoading:'정보 불러오는 중…',
+    openNow:'영업 중', closedNow:'영업 종료',
+    saveToPlaces:'🍴 맛집&장소 저장', deletePlace:'🗑️ 삭제', googleMap:'🗺️ 구글맵',
+    depart:'DEPARTURE 출국편', ret:'RETURN 귀국편',
+    voucherPdfView:'PDF 보기', voucherPdfAdd:'PDF 추가',
+    voucherPdfViewShort:'📄 보기', voucherPdfAddShort:'보기',
+    airlinePlaceholderText:'항공사를 입력해주세요',
+    dateSelectText:'날짜를 선택하세요',
+    editHint:'✏️ 편집', editSpanLabel:'편집', doneSpanLabel:'완료',
+    tripIdLoading:'ID 로드 중…',
+    toastSaved:'저장되었습니다 ✓',
+    toastItemDeleted:'항목을 삭제했어요',
+    toastDoneDeleted:'완료된 항목을 삭제했어요 ✓',
+    toastPdfSaving:'PDF 저장 중…',
+    toastPdfSaved:'PDF가 이 기기에 저장됐어요 📄',
+    toastPdfDeleted:'PDF를 삭제했어요',
+    toastPdfOnly:'PDF 파일만 추가할 수 있어요',
+    toastPdfSize:'20MB 이하 파일만 가능해요',
+    toastAlreadySaved:'이미 맛집&장소에 저장된 장소예요',
+    toastPlaceSaved:'맛집&장소에 저장됐어요',
+    toastPlaceDeleted:'삭제됐어요',
+    toastOnline:'🌐 온라인 연결됨 — 최신 데이터 불러오는 중…',
+    toastOnlineUpdated:'✅ 최신 데이터로 업데이트됐어요',
+    offlineMsgSaved:'📴 오프라인 모드 — 마지막 저장:',
+    offlineMsgNoData:'📴 오프라인 모드 — 저장된 데이터 없음',
+    offlineMsg:'📴 오프라인 모드',
+    offlineMapMsg:'📴 오프라인 모드 — 저장된 지도로 표시 중',
+    confirmArchive:'을 지난 여행으로 이동할까요?',
+    confirmDelete:'\n\n이 여행을 완전히 삭제할까요?\nFirebase에서도 삭제되며 복구할 수 없어요.',
+    alertDeleteFail:'삭제 실패: ',
+    checklistItems: [
+      { id:'passport',     label:'여권',           emoji:'🛂' },
+      { id:'id-card',      label:'신분증',          emoji:'🪪' },
+      { id:'intl-license', label:'국제면허증',       emoji:'🚗' },
+      { id:'toiletry',     label:'세면도구',         emoji:'🧴' },
+      { id:'adapter',      label:'변압기 / 어댑터',  emoji:'🔌' },
+    ],
+    voucherItems: [
+      { id:'eticket-out', label:'비행기 출국 E-Ticket', emoji:'✈️' },
+      { id:'eticket-in',  label:'비행기 귀국 E-Ticket', emoji:'🛬' },
+      { id:'rentcar',     label:'렌트카 바우처',          emoji:'🚗' },
+      { id:'hotel1',      label:'호텔 바우처 1',          emoji:'🏨' },
+      { id:'hotel2',      label:'호텔 바우처 2',          emoji:'🏩' },
+    ],
   },
   ja: {
-    tab0: '✈️ 旅行情報', tab1: '📅 日程', tab2: '🎒 持ち物', tab3: '🗺️ 地図',
-    saveBtn: '📥 オフライン保存', shareBtn: '🔗 共有',
-    addSchedule: '＋ 予定追加',
-    secInfo: '旅行基本情報', secFlight: '航空便', secPlaces: 'グルメ＆スポット', secChecklist: '持ち物リスト', secVoucher: 'バウチャー',
-    typeFood: 'グルメ', typeCafe: 'カフェ', typeSight: '観光', typeHotel: '宿泊', typeShop: 'ショッピング', typeMove: '移動',
-    searchPlaceholder: 'Google マップ検索',
-    schName: '場所または予定の名前',
-    btnAddDay: '＋ Day 追加', btnSave: '保存', btnCancel: 'キャンセル',
-    depart: 'DEPARTURE 出国便', ret: 'RETURN 帰国便',
-    archiveBtn: '✓ 完了',
+    tab0:'✈️ 旅行情報', tab1:'📅 日程', tab2:'🎒 持ち物', tab3:'🗺️ 地図',
+    saveBtn:'📥 オフライン保存', shareBtn:'🔗 共有', addSchedule:'＋ 予定追加',
+    secInfo:'旅行基本情報', secFlight:'航空便', secPlaces:'📍 グルメ＆スポット',
+    secSchedule:'日別スケジュール', secChecklist:'持ち物リスト', secVoucher:'バウチャー／チケット',
+    secDomestic:'🚗 国内旅行', secWeather:'旅行期間の予想天気',
+    typeFood:'グルメ', typeCafe:'カフェ', typeSight:'観光', typeHotel:'宿泊', typeShop:'ショッピング', typeMove:'移動',
+    searchPlaceholder:'Googleマップ検索',
+    schPopupTitle:'予定追加', schName:'場所または予定の名前', schMemo:'簡単なメモを入力してください',
+    schPickBtn:'📍 地図で位置をクリック',
+    labelType:'種類', labelName:'名前', labelTime:'時間', labelMemo:'メモ', labelLocation:'位置',
+    btnAdd:'追加', btnSave:'保存', btnCancel:'キャンセル', btnEdit:'編集', btnClose:'閉じる', btnConfirm:'確認',
+    labelDepart:'出発', labelArrive:'到着',
+    flightAirlinePh:'例: チェジュ航空 7C1601', returnAirlinePh:'例: アシアナ航空 OZ102',
+    ticketEditLabel:'編集', ticketDoneLabel:'完了',
+    setupStep1Sub:'旅行のタイトルを決めてください', setupStep2Sub:'出発日と帰国日を選んでください',
+    setupTitleLabel:'旅先 / タイトル', setupTitlePh:'例: 東京旅行 2025 🗼',
+    setupAuthorLabel:'作成者', setupAuthorPh:'例: 山田太郎',
+    setupNoteLabel:'旅行メモ', setupNotePh:'例: 友達3人、個人旅行',
+    setupStartLabel:'出発日', setupEndLabel:'帰国日', setupDoneTitle:'旅行の準備完了！🎉',
+    myTrips:'マイ旅行プラン', allTrips:'全旅行プラン（管理者）',
+    archiveBtn:'✓ 完了', unarchiveBtn:'↩ 復元', pastTrip:'旅行済み', newTripBtn:'＋ 新しい旅行を作成',
+    domHotelName:'宿泊施設名', domHotelAddr:'住所',
+    domHotelNamePh:'例: 新宿グランドホテル', domHotelAddrPh:'例: 東京都新宿区西新宿',
+    checkPh:'項目名を入力...', plNamePh:'例: 一蘭ラーメン新宿店', plDescPh:'例: 要予約、ランチがおすすめ',
+    transitDriving:'レンタカー', transitTransit:'公共交通機関', transitWalking:'徒歩', transitBicycling:'自転車',
+    weatherNote:'7日以降は過去の気候平均です',
+    searchLoading:'検索中…', searchNoResult:'結果がありません', infoLoading:'情報を取得中…',
+    openNow:'営業中', closedNow:'営業終了',
+    saveToPlaces:'🍴 グルメ＆スポット保存', deletePlace:'🗑️ 削除', googleMap:'🗺️ Googleマップ',
+    depart:'DEPARTURE 出国便', ret:'RETURN 帰国便',
+    voucherPdfView:'PDF 閲覧', voucherPdfAdd:'PDF 追加',
+    voucherPdfViewShort:'📄 表示', voucherPdfAddShort:'表示',
+    airlinePlaceholderText:'航空会社を入力してください',
+    dateSelectText:'日付を選択してください',
+    editHint:'✏️ 編集', editSpanLabel:'編集', doneSpanLabel:'完了',
+    tripIdLoading:'ID 読み込み中…',
+    toastSaved:'保存しました ✓',
+    toastItemDeleted:'項目を削除しました',
+    toastDoneDeleted:'完了した項目を削除しました ✓',
+    toastPdfSaving:'PDF 保存中…',
+    toastPdfSaved:'PDFをこのデバイスに保存しました 📄',
+    toastPdfDeleted:'PDFを削除しました',
+    toastPdfOnly:'PDFファイルのみ追加できます',
+    toastPdfSize:'20MB以下のファイルのみ可能です',
+    toastAlreadySaved:'すでにグルメ＆スポットに保存済みです',
+    toastPlaceSaved:'グルメ＆スポットに保存しました',
+    toastPlaceDeleted:'削除しました',
+    toastOnline:'🌐 オンライン接続 — 最新データを取得中…',
+    toastOnlineUpdated:'✅ 最新データに更新しました',
+    offlineMsgSaved:'📴 オフラインモード — 最終保存:',
+    offlineMsgNoData:'📴 オフラインモード — 保存済みデータなし',
+    offlineMsg:'📴 オフラインモード',
+    offlineMapMsg:'📴 オフラインモード — 保存済みの地図を表示中',
+    confirmArchive:'を過去の旅行に移動しますか？',
+    confirmDelete:'\n\nこの旅行を完全に削除しますか？\nFirebaseからも削除され、復元できません。',
+    alertDeleteFail:'削除失敗: ',
+    checklistItems: [
+      { id:'passport',     label:'パスポート',         emoji:'🛂' },
+      { id:'id-card',      label:'身分証明書',           emoji:'🪪' },
+      { id:'intl-license', label:'国際免許証',           emoji:'🚗' },
+      { id:'toiletry',     label:'洗面用具',             emoji:'🧴' },
+      { id:'adapter',      label:'変圧器 / アダプター',  emoji:'🔌' },
+    ],
+    voucherItems: [
+      { id:'eticket-out', label:'出国 E-Ticket',        emoji:'✈️' },
+      { id:'eticket-in',  label:'帰国 E-Ticket',        emoji:'🛬' },
+      { id:'rentcar',     label:'レンタカーバウチャー',   emoji:'🚗' },
+      { id:'hotel1',      label:'ホテルバウチャー 1',    emoji:'🏨' },
+      { id:'hotel2',      label:'ホテルバウチャー 2',    emoji:'🏩' },
+    ],
   }
 };
 
@@ -2681,20 +2801,16 @@ function applyLang(lang) {
   currentLang = lang;
   localStorage.setItem('appLang', lang);
 
-  // 토글 스위치 업데이트
+  // 토글 스위치
   const jaLabel = document.getElementById('lang-ja-label');
   const koLabel = document.getElementById('lang-ko-label');
   if (jaLabel && koLabel) {
     if (lang === 'ja') {
-      jaLabel.style.background = '#C8102E';
-      jaLabel.style.color = '#fff';
-      koLabel.style.background = 'var(--white)';
-      koLabel.style.color = 'var(--ink3)';
+      jaLabel.style.background = '#C8102E'; jaLabel.style.color = '#fff';
+      koLabel.style.background = 'var(--white)'; koLabel.style.color = 'var(--ink3)';
     } else {
-      jaLabel.style.background = 'var(--white)';
-      jaLabel.style.color = 'var(--ink3)';
-      koLabel.style.background = 'var(--accent2)';
-      koLabel.style.color = '#fff';
+      jaLabel.style.background = 'var(--white)'; jaLabel.style.color = 'var(--ink3)';
+      koLabel.style.background = 'var(--accent2)'; koLabel.style.color = '#fff';
     }
   }
 
@@ -2706,45 +2822,157 @@ function applyLang(lang) {
   const mapTab = document.querySelector('.panel-tab.map-tab-mobile');
   if (mapTab) mapTab.textContent = t.tab3;
 
-  // 버튼
-  const saveBtn = document.getElementById('save-btn');
-  if (saveBtn) saveBtn.textContent = t.saveBtn;
-  const shareBtn = document.getElementById('share-btn');
-  if (shareBtn) shareBtn.textContent = t.shareBtn;
-  const addSchBtn = document.getElementById('add-schedule-btn');
-  if (addSchBtn) addSchBtn.innerHTML = t.addSchedule;
-
-  // 검색 placeholder
-  const searchInput = document.getElementById('map-search-input');
-  if (searchInput) searchInput.placeholder = t.searchPlaceholder;
-  const ovSearchInput = document.getElementById('map-overlay-search-input');
-  if (ovSearchInput) ovSearchInput.placeholder = t.searchPlaceholder;
-
-  // 일정 추가 팝업 타입 버튼
-  const typeOpts = document.querySelectorAll('.type-opt');
-  typeOpts.forEach(opt => {
-    const type = opt.dataset.type;
-    const ico = opt.querySelector('.ico')?.outerHTML || '';
-    const labels = { food: t.typeFood, cafe: t.typeCafe, sight: t.typeSight, hotel: t.typeHotel, shop: t.typeShop, move: t.typeMove };
-    if (labels[type]) opt.innerHTML = `${ico}${labels[type]}`;
-  });
-
-  // 일정 추가 팝업 input placeholder
-  const schNameInput = document.getElementById('sch-name');
-  if (schNameInput) schNameInput.placeholder = t.schName;
+  // 헤더 버튼
+  const saveBtn = document.getElementById('save-btn');    if (saveBtn)   saveBtn.textContent   = t.saveBtn;
+  const shareBtn = document.getElementById('share-btn');  if (shareBtn)  shareBtn.textContent  = t.shareBtn;
+  const addSchBtn = document.getElementById('add-schedule-btn'); if (addSchBtn) addSchBtn.innerHTML = t.addSchedule;
 
   // 섹션 라벨
   document.querySelectorAll('.section-label').forEach(el => {
     const txt = el.textContent.trim();
-    if (txt.includes('여행 기본') || txt.includes('旅行基本')) el.textContent = t.secInfo;
-    if (txt.includes('항공편') || txt.includes('航空')) el.textContent = t.secFlight;
-    if (txt.includes('맛집') || txt.includes('グルメ')) el.textContent = t.secPlaces;
+    if (/여행 기본|旅行基本/.test(txt))      el.textContent = t.secInfo;
+    if (/^항공편$|^航空便$/.test(txt))        el.textContent = t.secFlight;
+    if (/맛집.*장소|グルメ.*スポット/.test(txt)) el.textContent = t.secPlaces;
+    if (/일별 일정|日別スケジュール/.test(txt))  el.textContent = t.secSchedule;
+    if (/여행 준비물|持ち物リスト/.test(txt))    el.textContent = t.secChecklist;
+    if (/바우처|バウチャー/.test(txt))          el.textContent = t.secVoucher;
+    if (/국내 여행|国内旅行/.test(txt))          el.textContent = t.secDomestic;
+  });
+  const weatherTitle = document.getElementById('weather-section-title');
+  if (weatherTitle) weatherTitle.textContent = t.secWeather;
+
+  // 타입 선택기
+  document.querySelectorAll('.type-opt').forEach(opt => {
+    const type = opt.dataset.type;
+    const ico = opt.querySelector('.ico')?.outerHTML || '';
+    const labels = { food:t.typeFood, cafe:t.typeCafe, sight:t.typeSight, hotel:t.typeHotel, shop:t.typeShop, move:t.typeMove };
+    if (labels[type]) opt.innerHTML = `${ico}${labels[type]}`;
   });
 
-  // 항공편 헤더 태그
+  // 검색 placeholder
+  ['map-search-input','map-overlay-search-input'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.placeholder = t.searchPlaceholder;
+  });
+
+  // 일정 팝업
+  const schTitle = document.querySelector('#schedule-overlay .popup-title');
+  if (schTitle) schTitle.textContent = t.schPopupTitle;
+  const schName = document.getElementById('sch-name'); if (schName) schName.placeholder = t.schName;
+  const schDesc = document.getElementById('sch-desc'); if (schDesc) schDesc.placeholder = t.schMemo;
+  const schPick = document.getElementById('sch-pick-btn');
+  if (schPick && !/선택됨|選択/.test(schPick.textContent)) schPick.textContent = t.schPickBtn;
+  const schCancel = document.querySelector('#schedule-overlay .btn-cancel'); if (schCancel) schCancel.textContent = t.btnCancel;
+  const schSave   = document.querySelector('#schedule-overlay .btn-save');
+  if (schSave && !/편집|編集/.test(schSave.textContent)) schSave.textContent = t.btnAdd;
+
+  // 팝업 필드 라벨
+  document.querySelectorAll('.popup-field > label').forEach(el => {
+    const txt = el.textContent.trim();
+    if (/^유형$|^種類$/.test(txt))   el.textContent = t.labelType;
+    if (/^이름$|^名前$/.test(txt))   el.textContent = t.labelName;
+    if (/^시간$|^時間$/.test(txt))   el.textContent = t.labelTime;
+    if (/^메모$|^メモ$/.test(txt))   el.textContent = t.labelMemo;
+    if (/^위치$|^位置$/.test(txt))   el.textContent = t.labelLocation;
+  });
+
+  // 항공편 티켓
+  document.querySelectorAll('.ticket-time-label').forEach((el, i) => {
+    el.textContent = i % 2 === 0 ? t.labelDepart : t.labelArrive;
+  });
+  document.querySelectorAll('.ticket-field-lbl').forEach((el, i) => {
+    el.textContent = i % 2 === 0 ? t.labelDepart : t.labelArrive;
+  });
   document.querySelectorAll('.ticket-header-tag').forEach(el => {
-    if (el.textContent.includes('DEPARTURE') || el.textContent.includes('출국')) el.textContent = t.depart;
-    if (el.textContent.includes('RETURN') || el.textContent.includes('귀국')) el.textContent = t.ret;
+    if (/DEPARTURE|출국/.test(el.textContent)) el.textContent = t.depart;
+    if (/RETURN|귀국/.test(el.textContent))    el.textContent = t.ret;
+  });
+  const fa = document.getElementById('flight-airline');  if (fa) fa.placeholder = t.flightAirlinePh;
+  const ra = document.getElementById('return-airline');  if (ra) ra.placeholder = t.returnAirlinePh;
+
+  // 여행 설정 위자드
+  const sp1 = document.querySelector('#setup-page-1 .setup-page-sub'); if (sp1) sp1.textContent = t.setupStep1Sub;
+  const sp2 = document.querySelector('#setup-page-2 .setup-page-sub'); if (sp2) sp2.textContent = t.setupStep2Sub;
+  const sp3 = document.querySelector('#setup-page-3 .setup-page-title'); if (sp3) sp3.textContent = t.setupDoneTitle;
+  const setupTitle = document.getElementById('setup-title'); if (setupTitle) setupTitle.placeholder = t.setupTitlePh;
+  const setupAuthor = document.getElementById('setup-author'); if (setupAuthor) setupAuthor.placeholder = t.setupAuthorPh;
+  const setupNote = document.getElementById('setup-note'); if (setupNote) setupNote.placeholder = t.setupNotePh;
+  document.querySelectorAll('.popup-field > label, .setup-field > label').forEach(el => {
+    const txt = el.textContent.trim();
+    if (/여행지.*제목|旅先/.test(txt))      el.textContent = t.setupTitleLabel;
+    if (/^작성자$|^作成者$/.test(txt))      el.textContent = t.setupAuthorLabel;
+    if (/여행 메모|旅行メモ/.test(txt))     el.textContent = t.setupNoteLabel;
+    if (/^출발일$|^出発日$/.test(txt))      el.textContent = t.setupStartLabel;
+    if (/^귀국일$|^帰国日$/.test(txt))      el.textContent = t.setupEndLabel;
+  });
+
+  // 여행 목록
+  const tlSub = document.getElementById('tl-sub-text');
+  if (tlSub) tlSub.textContent = (typeof isAdminMode !== 'undefined' && isAdminMode) ? t.allTrips : t.myTrips;
+  document.querySelectorAll('.tl-archive-btn').forEach(btn => {
+    if (/완료|完了/.test(btn.textContent) && !/↩/.test(btn.textContent)) btn.textContent = t.archiveBtn;
+    if (/복원|復元/.test(btn.textContent)) btn.textContent = t.unarchiveBtn;
+  });
+  document.querySelectorAll('.tl-card-dday.past').forEach(el => { el.textContent = t.pastTrip; });
+  const newTripBtn = document.getElementById('new-trip-btn'); if (newTripBtn) newTripBtn.textContent = t.newTripBtn;
+
+  // 국내 여행
+  const dhn = document.getElementById('dom-hotel-name'); if (dhn) dhn.placeholder = t.domHotelNamePh;
+  const dha = document.getElementById('dom-hotel-addr'); if (dha) dha.placeholder = t.domHotelAddrPh;
+  document.querySelectorAll('label').forEach(el => {
+    const txt = el.textContent.trim();
+    if (/^숙소명$|^宿泊施設名$/.test(txt)) el.textContent = t.domHotelName;
+    if (/^주소$|^住所$/.test(txt))          el.textContent = t.domHotelAddr;
+  });
+
+  // 장소 팝업
+  const plName = document.getElementById('pl-name'); if (plName) plName.placeholder = t.plNamePh;
+  const plDesc = document.getElementById('pl-desc'); if (plDesc) plDesc.placeholder = t.plDescPh;
+
+  // 항공사 기본 텍스트
+  document.querySelectorAll('[data-i18n-key="airlinePlaceholderText"]').forEach(el => {
+    if (!el.textContent.trim() || /항공사|航空会社/.test(el.textContent)) el.textContent = t.airlinePlaceholderText;
+  });
+  // 날짜 선택 텍스트
+  const durationText = document.getElementById('duration-text');
+  if (durationText && /날짜를|日付を/.test(durationText.textContent)) durationText.textContent = t.dateSelectText;
+  // 편집 힌트
+  document.querySelectorAll('[data-i18n-key="editHint"]').forEach(el => { el.textContent = t.editHint; });
+  // 편집 버튼 span
+  document.querySelectorAll('.edit-span-label').forEach(el => { el.textContent = t.editSpanLabel; });
+  // trip-id 로딩 텍스트
+  const tripIdBadge = document.getElementById('trip-id-badge');
+  if (tripIdBadge && /로드|読み込/.test(tripIdBadge.textContent)) tripIdBadge.textContent = t.tripIdLoading;
+
+  // 체크리스트 항목 라벨 갱신
+  if (t.checklistItems) {
+    t.checklistItems.forEach(item => {
+      const el = document.querySelector(`.check-item-label[data-id="${item.id}"], [data-check-id="${item.id}"] .check-label`);
+      if (el) el.textContent = item.label;
+    });
+    // 렌더된 체크리스트 전체 재렌더 (CHECKLIST_ITEMS 라벨 교체 후)
+    CHECKLIST_ITEMS.forEach((item, i) => {
+      if (t.checklistItems[i]) item.label = t.checklistItems[i].label;
+    });
+  }
+  // 바우처 항목 라벨 갱신
+  if (t.voucherItems) {
+    VOUCHER_ITEMS.forEach((item, i) => {
+      if (t.voucherItems[i]) item.label = t.voucherItems[i].label;
+    });
+    // 렌더된 바우처 카드 라벨 갱신
+    document.querySelectorAll('.voucher-card .vc-label').forEach(el => {
+      const card = el.closest('.voucher-card');
+      const id = card?.dataset?.voucherId;
+      if (!id) return;
+      const match = t.voucherItems.find(v => v.id === id);
+      if (match) el.textContent = match.label;
+    });
+  }
+
+  // 모바일 항공편 탭 항공사 텍스트
+  ['depart-airline-display','return-airline-display'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && /항공사를|航空会社を/.test(el.textContent)) el.textContent = t.airlinePlaceholderText;
   });
 }
 
@@ -2752,7 +2980,6 @@ function toggleLang() {
   applyLang(currentLang === 'ko' ? 'ja' : 'ko');
 }
 
-// 초기 언어 적용 (저장된 언어가 있을 때)
 document.addEventListener('DOMContentLoaded', () => {
   if (currentLang === 'ja') applyLang('ja');
 });
@@ -2860,7 +3087,7 @@ async function showTripListScreen() {
       if (!isAdminMode) {
         card.querySelector('.tl-archive-btn').addEventListener('click', (e) => {
           e.stopPropagation();
-          if (!confirm(`"${title}"을 지난 여행으로 이동할까요?`)) return;
+          if (!confirm(`"${title}"$(LANG_MAP[currentLang]?.confirmArchive || LANG_MAP.ko.confirmArchive)`)) return;
           archiveTrip(tripId);
           card.style.transition = 'opacity .3s'; card.style.opacity = '0';
           setTimeout(() => showTripListScreen(), 320);
@@ -2871,7 +3098,7 @@ async function showTripListScreen() {
       if (isAdminMode) {
         card.querySelector('.tl-card-del').addEventListener('click', async (e) => {
           e.stopPropagation();
-          if (!confirm(`"${title}"\n\n이 여행을 완전히 삭제할까요?\nFirebase에서도 삭제되며 복구할 수 없어요.`)) return;
+          if (!confirm(`"${title}"(LANG_MAP[currentLang]?.confirmDelete || LANG_MAP.ko.confirmDelete)`)) return;
           try {
             await window.fbDeleteTrip(tripId);
             removeTripFromList(tripId);
@@ -2880,7 +3107,7 @@ async function showTripListScreen() {
             card.style.transform = 'translateX(20px)';
             setTimeout(() => card.remove(), 300);
           } catch(err) {
-            alert('삭제 실패: ' + err.message);
+            alert((LANG_MAP[currentLang]?.alertDeleteFail || LANG_MAP.ko.alertDeleteFail) + err.message);
           }
         });
       }
@@ -3206,20 +3433,25 @@ function renderChecklist() {
   const group = document.getElementById('check-group');
   if (!group) return;
   group.innerHTML = '';
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
   const visibleDefaults = CHECKLIST_ITEMS.filter(item => !deletedCheckIds.has(item.id));
   [...visibleDefaults, ...customCheckItems].forEach(item => {
     const isCustom = customCheckItems.includes(item);
     const checked  = !!checklistData[item.id];
+    // 다국어 라벨 적용
+    const langItem = t.checklistItems?.find(ci => ci.id === item.id);
+    const displayLabel = langItem ? langItem.label : item.label;
     const div = document.createElement('div');
     div.className = 'check-item' + (checked ? ' checked' : '');
+    div.dataset.checkId = item.id;
     div.innerHTML = `
       <div class="check-box">${checked ? '✓' : ''}</div>
       <div class="check-item-body">
         <span class="check-emoji">${item.emoji}</span>
-        <span class="check-label">${item.label}</span>
+        <span class="check-label">${displayLabel}</span>
       </div>
       <div class="check-del-sep"></div>
-      <button class="check-del-btn" title="삭제">✕</button>`;
+      <button class="check-del-btn" title="${t.btnDelete || '삭제'}">✕</button>`;
     div.querySelector('.check-box').addEventListener('click', () => toggleCheck(item.id));
     div.querySelector('.check-item-body').addEventListener('click', () => toggleCheck(item.id));
     div.querySelector('.check-del-btn').addEventListener('click', (e) => {
@@ -3234,6 +3466,11 @@ function renderVouchers() {
   const group = document.getElementById('voucher-group');
   if (!group) return;
   group.innerHTML = '';
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  const pdfView = t.voucherPdfView || 'PDF 보기';
+  const pdfAdd  = t.voucherPdfAdd  || 'PDF 추가';
+  const pdfViewShort = t.voucherPdfViewShort || '📄 보기';
+  const pdfAddShort  = t.voucherPdfAddShort  || '보기';
   const visibleDefaults = VOUCHER_ITEMS.filter(item => !deletedVoucherIds.has(item.id));
   [...visibleDefaults, ...customVoucherItems].forEach(item => {
     const isCustom = customVoucherItems.includes(item);
@@ -3241,17 +3478,18 @@ function renderVouchers() {
     const hasPdf   = !!pdfData[item.id];
     const div = document.createElement('div');
     div.className = 'check-item' + (checked ? ' checked' : '');
+    div.dataset.voucherId = item.id;
     div.innerHTML = `
       <div class="check-box">${checked ? '✓' : ''}</div>
       <div class="check-item-body">
         <span class="check-emoji">${item.emoji}</span>
         <span class="check-label">${item.label}</span>
       </div>
-      <button class="voucher-view-btn ${hasPdf ? 'has-pdf' : ''}" title="${hasPdf ? 'PDF 보기' : 'PDF 추가'}">
-        ${hasPdf ? '📄 보기' : '보기'}
+      <button class="voucher-view-btn ${hasPdf ? 'has-pdf' : ''}" title="${hasPdf ? pdfView : pdfAdd}">
+        ${hasPdf ? pdfViewShort : pdfAddShort}
       </button>
       <div class="check-del-sep"></div>
-      <button class="check-del-btn" title="삭제">✕</button>`;
+      <button class="check-del-btn" title="${t.btnDelete || '삭제'}">✕</button>`;
     div.querySelector('.check-box').addEventListener('click', () => toggleVoucher(item.id));
     div.querySelector('.check-item-body').addEventListener('click', () => toggleVoucher(item.id));
     const viewBtn = div.querySelector('.voucher-view-btn');
@@ -3384,9 +3622,9 @@ function closePdfPopup(e) {
 function onPdfFileSelected(input) {
   if (!input.files.length || !currentPdfItemId) return;
   const file = input.files[0];
-  if (file.type !== 'application/pdf') { showToast('PDF 파일만 추가할 수 있어요'); return; }
-  if (file.size > 20 * 1024 * 1024) { showToast('20MB 이하 파일만 가능해요'); return; }
-  showToast('PDF 저장 중…');
+  if (file.type !== 'application/pdf') { showToast((LANG_MAP[currentLang]?.toastPdfOnly || LANG_MAP.ko.toastPdfOnly)); return; }
+  if (file.size > 20 * 1024 * 1024) { showToast((LANG_MAP[currentLang]?.toastPdfSize || LANG_MAP.ko.toastPdfSize)); return; }
+  showToast((LANG_MAP[currentLang]?.toastPdfSaving || LANG_MAP.ko.toastPdfSaving));
   const reader = new FileReader();
   reader.onload = async (ev) => {
     const b64 = ev.target.result;
@@ -3398,7 +3636,7 @@ function onPdfFileSelected(input) {
     miniWrap.innerHTML = '';
     renderPdfToWrap(b64, miniWrap, 1.2);
     renderVouchers();
-    showToast('PDF가 이 기기에 저장됐어요 📄');
+    showToast((LANG_MAP[currentLang]?.toastPdfSaved || LANG_MAP.ko.toastPdfSaved));
   };
   reader.readAsDataURL(file);
 }
@@ -3412,7 +3650,7 @@ async function deletePdfFile() {
   if (miniWrap) miniWrap.innerHTML = '';
   document.getElementById('pdf-file-input').value = '';
   renderVouchers();
-  showToast('PDF를 삭제했어요');
+  showToast((LANG_MAP[currentLang]?.toastPdfDeleted || LANG_MAP.ko.toastPdfDeleted));
 }
 
 function toggleCheck(id) {
@@ -3510,7 +3748,7 @@ function deleteCheckItem(id, type, isCustom) {
     renderVouchers();
   }
   autoSave();
-  showToast('항목을 삭제했어요');
+  showToast((LANG_MAP[currentLang]?.toastItemDeleted || LANG_MAP.ko.toastItemDeleted));
 }
 
 function deleteCustomCheckItem(id, type) {
@@ -3536,7 +3774,7 @@ function clearCheckedItems(type) {
     renderVouchers();
   }
   autoSave();
-  showToast('완료된 항목을 삭제했어요 ✓');
+  showToast((LANG_MAP[currentLang]?.toastDoneDeleted || LANG_MAP.ko.toastDoneDeleted));
 }
 
 
@@ -3600,7 +3838,7 @@ async function saveAll() {
   const payload = buildPayload();
   await window.fbSaveTrip(TRIP_ID, payload);
   window.offlineSave(TRIP_ID, payload).catch(() => {});
-  showToast('저장되었습니다 ✓');
+  showToast((LANG_MAP[currentLang]?.toastSaved || LANG_MAP.ko.toastSaved));
   updateTripSummary();
 }
 
@@ -3680,14 +3918,14 @@ async function loadFromLocalSnapshot() {
       applyTripData(snap.data);
       restoreUIState();
       const t = new Date(snap.savedAt).toLocaleString('ko-KR', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-      showOfflineBanner(`📴 오프라인 모드 — 마지막 저장: ${t}`);
+      showOfflineBanner((LANG_MAP[currentLang]?.offlineMsgSaved || LANG_MAP.ko.offlineMsgSaved) + ' ' + t);
     } else {
-      showOfflineBanner('📴 오프라인 모드 — 저장된 데이터 없음');
+      showOfflineBanner((LANG_MAP[currentLang]?.offlineMsgNoData || LANG_MAP.ko.offlineMsgNoData));
     }
     // 오프라인 지도 이미지 표시
     await showOfflineMap();
   } catch(e) {
-    showOfflineBanner('📴 오프라인 모드');
+    showOfflineBanner((LANG_MAP[currentLang]?.offlineMsg || LANG_MAP.ko.offlineMsg));
     await showOfflineMap();
   }
 }
@@ -3723,19 +3961,19 @@ window.addEventListener('online', async () => {
   document.getElementById('offline-map-layer').style.display = 'none';
   document.getElementById('map').style.display = '';
   if (window.google && map) google.maps.event.trigger(map, 'resize');
-  showToast('🌐 온라인 연결됨 — 최신 데이터 불러오는 중…');
+  showToast((LANG_MAP[currentLang]?.toastOnline || LANG_MAP.ko.toastOnline));
   try {
     const data = await window.fbGetTrip(TRIP_ID);
     if (data) {
       applyTripData(data);
       await window.offlineSave(TRIP_ID, data);
-      showToast('✅ 최신 데이터로 업데이트됐어요');
+      showToast((LANG_MAP[currentLang]?.toastOnlineUpdated || LANG_MAP.ko.toastOnlineUpdated));
     }
   } catch(e) { console.warn('온라인 복귀 로드 실패:', e); }
 });
 
 window.addEventListener('offline', async () => {
-  showOfflineBanner('📴 오프라인 모드 — 저장된 지도로 표시 중');
+  showOfflineBanner((LANG_MAP[currentLang]?.offlineMapMsg || LANG_MAP.ko.offlineMapMsg));
   await showOfflineMap();
 });
 document.getElementById('save-btn').onclick = async () => {
@@ -5763,14 +6001,14 @@ function highlightPlaceMarker(idx) {
 function savePoiToPlaces(name, lat, lng, img, placeId) {
   if (!name || !lat || !lng) return;
   if (placesData.find(p => p.name === name)) {
-    showToast('이미 맛집&장소에 저장된 장소예요');
+    showToast((LANG_MAP[currentLang]?.toastAlreadySaved || LANG_MAP.ko.toastAlreadySaved));
     return;
   }
   placesData.push({ name, lat, lng, img: img || '', desc: '', placeId: placeId || '' });
   autoSave();
   renderPlaceChips();
   renderMapMarkers();
-  showToast(`🍴 "${name}" 맛집&장소에 저장됐어요`);
+  showToast(`🍴 "${name}" ` + (LANG_MAP[currentLang]?.toastPlaceSaved || LANG_MAP.ko.toastPlaceSaved));
 }
 
 function showPlacePopup(place) {
@@ -5854,7 +6092,7 @@ function deletePlaceChip(name) {
   renderPlaceChips();
   renderMapMarkers();
   closeMapPlaceCard();
-  showToast(`"${name}" 삭제됐어요`);
+  showToast(`"${name}" ` + (LANG_MAP[currentLang]?.toastPlaceDeleted || LANG_MAP.ko.toastPlaceDeleted));
 }
 
 function addPlaceToDay(dayNum, name, lat, lng) {
@@ -6890,7 +7128,7 @@ function switchFlightSection(domestic) {
 
   if (domestic) {
     section.innerHTML = `
-      <div class="section-label">🚗 국내 여행</div>
+      <div class="section-label" data-i18n="secDomestic">🚗 국내 여행</div>
       <div class="domestic-card">
         <div class="domestic-row-h">
           <span class="lbl">출발</span>
@@ -6941,13 +7179,13 @@ function switchFlightSection(domestic) {
 
   } else {
     section.innerHTML = `
-      <div class="section-label">항공편</div>
+      <div class="section-label" data-i18n="secFlight">항공편</div>
 
       <div class="ticket-card" id="depart-ticket">
         <div class="ticket-header">
           <div class="ticket-header-left">
             <span class="ticket-header-tag">DEPARTURE · 출국편</span>
-            <div class="ticket-header-airline" id="depart-airline-display">항공사를 입력해주세요</div>
+            <div class="ticket-header-airline" id="depart-airline-display" data-i18n-key="airlinePlaceholderText">항공사를 입력해주세요</div>
           </div>
           <div class="ticket-header-icon">✈️</div>
         </div>
@@ -6973,7 +7211,7 @@ function switchFlightSection(domestic) {
               <span class="ticket-time-value" id="depart-time-display">--:--</span>
             </div>
             <div class="ticket-time-item center">
-              <span class="ticket-time-label">항공편</span>
+              <span class="ticket-time-label" data-i18n="secFlight">항공편</span>
               <span class="ticket-time-value" id="depart-flightno-display" style="font-size:11px;">-</span>
             </div>
             <div class="ticket-time-item" style="align-items:flex-end;">
@@ -7009,7 +7247,7 @@ function switchFlightSection(domestic) {
         <div class="ticket-header" style="background:#2c2c2a;">
           <div class="ticket-header-left">
             <span class="ticket-header-tag">RETURN · 귀국편</span>
-            <div class="ticket-header-airline" id="return-airline-display">항공사를 입력해주세요</div>
+            <div class="ticket-header-airline" id="return-airline-display" data-i18n-key="airlinePlaceholderText">항공사를 입력해주세요</div>
           </div>
           <div class="ticket-header-icon">🛬</div>
         </div>
@@ -7035,7 +7273,7 @@ function switchFlightSection(domestic) {
               <span class="ticket-time-value" id="return-time-display">--:--</span>
             </div>
             <div class="ticket-time-item center">
-              <span class="ticket-time-label">항공편</span>
+              <span class="ticket-time-label" data-i18n="secFlight">항공편</span>
               <span class="ticket-time-value" id="return-flightno-display" style="font-size:11px;">-</span>
             </div>
             <div class="ticket-time-item" style="align-items:flex-end;">
@@ -7403,7 +7641,7 @@ document.addEventListener('keydown', (e) => {
   </div>
   <div id="map-overlay-tabs">
     <button class="ov-tab" onclick="closeMapOverlay(0)"><span class="ov-ico">✈️</span>여행 정보</button>
-    <button class="ov-tab" onclick="closeMapOverlay(1)"><span class="ov-ico">📅</span>일별 일정</button>
+    <button class="ov-tab" onclick="closeMapOverlay(1)"><span class="ov-ico">📅</span data-i18n="secSchedule">일별 일정</button>
     <button class="ov-tab" onclick="closeMapOverlay(2)"><span class="ov-ico">🎒</span>챙겨야할 것</button>
     <button class="ov-tab active" onclick="void(0)"><span class="ov-ico">🗺️</span>지도</button>
   </div>
