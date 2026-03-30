@@ -1223,10 +1223,12 @@ html, body {
 /* ── ＋💰 버튼 (카테고리 카드 우상단) ── */
 .budget-cat-add-btn {
   position: absolute; top: 5px; right: 5px;
-  width: 20px; height: 20px; border-radius: 5px;
+  width: auto; height: 20px; border-radius: 5px;
   border: none; background: none; cursor: pointer;
-  font-size: 12px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; display: flex; align-items: center; justify-content: center;
   color: var(--ink3); transition: all .12s; opacity: 0; line-height: 1;
+  white-space: nowrap; flex-direction: row; padding: 0 3px;
+  writing-mode: horizontal-tb;
 }
 #budget-cat-grid .budget-cat-item:hover .budget-cat-add-btn { opacity: 1; }
 .budget-cat-add-btn:hover { background: var(--sand); color: var(--ink); }
@@ -5200,7 +5202,7 @@ function calcBudget() {
 
     // ＋💰 버튼 (숙박 제외)
     const addBtnHtml = hasExpense
-      ? `<button class="budget-cat-add-btn" onclick="openExpensePopup('${key}')" title="지출 추가">＋💰</button>`
+      ? `<button class="budget-cat-add-btn" onclick="openExpensePopup('${key}')" title="지출 추가"><span style="white-space:nowrap;writing-mode:horizontal-tb;display:inline-flex;align-items:center;gap:1px;font-size:11px;">＋💰</span></button>`
       : '';
 
     // 스택 바 HTML 생성
