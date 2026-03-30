@@ -1213,11 +1213,79 @@ html, body {
 #budget-cat-grid .budget-cat-item {
   background: var(--stone); border-radius: 7px;
   padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;
+  position: relative;
 }
 #budget-cat-grid .bci-label { font-size: 10px; color: var(--ink3); }
 #budget-cat-grid .bci-amount { font-size: 12px; font-weight: 600; color: var(--ink); }
-#budget-cat-grid .bci-bar-wrap { height: 3px; background: var(--sand); border-radius: 2px; overflow: hidden; margin-top: 2px; }
-#budget-cat-grid .bci-bar { height: 100%; border-radius: 2px; }
+#budget-cat-grid .bci-bar-wrap { height: 6px; background: var(--sand); border-radius: 3px; overflow: visible; margin-top: 4px; position: relative; }
+#budget-cat-grid .bci-bar { height: 100%; border-radius: 3px; }
+
+/* ── ＋💰 버튼 (카테고리 카드 우상단) ── */
+.budget-cat-add-btn {
+  position: absolute; top: 5px; right: 5px;
+  width: 20px; height: 20px; border-radius: 5px;
+  border: none; background: none; cursor: pointer;
+  font-size: 12px; display: flex; align-items: center; justify-content: center;
+  color: var(--ink3); transition: all .12s; opacity: 0; line-height: 1;
+}
+#budget-cat-grid .budget-cat-item:hover .budget-cat-add-btn { opacity: 1; }
+.budget-cat-add-btn:hover { background: var(--sand); color: var(--ink); }
+
+/* ── 지출 항목 스택 바 ── */
+.bci-stack-bar {
+  position: relative; height: 6px; background: var(--sand); border-radius: 3px;
+  overflow: visible; margin-top: 4px;
+}
+.bci-stack-seg {
+  position: absolute; top: 0; height: 100%;
+  cursor: pointer; transition: filter .15s;
+}
+.bci-stack-seg:first-child { border-radius: 3px 0 0 3px; }
+.bci-stack-seg:last-child  { border-radius: 0 3px 3px 0; }
+.bci-stack-seg:only-child  { border-radius: 3px; }
+.bci-stack-seg:hover { filter: brightness(1.2); }
+
+/* ── 툴팁 말풍선 ── */
+.bci-tooltip {
+  position: fixed; z-index: 9999;
+  background: #1A1A18; color: #fff;
+  font-size: 11px; font-weight: 500; line-height: 1.5;
+  padding: 6px 10px; border-radius: 8px;
+  pointer-events: none; white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  transform: translateX(-50%) translateY(-100%);
+  margin-top: -10px;
+}
+.bci-tooltip::after {
+  content: ''; position: absolute; top: 100%; left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1A1A18;
+}
+
+/* ── 지출 목록 아이템 ── */
+.expense-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 8px;
+  background: var(--stone);
+}
+.expense-item-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.expense-item-name {
+  flex: 1; font-size: 12px; color: var(--ink2); font-weight: 500;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.expense-item-amount { font-size: 12px; font-weight: 700; color: var(--ink); flex-shrink: 0; }
+.expense-item-del {
+  width: 20px; height: 20px; border-radius: 5px; border: none;
+  background: none; cursor: pointer; color: var(--ink3); font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .12s; flex-shrink: 0;
+}
+.expense-item-del:hover { background: var(--red); color: #fff; }
+
+
 
 /* ── 숙소 추가 필드 (일정 팝업 안) ── */
 #hotel-extra-fields {
@@ -2695,6 +2763,70 @@ html, body {
   </div>
 </div>
 
+<!-- 지출 입력 팝업 -->
+<div class="overlay" id="expense-overlay" onclick="closeIfBg(event,'expense-overlay')">
+  <div class="popup" style="width:400px;">
+    <div class="popup-title" id="expense-popup-title">식비 지출 추가</div>
+
+    <!-- 지출 입력 폼 -->
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--ink3);font-weight:500;margin-bottom:4px;" id="expense-name-label">항목명</div>
+          <input type="text" id="expense-name-input" placeholder="예: 라멘"
+            style="width:100%;border:1.5px solid var(--sand);border-radius:8px;padding:8px 12px;
+                   font-family:inherit;font-size:13px;background:var(--cream);outline:none;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--sand)'"
+            onkeydown="if(event.key==='Enter')addExpenseItem()" />
+        </div>
+        <div style="width:120px;flex-shrink:0;">
+          <div style="font-size:11px;color:var(--ink3);font-weight:500;margin-bottom:4px;" id="expense-amount-label">금액</div>
+          <div style="position:relative;">
+            <input type="number" id="expense-amount-input" placeholder="0" min="0"
+              style="width:100%;border:1.5px solid var(--sand);border-radius:8px;padding:8px 10px;
+                     font-family:inherit;font-size:13px;background:var(--cream);outline:none;"
+              onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--sand)'"
+              oninput="updateExpenseKrwPreview()"
+              onkeydown="if(event.key==='Enter')addExpenseItem()" />
+          </div>
+        </div>
+        <div style="width:68px;flex-shrink:0;">
+          <div style="font-size:11px;color:var(--ink3);font-weight:500;margin-bottom:4px;" id="expense-unit-label">단위</div>
+          <select id="expense-unit-select"
+            style="width:100%;border:1.5px solid var(--sand);border-radius:8px;padding:8px 6px;
+                   font-family:inherit;font-size:12px;background:var(--cream);outline:none;cursor:pointer;"
+            onchange="updateExpenseKrwPreview()">
+            <option value="KRW">₩</option>
+            <option value="foreign" id="expense-unit-foreign">¥</option>
+          </select>
+        </div>
+      </div>
+      <!-- 환율 변환 미리보기 -->
+      <div id="expense-krw-preview" style="font-size:11px;color:var(--ink3);text-align:right;min-height:14px;"></div>
+      <button onclick="addExpenseItem()"
+        style="width:100%;padding:9px;border-radius:9px;border:none;background:var(--accent);
+               color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .13s;"
+        onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        <span id="expense-add-btn-text">＋ 추가</span>
+      </button>
+    </div>
+
+    <!-- 지출 목록 -->
+    <div id="expense-list-wrap" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
+
+    <!-- 합계 -->
+    <div id="expense-total-row" style="display:none;margin-top:10px;padding-top:10px;
+         border-top:1.5px solid var(--sand);justify-content:space-between;align-items:center;">
+      <span style="font-size:12px;color:var(--ink3);" id="expense-total-label">합계</span>
+      <span style="font-size:15px;font-weight:700;color:var(--ink);" id="expense-total-display">₩0</span>
+    </div>
+
+    <div class="popup-actions" style="margin-top:12px;">
+      <button class="btn-cancel" onclick="closeOverlay('expense-overlay')">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 토스트 -->
 <div id="toast"></div>
 
@@ -2706,6 +2838,8 @@ let routeMode = false;
 let scheduleData  = {};
 let placesData    = [];
 let checklistData = {};   // { "passport": true, "license": false, ... }
+// 지출 데이터: { food: [{id, name, amountKrw, color}, ...], move: [...], ... }
+let expenseData   = { food:[], cafe:[], sight:[], move:[], shop:[] };
 let voucherData   = {};   // { "flight-out": "base64...", ... }
 let customCheckItems = []; // [{ id, label, emoji }, ...]
 let customVoucherItems = [];
@@ -2882,6 +3016,10 @@ const LANG_MAP = {
     hotelPriceHint:'(체크인에만 입력 — 예산에 자동 반영)',
     budgetRateLoading:'환율 불러오는 중…',
     budgetRateError:'환율을 불러올 수 없어요',
+    budgetExpenseAdd:'지출 추가',
+    expenseNameLabel:'항목명', expenseAmountLabel:'금액', expenseUnitLabel:'단위',
+    expenseAddBtn:'＋ 추가', expenseTotalLabel:'합계',
+    expenseEmpty:'아직 지출 내역이 없어요',
     toastSaved:'저장되었습니다 ✓',
     toastItemDeleted:'항목을 삭제했어요',
     toastDoneDeleted:'완료된 항목을 삭제했어요 ✓',
@@ -2985,6 +3123,10 @@ const LANG_MAP = {
     hotelPriceHint:'(チェックイン時のみ入力 — 予算に自動反映)',
     budgetRateLoading:'為替レート取得中…',
     budgetRateError:'為替レートを取得できません',
+    budgetExpenseAdd:'支出追加',
+    expenseNameLabel:'項目名', expenseAmountLabel:'金額', expenseUnitLabel:'単位',
+    expenseAddBtn:'＋ 追加', expenseTotalLabel:'合計',
+    expenseEmpty:'まだ支出履歴がありません',
     toastSaved:'保存しました ✓',
     toastItemDeleted:'項目を削除しました',
     toastDoneDeleted:'完了した項目を削除しました ✓',
@@ -3292,6 +3434,16 @@ function applyLang(lang) {
   if (secBudgetEl && t.secBudget) secBudgetEl.textContent = t.secBudget;
   // 카테고리 바 재렌더
   calcBudget();
+  // 지출 팝업이 열려있으면 라벨 갱신
+  if (document.getElementById('expense-overlay')?.classList.contains('show')) {
+    const t2 = LANG_MAP[lang] || LANG_MAP.ko;
+    _bset('expense-name-label',   'expenseNameLabel');
+    _bset('expense-amount-label', 'expenseAmountLabel');
+    _bset('expense-unit-label',   'expenseUnitLabel');
+    _bset('expense-add-btn-text', 'expenseAddBtn');
+    _bset('expense-total-label',  'expenseTotalLabel');
+    renderExpenseList();
+  }
 }
 
 function toggleLang() {
@@ -3739,6 +3891,13 @@ function applyTripData(data) {
     const bs = document.getElementById('budget-currency-select');
     if (bs) bs.value = data.budgetCurrency;
   }
+  if (data.expenseData) {
+    // 기존 카테고리 구조 유지하며 병합
+    const cats = ['food','cafe','sight','move','shop'];
+    cats.forEach(k => {
+      if (data.expenseData[k]) expenseData[k] = data.expenseData[k];
+    });
+  }
   calcBudget();
   fetchExchangeRate();
   // 초기 로드: 모든 일정 핀을 한눈에 보이게 fitBounds
@@ -4165,6 +4324,7 @@ function buildPayload() {
     mapZoom:       map ? map.getZoom() : 12,
     budgetTotal:   parseFloat(document.getElementById('budget-total-input')?.value) || 0,
     budgetCurrency: document.getElementById('budget-currency-select')?.value || 'JPY',
+    expenseData,
     updatedAt:     new Date().toISOString(),
   };
 }
@@ -4946,49 +5106,56 @@ function calcFx() {
 
 // ── 핵심: 예산 집계 ──────────────────────────────────────────
 // 숙박: 같은 숙소명의 체크인 카드 가격만 합산 (체크아웃 중복 방지)
+// ── 카테고리별 세부 항목 색상 팔레트 ─────────────────────────
+// 각 카테고리마다 항목 순서대로 색상을 순환 배정
+const CAT_PALETTES = {
+  food:  ['#E8430A','#F97316','#FBBF24','#84CC16','#06B6D4','#8B5CF6','#EC4899','#F43F5E'],
+  cafe:  ['#AD6B2F','#D97706','#F59E0B','#CA8A04','#A16207','#78350F','#92400E','#B45309'],
+  sight: ['#2E7D32','#16A34A','#15803D','#166534','#4ADE80','#22C55E','#86EFAC','#1D6A5A'],
+  move:  ['#888780','#6B7280','#9CA3AF','#4B5563','#374151','#D1D5DB','#A1A1A9','#71717A'],
+  shop:  ['#7B1FA2','#9333EA','#A855F7','#C084FC','#E879F9','#D946EF','#8B5CF6','#6D28D9'],
+};
+
+// ── calcBudget (개편판: 세부 항목 스택바 + 툴팁) ──────────────
 function calcBudget() {
-  if (!document.getElementById('budget-total-input')) return; // DOM 미준비 시 스킵
+  if (!document.getElementById('budget-total-input')) return;
   const t = LANG_MAP[currentLang] || LANG_MAP.ko;
   const totalInput = parseFloat(document.getElementById('budget-total-input')?.value) || 0;
 
-  // 카테고리별 지출 집계
+  // ── 카테고리별 집계 ──
   const cats = { hotel: 0, food: 0, move: 0, shop: 0, cafe: 0, sight: 0 };
 
-  // 숙박 중복 제거: { 숙소명 → 첫 번째 체크인 가격만 }
-  const hotelSeen = {}; // key: 숙소명(소문자 trim)
-
+  // 숙박: 체크인 카드 × 숙소명 중복 제거
+  const hotelSeen = {};
   Object.values(scheduleData).forEach(dayItems => {
     (dayItems || []).forEach(item => {
-      if (item.type === 'hotel') {
-        // 체크아웃 카드는 항상 건너뜀
-        if (item.hotelCheckType === 'checkout') return;
-        // 체크인 카드: 같은 숙소명 첫 번째만 집계
-        const key = (item.name || '').trim().toLowerCase();
-        if (!hotelSeen[key]) {
-          hotelSeen[key] = true;
-          cats.hotel += parseFloat(item.hotelPrice) || 0;
-        }
-        // 같은 이름 두 번째 이후 체크인 카드는 제외 (실수 방지)
-      } else if (item.type === 'food')  {
-        // 일정 카드에 직접 가격 필드가 없으므로 식비는 0
-        // (추후 확장 가능: item.price)
+      if (item.type !== 'hotel') return;
+      if (item.hotelCheckType === 'checkout') return;
+      const key = (item.name || '').trim().toLowerCase();
+      if (!hotelSeen[key]) {
+        hotelSeen[key] = true;
+        cats.hotel += parseFloat(item.hotelPrice) || 0;
       }
-      // move/shop/cafe/sight는 현재 일정 카드에 가격 없음 → 0
     });
+  });
+
+  // 나머지 카테고리: expenseData 합산
+  ['food','cafe','sight','move','shop'].forEach(k => {
+    cats[k] = (expenseData[k] || []).reduce((s, e) => s + (e.amountKrw || 0), 0);
   });
 
   const totalSpent = Object.values(cats).reduce((s, v) => s + v, 0);
   const remain     = totalInput - totalSpent;
   const pct        = totalInput > 0 ? Math.min(totalSpent / totalInput * 100, 100) : 0;
 
-  // ── UI 업데이트 ──
-  const totalDisplay  = document.getElementById('budget-total-display');
-  const progressWrap  = document.getElementById('budget-progress-wrap');
-  const progressBar   = document.getElementById('budget-progress-bar');
-  const spentLabel    = document.getElementById('budget-spent-label');
-  const remainLabel   = document.getElementById('budget-remain-label');
-  const noHint        = document.getElementById('budget-no-total-hint');
-  const catGrid       = document.getElementById('budget-cat-grid');
+  // ── 요약 바 UI ──
+  const totalDisplay = document.getElementById('budget-total-display');
+  const progressWrap = document.getElementById('budget-progress-wrap');
+  const progressBar  = document.getElementById('budget-progress-bar');
+  const spentLabel   = document.getElementById('budget-spent-label');
+  const remainLabel  = document.getElementById('budget-remain-label');
+  const noHint       = document.getElementById('budget-no-total-hint');
+  const catGrid      = document.getElementById('budget-cat-grid');
 
   if (totalInput > 0) {
     if (totalDisplay) totalDisplay.textContent = '₩' + totalInput.toLocaleString();
@@ -5004,33 +5171,240 @@ function calcBudget() {
       remainLabel.style.color = remain < 0 ? 'var(--red)' : 'var(--green)';
     }
   } else {
-    if (totalDisplay) totalDisplay.textContent = (t.budgetNoTotalHint ? '' : '미설정');
+    if (totalDisplay) totalDisplay.textContent = '';
     if (progressWrap) progressWrap.style.display = 'none';
     if (noHint)       noHint.style.display = '';
   }
 
-  // 카테고리 그리드
+  // ── 카테고리 그리드 ──
   if (!catGrid) return;
+
   const catDefs = [
-    { key:'hotel', label: t.budgetCatHotel || '🏨 숙박', color:'#1565C0' },
-    { key:'food',  label: t.budgetCatFood  || '🍜 식비',  color:'#E8430A' },
-    { key:'move',  label: t.budgetCatMove  || '🚇 교통',  color:'#888780' },
-    { key:'shop',  label: t.budgetCatShop  || '🛍️ 쇼핑', color:'#7B1FA2' },
-    { key:'cafe',  label: t.budgetCatCafe  || '☕ 카페',  color:'#AD6B2F' },
-    { key:'sight', label: t.budgetCatSight || '🏛️ 관광', color:'#2E7D32' },
+    { key:'hotel', label: t.budgetCatHotel || '🏨 숙박', baseColor:'#1565C0', hasExpense: false },
+    { key:'food',  label: t.budgetCatFood  || '🍜 식비',  baseColor:'#E8430A', hasExpense: true },
+    { key:'move',  label: t.budgetCatMove  || '🚇 교통',  baseColor:'#888780', hasExpense: true },
+    { key:'shop',  label: t.budgetCatShop  || '🛍️ 쇼핑', baseColor:'#7B1FA2', hasExpense: true },
+    { key:'cafe',  label: t.budgetCatCafe  || '☕ 카페',  baseColor:'#AD6B2F', hasExpense: true },
+    { key:'sight', label: t.budgetCatSight || '🏛️ 관광', baseColor:'#2E7D32', hasExpense: true },
   ];
 
-  catGrid.innerHTML = catDefs.map(({ key, label, color }) => {
-    const amt  = cats[key];
-    const catPct = totalInput > 0 ? Math.min(amt / totalInput * 100, 100) : 0;
-    return `<div class="budget-cat-item">
+  catGrid.innerHTML = '';
+
+  catDefs.forEach(({ key, label, baseColor, hasExpense }) => {
+    const amt    = cats[key];
+    const items  = hasExpense ? (expenseData[key] || []) : [];
+    const palette = CAT_PALETTES[key] || [baseColor];
+
+    const card = document.createElement('div');
+    card.className = 'budget-cat-item';
+
+    // ＋💰 버튼 (숙박 제외)
+    const addBtnHtml = hasExpense
+      ? `<button class="budget-cat-add-btn" onclick="openExpensePopup('${key}')" title="지출 추가">＋💰</button>`
+      : '';
+
+    // 스택 바 HTML 생성
+    let stackBarHtml = '';
+    if (items.length > 0 && amt > 0) {
+      let leftPct = 0;
+      const segs = items.map((item, i) => {
+        const segPct = (item.amountKrw / amt) * 100;
+        const color  = palette[i % palette.length];
+        const seg = { item, segPct, leftPct, color };
+        leftPct += segPct;
+        return seg;
+      });
+      const segHtml = segs.map(({ item, segPct, leftPct, color }) =>
+        `<div class="bci-stack-seg"
+          style="left:${leftPct.toFixed(2)}%;width:${segPct.toFixed(2)}%;background:${color};"
+          data-name="${item.name.replace(/"/g,'&quot;')}"
+          data-amt="₩${item.amountKrw.toLocaleString()}"
+          onmouseenter="showStackTooltip(event,this)"
+          onmouseleave="hideStackTooltip()"></div>`
+      ).join('');
+      stackBarHtml = `<div class="bci-stack-bar">${segHtml}</div>`;
+    } else {
+      // 지출 없으면 단색 바
+      const catPct = totalInput > 0 ? Math.min(amt / totalInput * 100, 100) : 0;
+      stackBarHtml = `<div class="bci-stack-bar">
+        <div class="bci-stack-seg" style="left:0;width:${catPct.toFixed(1)}%;background:${baseColor};border-radius:3px;"></div>
+      </div>`;
+    }
+
+    card.innerHTML = `
+      ${addBtnHtml}
       <div class="bci-label">${label}</div>
       <div class="bci-amount">₩${amt.toLocaleString()}</div>
-      <div class="bci-bar-wrap">
-        <div class="bci-bar" style="width:${catPct.toFixed(1)}%;background:${color};"></div>
-      </div>
-    </div>`;
-  }).join('');
+      ${stackBarHtml}`;
+
+    catGrid.appendChild(card);
+  });
+}
+
+// ── 툴팁 ─────────────────────────────────────────────────────
+let _tooltipEl = null;
+function showStackTooltip(e, el) {
+  hideStackTooltip();
+  const name = el.dataset.name;
+  const amt  = el.dataset.amt;
+  const tip  = document.createElement('div');
+  tip.className = 'bci-tooltip';
+  tip.innerHTML = `<b>${name}</b><br>${amt}`;
+  document.body.appendChild(tip);
+  _tooltipEl = tip;
+  positionTooltip(e, tip);
+  el.addEventListener('mousemove', (ev) => positionTooltip(ev, tip));
+}
+function positionTooltip(e, tip) {
+  tip.style.left = e.clientX + 'px';
+  tip.style.top  = (e.clientY - 8) + 'px';
+}
+function hideStackTooltip() {
+  if (_tooltipEl) { _tooltipEl.remove(); _tooltipEl = null; }
+}
+
+// ── 지출 팝업 ────────────────────────────────────────────────
+let currentExpenseCat = 'food'; // 현재 열린 카테고리
+
+const CAT_LABEL_MAP = {
+  food:  { ko:'🍜 식비',  ja:'🍜 食費' },
+  cafe:  { ko:'☕ 카페',  ja:'☕ カフェ' },
+  sight: { ko:'🏛️ 관광', ja:'🏛️ 観光' },
+  move:  { ko:'🚇 교통',  ja:'🚇 交通' },
+  shop:  { ko:'🛍️ 쇼핑', ja:'🛍️ ショッピング' },
+};
+
+function openExpensePopup(catKey) {
+  currentExpenseCat = catKey;
+  const lang = currentLang || 'ko';
+  const labelObj = CAT_LABEL_MAP[catKey] || { ko: catKey, ja: catKey };
+  const catLabel = labelObj[lang] || labelObj.ko;
+  const t = LANG_MAP[lang] || LANG_MAP.ko;
+
+  // 팝업 제목
+  const titleEl = document.getElementById('expense-popup-title');
+  if (titleEl) titleEl.textContent = catLabel + ' ' + (t.budgetExpenseAdd || '지출 추가');
+
+  // 입력 필드 초기화
+  const nameEl = document.getElementById('expense-name-input');
+  const amtEl  = document.getElementById('expense-amount-input');
+  const unitEl = document.getElementById('expense-unit-select');
+  if (nameEl) nameEl.value = '';
+  if (amtEl)  amtEl.value  = '';
+  if (unitEl) {
+    // 현재 통화 옵션 업데이트
+    const currency = document.getElementById('budget-currency-select')?.value || 'JPY';
+    const foreignOpt = document.getElementById('expense-unit-foreign');
+    if (foreignOpt) foreignOpt.value = currency === 'KRW' ? 'KRW' : 'foreign';
+    if (foreignOpt) foreignOpt.textContent = currencySymbol(currency);
+    unitEl.value = 'foreign'; // 기본: 현지통화
+  }
+  document.getElementById('expense-krw-preview').textContent = '';
+
+  // 목록 렌더
+  renderExpenseList();
+  openOverlay('expense-overlay');
+  setTimeout(() => nameEl && nameEl.focus(), 120);
+}
+
+function currencySymbol(code) {
+  const map = { JPY:'¥', USD:'$', EUR:'€', THB:'฿', VND:'₫', TWD:'NT$', HKD:'HK$', SGD:'S$', GBP:'£', CNY:'¥' };
+  return map[code] || code;
+}
+
+function updateExpenseKrwPreview() {
+  const amt      = parseFloat(document.getElementById('expense-amount-input')?.value) || 0;
+  const unitSel  = document.getElementById('expense-unit-select')?.value;
+  const preview  = document.getElementById('expense-krw-preview');
+  if (!preview) return;
+  if (unitSel === 'KRW' || !budgetExchangeRate || amt === 0) {
+    preview.textContent = '';
+    return;
+  }
+  const won = Math.round(amt * budgetExchangeRate);
+  preview.textContent = `≈ ₩${won.toLocaleString()}`;
+}
+
+function addExpenseItem() {
+  const nameEl = document.getElementById('expense-name-input');
+  const amtEl  = document.getElementById('expense-amount-input');
+  const unitEl = document.getElementById('expense-unit-select');
+  const name   = nameEl?.value.trim();
+  const raw    = parseFloat(amtEl?.value) || 0;
+  if (!name || raw <= 0) { showToast('항목명과 금액을 입력해주세요'); return; }
+
+  const isKrw = unitEl?.value === 'KRW';
+  const amountKrw = isKrw ? raw : Math.round(raw * (budgetExchangeRate || 1));
+
+  if (!expenseData[currentExpenseCat]) expenseData[currentExpenseCat] = [];
+
+  // 색상: 팔레트에서 현재 항목 수 기준 순환
+  const palette = CAT_PALETTES[currentExpenseCat] || ['#888780'];
+  const colorIdx = expenseData[currentExpenseCat].length % palette.length;
+  const color = palette[colorIdx];
+
+  expenseData[currentExpenseCat].push({
+    id: Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    name,
+    amountKrw,
+    rawAmount: raw,
+    rawUnit: isKrw ? 'KRW' : (document.getElementById('budget-currency-select')?.value || 'JPY'),
+    color,
+  });
+
+  nameEl.value = '';
+  amtEl.value  = '';
+  document.getElementById('expense-krw-preview').textContent = '';
+  renderExpenseList();
+  calcBudget();
+  autoSave();
+  nameEl.focus();
+}
+
+function deleteExpenseItem(catKey, id) {
+  if (!expenseData[catKey]) return;
+  expenseData[catKey] = expenseData[catKey].filter(e => e.id !== id);
+  // 색상 재배정 (삭제 후 순서 맞춤)
+  const palette = CAT_PALETTES[catKey] || ['#888780'];
+  expenseData[catKey].forEach((e, i) => { e.color = palette[i % palette.length]; });
+  renderExpenseList();
+  calcBudget();
+  autoSave();
+}
+
+function renderExpenseList() {
+  const wrap    = document.getElementById('expense-list-wrap');
+  const totRow  = document.getElementById('expense-total-row');
+  const totDisp = document.getElementById('expense-total-display');
+  if (!wrap) return;
+
+  const items = expenseData[currentExpenseCat] || [];
+  wrap.innerHTML = '';
+
+  if (items.length === 0) {
+    const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+    wrap.innerHTML = `<div style="font-size:12px;color:var(--ink3);text-align:center;padding:12px 0;">${t.expenseEmpty || '아직 지출 내역이 없어요'}</div>`;
+    if (totRow)  totRow.style.display  = 'none';
+    return;
+  }
+
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'expense-item';
+    const rawTxt = item.rawUnit && item.rawUnit !== 'KRW'
+      ? ` (${currencySymbol(item.rawUnit)}${item.rawAmount.toLocaleString()})`
+      : '';
+    div.innerHTML = `
+      <div class="expense-item-dot" style="background:${item.color};"></div>
+      <div class="expense-item-name">${item.name}</div>
+      <div class="expense-item-amount">₩${item.amountKrw.toLocaleString()}${rawTxt}</div>
+      <button class="expense-item-del" onclick="deleteExpenseItem('${currentExpenseCat}','${item.id}')">✕</button>`;
+    wrap.appendChild(div);
+  });
+
+  const total = items.reduce((s, e) => s + e.amountKrw, 0);
+  if (totRow)  { totRow.style.display  = 'flex'; }
+  if (totDisp) totDisp.textContent = '₩' + total.toLocaleString();
 }
 
 // ── 일정 핀 모드 (장소 핀과 독립) ────────────────────────────
