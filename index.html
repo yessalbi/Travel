@@ -1205,9 +1205,39 @@ html, body {
 }
 
 
-/* ── 모바일 ── */
-/* 지도 탭 — 모바일 전용 */
-.map-tab-mobile { display: none; }
+/* ── 예산 트래커 ── */
+#budget-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--stone);
+}
+#budget-cat-grid .budget-cat-item {
+  background: var(--stone); border-radius: 7px;
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;
+}
+#budget-cat-grid .bci-label { font-size: 10px; color: var(--ink3); }
+#budget-cat-grid .bci-amount { font-size: 12px; font-weight: 600; color: var(--ink); }
+#budget-cat-grid .bci-bar-wrap { height: 3px; background: var(--sand); border-radius: 2px; overflow: hidden; margin-top: 2px; }
+#budget-cat-grid .bci-bar { height: 100%; border-radius: 2px; }
+
+/* ── 숙소 추가 필드 (일정 팝업 안) ── */
+#hotel-extra-fields {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 10px 14px; background: var(--stone);
+  border-radius: 10px; margin-top: -4px;
+}
+#hotel-extra-fields.show { display: flex; }
+.hotel-checkin-selector {
+  display: flex; gap: 6px;
+}
+.hotel-check-opt {
+  flex: 1; padding: 8px 6px; border-radius: 8px;
+  border: 1.5px solid var(--sand); background: var(--cream);
+  font-family: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all .13s; text-align: center; color: var(--ink3);
+}
+.hotel-check-opt.sel { border-color: var(--green); background: #EBF7EF; color: var(--green); font-weight: 700; }
+
+
 
 /* 지도 전체화면 오버레이 — iOS/Android 공통 */
 #map-overlay {
@@ -2291,6 +2321,88 @@ html, body {
         <div id="airline-logo" style="display:none;">✈</div>
       </div>
 
+      <!-- 예산 트래커 -->
+      <div id="budget-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="section-label" data-i18n="secBudget" style="margin-bottom:0;">💰 예산 트래커</div>
+          <button id="budget-edit-btn" onclick="toggleBudgetEdit()"
+            style="font-size:11px;padding:4px 10px;border-radius:20px;border:1.5px solid var(--sand);
+                   background:none;color:var(--ink3);cursor:pointer;font-family:inherit;transition:all .13s;"
+            onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+            onmouseout="this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">✏️ <span id="budget-edit-label">설정</span></button>
+        </div>
+
+        <!-- 예산 설정 패널 (접힘/펼침) -->
+        <div id="budget-setup-panel" style="display:none;flex-direction:column;gap:8px;margin-bottom:12px;
+             background:var(--stone);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:11px;color:var(--ink3);font-weight:500;width:64px;flex-shrink:0;" id="budget-total-label">총 예산</label>
+            <input type="number" id="budget-total-input" placeholder="1500000" min="0"
+              style="flex:1;border:1.5px solid var(--sand);border-radius:7px;padding:7px 10px;
+                     font-family:inherit;font-size:13px;background:var(--white);outline:none;"
+              oninput="calcBudget()" onfocus="this.style.borderColor='var(--accent)'"
+              onblur="this.style.borderColor='var(--sand)'" />
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:11px;color:var(--ink3);font-weight:500;width:64px;flex-shrink:0;" id="budget-currency-label">현지통화</label>
+            <select id="budget-currency-select"
+              style="flex:1;border:1.5px solid var(--sand);border-radius:7px;padding:7px 10px;
+                     font-family:inherit;font-size:13px;background:var(--white);outline:none;cursor:pointer;"
+              onchange="fetchExchangeRate()">
+              <option value="JPY">🇯🇵 JPY (일본 엔)</option>
+              <option value="USD">🇺🇸 USD (미국 달러)</option>
+              <option value="EUR">🇪🇺 EUR (유로)</option>
+              <option value="THB">🇹🇭 THB (태국 바트)</option>
+              <option value="VND">🇻🇳 VND (베트남 동)</option>
+              <option value="TWD">🇹🇼 TWD (대만 달러)</option>
+              <option value="HKD">🇭🇰 HKD (홍콩 달러)</option>
+              <option value="SGD">🇸🇬 SGD (싱가포르 달러)</option>
+              <option value="GBP">🇬🇧 GBP (영국 파운드)</option>
+              <option value="CNY">🇨🇳 CNY (중국 위안)</option>
+            </select>
+          </div>
+          <!-- 환율 표시 -->
+          <div id="budget-rate-row" style="font-size:11px;color:var(--ink3);text-align:right;min-height:16px;"></div>
+        </div>
+
+        <!-- 요약 바 -->
+        <div id="budget-summary-bar" style="background:var(--stone);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <span style="font-size:11px;color:var(--ink3);" id="budget-summary-label-total">총 예산</span>
+            <span style="font-size:15px;font-weight:700;color:var(--ink);" id="budget-total-display">미설정</span>
+          </div>
+          <div id="budget-progress-wrap" style="display:none;">
+            <div style="height:6px;background:var(--sand);border-radius:3px;overflow:hidden;margin-bottom:6px;">
+              <div id="budget-progress-bar" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width .4s;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;">
+              <span style="color:var(--red);" id="budget-spent-label">지출 ₩0</span>
+              <span style="color:var(--green);" id="budget-remain-label">잔액 ₩0</span>
+            </div>
+          </div>
+          <div id="budget-no-total-hint" style="font-size:11px;color:var(--ink3);margin-top:4px;">위 ✏️ 설정 버튼을 눌러 예산을 입력해보세요</div>
+        </div>
+
+        <!-- 카테고리별 지출 그리드 -->
+        <div id="budget-cat-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;"></div>
+
+        <!-- 환율 변환기 -->
+        <div id="budget-fx-row" style="display:none;background:var(--stone);border-radius:8px;padding:8px 12px;">
+          <div style="font-size:10px;font-weight:600;letter-spacing:.8px;color:var(--ink3);margin-bottom:6px;" id="budget-fx-title">환율 변환</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" id="budget-fx-input" placeholder="0" min="0"
+              style="flex:1;border:1.5px solid var(--sand);border-radius:7px;padding:6px 10px;
+                     font-family:inherit;font-size:13px;background:var(--white);outline:none;"
+              oninput="calcFx()" onfocus="this.style.borderColor='var(--accent2)'"
+              onblur="this.style.borderColor='var(--sand)'" />
+            <span id="budget-fx-unit" style="font-size:12px;color:var(--ink3);flex-shrink:0;">JPY</span>
+            <span style="font-size:12px;color:var(--ink3);">→</span>
+            <span id="budget-fx-result" style="font-size:14px;font-weight:700;color:var(--accent2);flex-shrink:0;">₩0</span>
+          </div>
+          <div id="budget-fx-rate-hint" style="font-size:10px;color:var(--ink3);margin-top:4px;text-align:right;"></div>
+        </div>
+      </div>
+
       <!-- 맛집 핀 -->
       <div id="places-section">
         <div class="section-label" data-i18n="secPlaces">📍 맛집 &amp; 장소</div>
@@ -2411,6 +2523,23 @@ html, body {
         <div class="type-opt" data-type="move"  onclick="selectType(this,'move')">
           <span class="ico">🚆</span>이동
         </div>
+      </div>
+    </div>
+    <!-- 숙소 추가 필드 (type=hotel 선택 시 표시) -->
+    <div id="hotel-extra-fields">
+      <div>
+        <div style="font-size:11px;color:var(--ink3);font-weight:500;margin-bottom:6px;" id="hotel-check-label">체크인 / 체크아웃</div>
+        <div class="hotel-checkin-selector">
+          <button class="hotel-check-opt sel" id="hotel-opt-in"  onclick="selectHotelCheck('checkin')">🏨 체크인</button>
+          <button class="hotel-check-opt"     id="hotel-opt-out" onclick="selectHotelCheck('checkout')">🚪 체크아웃</button>
+        </div>
+      </div>
+      <div id="hotel-price-wrap">
+        <div style="font-size:11px;color:var(--ink3);font-weight:500;margin-bottom:4px;" id="hotel-price-label">숙박 요금 <small style="color:var(--ink3);font-weight:400;" id="hotel-price-hint">(체크인에만 입력 — 예산에 자동 반영)</small></div>
+        <input type="number" id="hotel-price-input" placeholder="예: 120000" min="0"
+          style="width:100%;border:1.5px solid var(--sand);border-radius:8px;padding:8px 12px;
+                 font-family:inherit;font-size:13px;background:var(--white);outline:none;"
+          onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--sand)'" />
       </div>
     </div>
     <div class="popup-field">
@@ -2738,6 +2867,21 @@ const LANG_MAP = {
     dateSelectText:'날짜를 선택하세요',
     editHint:'✏️ 편집', editSpanLabel:'편집', doneSpanLabel:'완료',
     tripIdLoading:'ID 로드 중…',
+    secBudget:'💰 예산 트래커',
+    budgetEditLabel:'설정', budgetEditDone:'완료',
+    budgetTotalLabel:'총 예산', budgetCurrencyLabel:'현지통화',
+    budgetSummaryLabelTotal:'총 예산',
+    budgetNoTotalHint:'위 ✏️ 설정 버튼을 눌러 예산을 입력해보세요',
+    budgetSpent:'지출', budgetRemain:'잔액',
+    budgetFxTitle:'환율 변환',
+    budgetCatHotel:'🏨 숙박', budgetCatFood:'🍜 식비', budgetCatMove:'🚇 교통',
+    budgetCatShop:'🛍️ 쇼핑', budgetCatCafe:'☕ 카페', budgetCatSight:'🏛️ 관광', budgetCatOther:'📌 기타',
+    hotelCheckLabel:'체크인 / 체크아웃',
+    hotelOptIn:'🏨 체크인', hotelOptOut:'🚪 체크아웃',
+    hotelPriceLabel:'숙박 요금',
+    hotelPriceHint:'(체크인에만 입력 — 예산에 자동 반영)',
+    budgetRateLoading:'환율 불러오는 중…',
+    budgetRateError:'환율을 불러올 수 없어요',
     toastSaved:'저장되었습니다 ✓',
     toastItemDeleted:'항목을 삭제했어요',
     toastDoneDeleted:'완료된 항목을 삭제했어요 ✓',
@@ -2826,6 +2970,21 @@ const LANG_MAP = {
     dateSelectText:'日付を選択してください',
     editHint:'✏️ 編集', editSpanLabel:'編集', doneSpanLabel:'完了',
     tripIdLoading:'ID 読み込み中…',
+    secBudget:'💰 予算トラッカー',
+    budgetEditLabel:'設定', budgetEditDone:'完了',
+    budgetTotalLabel:'総予算', budgetCurrencyLabel:'現地通貨',
+    budgetSummaryLabelTotal:'総予算',
+    budgetNoTotalHint:'✏️ 設定ボタンを押して予算を入力してください',
+    budgetSpent:'支出', budgetRemain:'残高',
+    budgetFxTitle:'為替換算',
+    budgetCatHotel:'🏨 宿泊', budgetCatFood:'🍜 食費', budgetCatMove:'🚇 交通',
+    budgetCatShop:'🛍️ ショッピング', budgetCatCafe:'☕ カフェ', budgetCatSight:'🏛️ 観光', budgetCatOther:'📌 その他',
+    hotelCheckLabel:'チェックイン / チェックアウト',
+    hotelOptIn:'🏨 チェックイン', hotelOptOut:'🚪 チェックアウト',
+    hotelPriceLabel:'宿泊料金',
+    hotelPriceHint:'(チェックイン時のみ入力 — 予算に自動反映)',
+    budgetRateLoading:'為替レート取得中…',
+    budgetRateError:'為替レートを取得できません',
     toastSaved:'保存しました ✓',
     toastItemDeleted:'項目を削除しました',
     toastDoneDeleted:'完了した項目を削除しました ✓',
@@ -3109,6 +3268,30 @@ function applyLang(lang) {
   // 목록 버튼 (좌측 상단) — title 속성
   const btnBackList = document.getElementById('btn-back-list');
   if (btnBackList) btnBackList.title = t.btnBackList;
+
+  // ── 예산 트래커 다국어 ──
+  const _bset = (id, key) => { const el = document.getElementById(id); if (el && t[key]) el.textContent = t[key]; };
+  _bset('budget-total-label', 'budgetTotalLabel');
+  _bset('budget-currency-label', 'budgetCurrencyLabel');
+  _bset('budget-summary-label-total', 'budgetSummaryLabelTotal');
+  _bset('budget-no-total-hint', 'budgetNoTotalHint');
+  _bset('budget-fx-title', 'budgetFxTitle');
+  _bset('hotel-check-label', 'hotelCheckLabel');
+  _bset('hotel-price-label', 'hotelPriceLabel');
+  _bset('hotel-opt-in', 'hotelOptIn');
+  _bset('hotel-opt-out', 'hotelOptOut');
+  const hph = document.getElementById('hotel-price-hint'); if (hph && t.hotelPriceHint) hph.textContent = t.hotelPriceHint;
+  // budget-edit-label: 패널 열림 상태에 따라 다른 텍스트
+  const budgetEditLabelEl = document.getElementById('budget-edit-label');
+  if (budgetEditLabelEl) {
+    const isOpen = document.getElementById('budget-setup-panel')?.style.display !== 'none';
+    budgetEditLabelEl.textContent = isOpen ? (t.budgetEditDone || '완료') : (t.budgetEditLabel || '설정');
+  }
+  // 예산 섹션 data-i18n
+  const secBudgetEl = document.querySelector('[data-i18n="secBudget"]');
+  if (secBudgetEl && t.secBudget) secBudgetEl.textContent = t.secBudget;
+  // 카테고리 바 재렌더
+  calcBudget();
 }
 
 function toggleLang() {
@@ -3547,6 +3730,17 @@ function applyTripData(data) {
   }
   updateDuration();
   updateTripSummary();
+  // 예산 복원
+  if (data.budgetTotal) {
+    const bi = document.getElementById('budget-total-input');
+    if (bi) bi.value = data.budgetTotal;
+  }
+  if (data.budgetCurrency) {
+    const bs = document.getElementById('budget-currency-select');
+    if (bs) bs.value = data.budgetCurrency;
+  }
+  calcBudget();
+  fetchExchangeRate();
   // 초기 로드: 모든 일정 핀을 한눈에 보이게 fitBounds
   // (저장된 mapCenter는 사용자가 직접 이동한 거라 덮어쓰지 않음 — 핀 기준 우선)
   fitSchedulePins(data.title);
@@ -3969,6 +4163,8 @@ function buildPayload() {
     deletedVoucherIds: [...deletedVoucherIds],
     mapCenter:     map ? { lat: map.getCenter().lat(), lng: map.getCenter().lng() } : null,
     mapZoom:       map ? map.getZoom() : 12,
+    budgetTotal:   parseFloat(document.getElementById('budget-total-input')?.value) || 0,
+    budgetCurrency: document.getElementById('budget-currency-select')?.value || 'JPY',
     updatedAt:     new Date().toISOString(),
   };
 }
@@ -4276,12 +4472,25 @@ function renderScheduleList() {
     div.className = 'schedule-item type-' + item.type;
     const hasLoc = item.lat && item.lng;
     const hasMemo = item.memo && item.memo.trim();
+    // 숙소 체크인/아웃 배지
+    let hotelBadge = '';
+    if (item.type === 'hotel' && item.hotelCheckType) {
+      const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+      const isIn = item.hotelCheckType === 'checkin';
+      const badgeText = isIn ? (t.hotelOptIn || '🏨 체크인') : (t.hotelOptOut || '🚪 체크아웃');
+      const badgeColor = isIn ? '#2E7D32' : '#888780';
+      const priceText = (isIn && item.hotelPrice) ? ` · ₩${Number(item.hotelPrice).toLocaleString()}` : '';
+      hotelBadge = `<div style="display:inline-flex;align-items:center;gap:3px;font-size:10px;
+        color:${badgeColor};font-weight:600;margin-top:3px;background:${isIn?'#DDF3E4':'#EBEBEB'};
+        border-radius:10px;padding:2px 8px;">${badgeText}${priceText}</div>`;
+    }
     div.innerHTML = `
       <div class="item-icon">${typeIcon[item.type]||'📌'}</div>
       <div class="item-body" onclick="onScheduleItemClick(${idx})">
         <div class="item-time">${item.time ? fmtTime(item.time) : ''}</div>
         <div class="item-name">${item.name}</div>
         <div class="item-desc">${item.desc || ''}</div>
+        ${hotelBadge}
         ${hasLoc ? `<div class="item-has-loc">${(LANG_MAP[currentLang]||LANG_MAP.ko).hasLoc}</div>` : ''}
         <div id="item-travel-${currentDay}-${idx}"></div>
         <div class="item-memo-wrap" id="memo-wrap-${currentDay}-${idx}">
@@ -4517,8 +4726,11 @@ function openSchedulePopup() {
   updateTpDisplay('scht');
   syncTpPopup('scht');
   selectTypeByValue('food');
-  document.querySelector('#schedule-overlay .popup-title').textContent = '일정 추가';
-  document.querySelector('#schedule-overlay .btn-save').textContent = '추가';
+  // 숙소 필드 초기화
+  resetHotelFields();
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  document.querySelector('#schedule-overlay .popup-title').textContent = t.schPopupTitle || '일정 추가';
+  document.querySelector('#schedule-overlay .btn-save').textContent = t.btnAdd || '추가';
   closeSchPlacePanel();
   openOverlay('schedule-overlay');
 }
@@ -4543,8 +4755,16 @@ function openEditSchedule(idx) {
   if (item.time) timeToTp('scht', item.time);
   else { tpState['scht'] = { h: '1', m: '00', ap: 'AM' }; updateTpDisplay('scht'); syncTpPopup('scht'); }
   selectTypeByValue(item.type || 'food');
-  document.querySelector('#schedule-overlay .popup-title').textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).schPopupEdit;
-  document.querySelector('#schedule-overlay .btn-save').textContent = '저장';
+  // 숙소 필드 복원
+  resetHotelFields();
+  if (item.type === 'hotel') {
+    selectHotelCheck(item.hotelCheckType || 'checkin');
+    const priceEl = document.getElementById('hotel-price-input');
+    if (priceEl) priceEl.value = (item.hotelPrice != null && item.hotelCheckType === 'checkin') ? item.hotelPrice : '';
+  }
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  document.querySelector('#schedule-overlay .popup-title').textContent = t.schPopupEdit || '일정 편집';
+  document.querySelector('#schedule-overlay .btn-save').textContent = t.btnSave || '저장';
   openOverlay('schedule-overlay');
 }
 
@@ -4552,6 +4772,12 @@ function selectType(el, type) {
   document.querySelectorAll('.type-opt').forEach(e => e.classList.remove('sel'));
   el.classList.add('sel');
   selectedType = type;
+  // 숙소 선택 시 추가 필드 표시
+  const hotelFields = document.getElementById('hotel-extra-fields');
+  if (hotelFields) {
+    if (type === 'hotel') hotelFields.classList.add('show');
+    else hotelFields.classList.remove('show');
+  }
 }
 function selectTypeByValue(type) {
   const el = document.querySelector(`.type-opt[data-type="${type}"]`);
@@ -4562,6 +4788,7 @@ function saveScheduleItem() {
   const name = document.getElementById('sch-name').value.trim();
   if (!name) { showToast('이름을 입력해주세요'); return; }
   if (!scheduleData[currentDay]) scheduleData[currentDay] = [];
+
   const item = {
     type: selectedType,
     name,
@@ -4570,7 +4797,23 @@ function saveScheduleItem() {
     lat:  schPendingLatLng ? schPendingLatLng.lat : null,
     lng:  schPendingLatLng ? schPendingLatLng.lng : null,
   };
+
+  // 숙소 타입 추가 데이터
+  if (selectedType === 'hotel') {
+    item.hotelCheckType = currentHotelCheckType || 'checkin';
+    // 가격은 체크인 카드에만 저장 (체크아웃은 0으로 명시)
+    if (item.hotelCheckType === 'checkin') {
+      const priceVal = parseFloat(document.getElementById('hotel-price-input').value) || 0;
+      item.hotelPrice = priceVal;
+    } else {
+      item.hotelPrice = 0; // 체크아웃 — 예산 집계에서 제외
+    }
+  }
+
   if (editingScheduleIdx !== null) {
+    // 편집 시 memo 보존
+    const prev = scheduleData[currentDay][editingScheduleIdx];
+    if (prev && prev.memo) item.memo = prev.memo;
     scheduleData[currentDay][editingScheduleIdx] = item;
   } else {
     scheduleData[currentDay].push(item);
@@ -4580,13 +4823,214 @@ function saveScheduleItem() {
   closeOverlay('schedule-overlay');
   renderScheduleList();
   drawDayRoutes();
+  calcBudget(); // 예산 재계산
   autoSave();
 }
 
 function deleteScheduleItem(idx) {
   scheduleData[currentDay].splice(idx, 1);
   renderScheduleList();
+  calcBudget();
   autoSave();
+}
+
+// ── 예산 트래커 ───────────────────────────────────────────────
+let currentHotelCheckType = 'checkin'; // 팝업 내 현재 선택
+let budgetExchangeRate = null;          // 1 현지통화 = N 원
+let budgetFetchedCurrency = null;       // 마지막으로 환율 조회한 통화
+
+function resetHotelFields() {
+  currentHotelCheckType = 'checkin';
+  const fi = document.getElementById('hotel-extra-fields');
+  if (fi) fi.classList.remove('show');
+  const pi = document.getElementById('hotel-price-input');
+  if (pi) pi.value = '';
+  // 버튼 초기화
+  document.getElementById('hotel-opt-in')?.classList.add('sel');
+  document.getElementById('hotel-opt-out')?.classList.remove('sel');
+  // 가격 입력란 표시 (체크인 기본)
+  const pw = document.getElementById('hotel-price-wrap');
+  if (pw) pw.style.display = '';
+}
+
+function selectHotelCheck(type) {
+  currentHotelCheckType = type;
+  const inBtn  = document.getElementById('hotel-opt-in');
+  const outBtn = document.getElementById('hotel-opt-out');
+  const pw     = document.getElementById('hotel-price-wrap');
+  const pi     = document.getElementById('hotel-price-input');
+  if (type === 'checkin') {
+    inBtn?.classList.add('sel');
+    outBtn?.classList.remove('sel');
+    if (pw) pw.style.display = '';   // 가격 입력 표시
+  } else {
+    inBtn?.classList.remove('sel');
+    outBtn?.classList.add('sel');
+    if (pw) pw.style.display = 'none'; // 체크아웃엔 가격 입력 숨김
+    if (pi) pi.value = '';
+  }
+}
+
+function toggleBudgetEdit() {
+  const panel = document.getElementById('budget-setup-panel');
+  const label = document.getElementById('budget-edit-label');
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'flex';
+  if (label) label.textContent = isOpen ? (t.budgetEditLabel || '설정') : (t.budgetEditDone || '완료');
+  if (!isOpen) {
+    // 패널 열릴 때 환율 자동 조회
+    fetchExchangeRate();
+    setTimeout(() => document.getElementById('budget-total-input')?.focus(), 100);
+  }
+}
+
+// 환율 조회 (exchangerate-api 무료 엔드포인트)
+async function fetchExchangeRate() {
+  const currency = document.getElementById('budget-currency-select')?.value || 'JPY';
+  const rateRow  = document.getElementById('budget-rate-row');
+  const fxUnit   = document.getElementById('budget-fx-unit');
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+
+  if (fxUnit) fxUnit.textContent = currency;
+
+  // 같은 통화면 재조회 생략
+  if (budgetFetchedCurrency === currency && budgetExchangeRate !== null) {
+    renderBudgetRateHint(currency, budgetExchangeRate);
+    calcBudget();
+    return;
+  }
+
+  if (rateRow) rateRow.textContent = t.budgetRateLoading || '환율 불러오는 중…';
+
+  try {
+    // 무료 환율 API (KRW 기준으로 조회)
+    const res  = await fetch(`https://open.er-api.com/v6/latest/KRW`);
+    const data = await res.json();
+    if (data.result === 'success' && data.rates[currency]) {
+      // 1 KRW = data.rates[currency] 현지통화
+      // → 1 현지통화 = 1 / data.rates[currency] 원
+      budgetExchangeRate   = 1 / data.rates[currency];
+      budgetFetchedCurrency = currency;
+      renderBudgetRateHint(currency, budgetExchangeRate);
+      calcBudget();
+    } else {
+      if (rateRow) rateRow.textContent = t.budgetRateError || '환율을 불러올 수 없어요';
+    }
+  } catch(e) {
+    if (rateRow) rateRow.textContent = t.budgetRateError || '환율을 불러올 수 없어요';
+  }
+}
+
+function renderBudgetRateHint(currency, rate) {
+  const rateRow = document.getElementById('budget-rate-row');
+  const fxHint  = document.getElementById('budget-fx-rate-hint');
+  const fxRow   = document.getElementById('budget-fx-row');
+  const rounded = rate >= 10 ? Math.round(rate) : rate >= 1 ? Math.round(rate * 10) / 10 : Math.round(rate * 100) / 100;
+  const txt = `1 ${currency} = ₩${rounded.toLocaleString()} (실시간)`;
+  if (rateRow) rateRow.textContent = txt;
+  if (fxHint)  fxHint.textContent  = txt;
+  if (fxRow)   fxRow.style.display = '';
+}
+
+function calcFx() {
+  const input  = parseFloat(document.getElementById('budget-fx-input')?.value) || 0;
+  const result = document.getElementById('budget-fx-result');
+  const currency = document.getElementById('budget-currency-select')?.value || 'JPY';
+  if (!result) return;
+  if (!budgetExchangeRate) { result.textContent = '₩—'; return; }
+  const won = Math.round(input * budgetExchangeRate);
+  result.textContent = '₩' + won.toLocaleString();
+}
+
+// ── 핵심: 예산 집계 ──────────────────────────────────────────
+// 숙박: 같은 숙소명의 체크인 카드 가격만 합산 (체크아웃 중복 방지)
+function calcBudget() {
+  if (!document.getElementById('budget-total-input')) return; // DOM 미준비 시 스킵
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  const totalInput = parseFloat(document.getElementById('budget-total-input')?.value) || 0;
+
+  // 카테고리별 지출 집계
+  const cats = { hotel: 0, food: 0, move: 0, shop: 0, cafe: 0, sight: 0 };
+
+  // 숙박 중복 제거: { 숙소명 → 첫 번째 체크인 가격만 }
+  const hotelSeen = {}; // key: 숙소명(소문자 trim)
+
+  Object.values(scheduleData).forEach(dayItems => {
+    (dayItems || []).forEach(item => {
+      if (item.type === 'hotel') {
+        // 체크아웃 카드는 항상 건너뜀
+        if (item.hotelCheckType === 'checkout') return;
+        // 체크인 카드: 같은 숙소명 첫 번째만 집계
+        const key = (item.name || '').trim().toLowerCase();
+        if (!hotelSeen[key]) {
+          hotelSeen[key] = true;
+          cats.hotel += parseFloat(item.hotelPrice) || 0;
+        }
+        // 같은 이름 두 번째 이후 체크인 카드는 제외 (실수 방지)
+      } else if (item.type === 'food')  {
+        // 일정 카드에 직접 가격 필드가 없으므로 식비는 0
+        // (추후 확장 가능: item.price)
+      }
+      // move/shop/cafe/sight는 현재 일정 카드에 가격 없음 → 0
+    });
+  });
+
+  const totalSpent = Object.values(cats).reduce((s, v) => s + v, 0);
+  const remain     = totalInput - totalSpent;
+  const pct        = totalInput > 0 ? Math.min(totalSpent / totalInput * 100, 100) : 0;
+
+  // ── UI 업데이트 ──
+  const totalDisplay  = document.getElementById('budget-total-display');
+  const progressWrap  = document.getElementById('budget-progress-wrap');
+  const progressBar   = document.getElementById('budget-progress-bar');
+  const spentLabel    = document.getElementById('budget-spent-label');
+  const remainLabel   = document.getElementById('budget-remain-label');
+  const noHint        = document.getElementById('budget-no-total-hint');
+  const catGrid       = document.getElementById('budget-cat-grid');
+
+  if (totalInput > 0) {
+    if (totalDisplay) totalDisplay.textContent = '₩' + totalInput.toLocaleString();
+    if (progressWrap) progressWrap.style.display = '';
+    if (noHint)       noHint.style.display = 'none';
+    if (progressBar) {
+      progressBar.style.width = pct + '%';
+      progressBar.style.background = pct >= 90 ? 'var(--red)' : pct >= 70 ? '#E07A3A' : 'var(--accent)';
+    }
+    if (spentLabel) spentLabel.textContent = (t.budgetSpent || '지출') + ' ₩' + totalSpent.toLocaleString();
+    if (remainLabel) {
+      remainLabel.textContent = (t.budgetRemain || '잔액') + ' ₩' + Math.max(remain, 0).toLocaleString();
+      remainLabel.style.color = remain < 0 ? 'var(--red)' : 'var(--green)';
+    }
+  } else {
+    if (totalDisplay) totalDisplay.textContent = (t.budgetNoTotalHint ? '' : '미설정');
+    if (progressWrap) progressWrap.style.display = 'none';
+    if (noHint)       noHint.style.display = '';
+  }
+
+  // 카테고리 그리드
+  if (!catGrid) return;
+  const catDefs = [
+    { key:'hotel', label: t.budgetCatHotel || '🏨 숙박', color:'#1565C0' },
+    { key:'food',  label: t.budgetCatFood  || '🍜 식비',  color:'#E8430A' },
+    { key:'move',  label: t.budgetCatMove  || '🚇 교통',  color:'#888780' },
+    { key:'shop',  label: t.budgetCatShop  || '🛍️ 쇼핑', color:'#7B1FA2' },
+    { key:'cafe',  label: t.budgetCatCafe  || '☕ 카페',  color:'#AD6B2F' },
+    { key:'sight', label: t.budgetCatSight || '🏛️ 관광', color:'#2E7D32' },
+  ];
+
+  catGrid.innerHTML = catDefs.map(({ key, label, color }) => {
+    const amt  = cats[key];
+    const catPct = totalInput > 0 ? Math.min(amt / totalInput * 100, 100) : 0;
+    return `<div class="budget-cat-item">
+      <div class="bci-label">${label}</div>
+      <div class="bci-amount">₩${amt.toLocaleString()}</div>
+      <div class="bci-bar-wrap">
+        <div class="bci-bar" style="width:${catPct.toFixed(1)}%;background:${color};"></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── 일정 핀 모드 (장소 핀과 독립) ────────────────────────────
