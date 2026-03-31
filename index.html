@@ -5199,9 +5199,9 @@ function calcBudget() {
     const palette  = CAT_PALETTES[key] || [baseColor];
 
     // 숙박: 일별카드 체크인 항목들 + expenseData 항목들을 합쳐서 표시
-    let allItems = [...expItems];
+    let allItems = [];
     if (key === 'hotel') {
-      // 일별카드 체크인 항목을 가상 expense 항목으로 변환 (중복 제거된 것들)
+      // 1) 일별카드 체크인 항목 먼저 (팔레트 앞자리)
       const seen = {};
       Object.values(scheduleData).forEach(dayItems => {
         (dayItems || []).forEach(item => {
@@ -5209,22 +5209,25 @@ function calcBudget() {
           const nameKey = (item.name || '').trim().toLowerCase();
           if (!seen[nameKey] && parseFloat(item.hotelPrice) > 0) {
             seen[nameKey] = true;
-            allItems.unshift({
+            allItems.push({
               id: 'schedule-' + nameKey,
               name: item.name,
               amountKrw: parseFloat(item.hotelPrice),
-              color: null, // 팔레트에서 나중에 배정
+              color: null,
             });
           }
         });
       });
+      // 2) expenseData hotel 항목 뒤에 추가
+      (expenseData['hotel'] || []).forEach(e => allItems.push({ ...e, color: null }));
+    } else {
+      allItems = (expenseData[key] || []).map(e => ({ ...e, color: null }));
     }
 
-    // 팔레트 색상 배정 (color가 없는 항목에 순서대로)
-    let palIdx = 0;
-    allItems = allItems.map(item => ({
+    // 팔레트 색상 순서대로 배정
+    allItems = allItems.map((item, i) => ({
       ...item,
-      color: item.color || palette[palIdx++ % palette.length],
+      color: palette[i % palette.length],
     }));
 
     const amt = allItems.reduce((s, e) => s + (e.amountKrw || 0), 0);
