@@ -1372,6 +1372,30 @@ html, body {
   bottom: 0;
 }
 
+/* 여행 목록 언어 버튼 */
+#tl-lang-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 30px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.7);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+  transition: box-shadow .2s, transform .15s;
+  overflow: hidden;
+}
+#tl-lang-switch:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.12); transform: translateY(-1px); }
+#tl-lang-switch:active { transform: scale(0.97); }
+
 /* PC 전용 헤더 (탭 대신 닫기 버튼) */
 #map-overlay-pc-header {
   display: none; /* 기본 숨김, PC에서만 표시 */
@@ -1475,24 +1499,112 @@ html, body {
     font-size: 12px; padding: 4px 8px;
     z-index: 1;
   }
+/* ── 언어 전환 버튼 (물방울 글래스모피즘) ── */
+#lang-switch-btn,
+#lang-switch-mobile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 30px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px;
+  gap: 0;
+  flex-shrink: 0;
+  /* 물방울 유리 배경 */
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.7);
+  box-shadow:
+    0 2px 12px rgba(0,0,0,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    inset 0 -1px 0 rgba(0,0,0,0.04);
+  transition: box-shadow .2s, transform .15s;
+  overflow: hidden; /* pill이 밖으로 안 나가게 */
+}
+#lang-switch-btn:hover,
+#lang-switch-mobile:hover {
+  box-shadow:
+    0 4px 20px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    inset 0 -1px 0 rgba(0,0,0,0.05);
+  transform: translateY(-1px);
+}
+#lang-switch-btn:active,
+#lang-switch-mobile:active {
+  transform: scale(0.97) translateY(0);
+}
+
+/* 슬라이딩 pill (활성 언어 하이라이트) */
+.lang-pill {
+  position: absolute;
+  top: 3px; bottom: 3px;
+  width: calc(50% - 3px);
+  border-radius: 24px;
+  /* 물방울 pill 자체 */
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.9) 0%,
+    rgba(255,255,255,0.6) 40%,
+    rgba(200,220,255,0.7) 100%
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.9);
+  box-shadow:
+    0 2px 8px rgba(58,143,224,0.2),
+    inset 0 1px 0 rgba(255,255,255,1),
+    inset 0 -1px 0 rgba(58,143,224,0.1);
+  transition: left .3s cubic-bezier(.34,1.56,.64,1);
+  /* 기본: 오른쪽 (한국어) */
+  left: calc(50% + 0px);
+  pointer-events: none;
+  z-index: 0;
+}
+/* 일본어 활성화 시 왼쪽으로 */
+.lang-pill.ja { left: 3px; }
+
+/* 텍스트 라벨 */
+.lang-opt {
+  position: relative;
+  z-index: 1;
+  padding: 5px 10px;
+  border-radius: 20px;
+  color: rgba(0,0,0,0.35);
+  transition: color .25s, font-weight .2s;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.lang-opt-active {
+  color: rgba(30,80,180,0.85);
+  font-weight: 800;
+}
+
+/* 헤더 다크 배경 위에선 다르게 */
+#header #lang-switch-btn {
+  background: rgba(255,255,255,0.45);
+}
+
+/* 모바일 */
+@media (max-width: 768px) {
   #lang-switch-btn {
-    display: none !important; /* 헤더 row에서는 숨김 */
+    display: none !important;
   }
   #lang-switch-mobile {
     display: flex !important;
     position: absolute;
-    top: 10px; right: 14px;
+    top: 8px; right: 14px;
     z-index: 1;
     font-size: 10px;
-    font-weight: 700;
-    border: 1.5px solid var(--sand);
-    border-radius: 20px;
-    overflow: hidden;
-    cursor: pointer;
-    user-select: none;
-    line-height: 1;
   }
-  #lang-switch-mobile span { padding: 4px 7px; transition: all .18s; }
+  #lang-switch-mobile .lang-opt {
+    padding: 4px 8px;
+  }
+}
+
   #header-logo {
     position: static !important;
     transform: none !important;
@@ -2203,14 +2315,10 @@ html, body {
     <div class="tl-logo">travel<span>.</span></div>
     <div class="tl-sub" id="tl-sub-text">나의 여행 계획</div>
     <div onclick="toggleLang()" title="언어 전환 / 言語切替"
-      style="display:flex;align-items:center;border:1.5px solid #ddd;
-             border-radius:20px;overflow:hidden;cursor:pointer;flex-shrink:0;
-             font-size:11px;font-weight:700;line-height:1;user-select:none;margin-left:auto;">
-      <span id="tl-lang-ja-label"
-        style="padding:5px 9px;transition:all .18s;background:#fff;color:#888;">日本語</span>
-      <span style="width:1px;background:#ddd;align-self:stretch;"></span>
-      <span id="tl-lang-ko-label"
-        style="padding:5px 9px;transition:all .18s;background:#003DA5;color:#fff;">한국어</span>
+      id="tl-lang-switch" style="margin-left:auto;">
+      <div class="lang-pill" id="lang-pill-tl"></div>
+      <span id="tl-lang-ja-label" class="lang-opt">日本語</span>
+      <span id="tl-lang-ko-label" class="lang-opt lang-opt-active">한국어</span>
     </div>
   </div>
   <div id="trip-list-cards"></div>
@@ -2260,11 +2368,10 @@ html, body {
     onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">← 목록</button>
 
   <!-- 모바일 전용 언어 스위치 (우측 상단) -->
-  <div id="lang-switch-mobile" onclick="toggleLang()"
-    style="display:none;background:var(--white);">
-    <span id="mob-lang-ja" style="background:var(--white);color:var(--ink3);">日本語</span>
-    <span style="width:1px;background:var(--sand);align-self:stretch;"></span>
-    <span id="mob-lang-ko" style="background:var(--accent2);color:#fff;">한국어</span>
+  <div id="lang-switch-mobile" onclick="toggleLang()">
+    <div class="lang-pill" id="lang-pill-mob"></div>
+    <span id="mob-lang-ja" class="lang-opt">日本語</span>
+    <span id="mob-lang-ko" class="lang-opt lang-opt-active">한국어</span>
   </div>
 
   <!-- travel. 로고 -->
@@ -2275,15 +2382,10 @@ html, body {
 
   <!-- 우측 버튼들 -->
   <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
-    <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替"
-      style="display:flex;align-items:center;border:1.5px solid var(--sand);
-             border-radius:20px;overflow:hidden;cursor:pointer;flex-shrink:0;
-             font-size:11px;font-weight:700;line-height:1;user-select:none;">
-      <span id="lang-ja-label"
-        style="padding:5px 9px;transition:all .18s;background:var(--white);color:var(--ink3);">日本語</span>
-      <span style="width:1px;background:var(--sand);align-self:stretch;"></span>
-      <span id="lang-ko-label"
-        style="padding:5px 9px;transition:all .18s;background:var(--accent2);color:#fff;">한국어</span>
+    <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替">
+      <div class="lang-pill" id="lang-pill-pc"></div>
+      <span id="lang-ja-label" class="lang-opt">日本語</span>
+      <span id="lang-ko-label" class="lang-opt lang-opt-active">한국어</span>
     </div>
     <button onclick="location.reload()" title="새로고침"
       style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
@@ -3269,23 +3371,41 @@ function applyLang(lang) {
   localStorage.setItem('appLang', lang);
 
   // 토글 스위치 (헤더 PC + 여행 목록 화면 + 모바일 우측 상단)
-  const jaLabel = document.getElementById('lang-ja-label');
-  const koLabel = document.getElementById('lang-ko-label');
+  const jaLabel   = document.getElementById('lang-ja-label');
+  const koLabel   = document.getElementById('lang-ko-label');
   const tlJaLabel = document.getElementById('tl-lang-ja-label');
   const tlKoLabel = document.getElementById('tl-lang-ko-label');
-  const mobJa = document.getElementById('mob-lang-ja');
-  const mobKo = document.getElementById('mob-lang-ko');
+  const mobJa     = document.getElementById('mob-lang-ja');
+  const mobKo     = document.getElementById('mob-lang-ko');
 
-  [[jaLabel, koLabel], [tlJaLabel, tlKoLabel], [mobJa, mobKo]].forEach(([ja, ko]) => {
+  // pill 위치 + 라벨 활성화 클래스 업데이트
+  [[jaLabel, koLabel, 'lang-pill-pc'], [mobJa, mobKo, 'lang-pill-mob']].forEach(([ja, ko, pillId]) => {
     if (!ja || !ko) return;
+    const pill = document.getElementById(pillId);
     if (lang === 'ja') {
-      ja.style.background = '#C8102E'; ja.style.color = '#fff';
-      ko.style.background = 'var(--white)'; ko.style.color = 'var(--ink3)';
+      ja.classList.add('lang-opt-active');
+      ko.classList.remove('lang-opt-active');
+      if (pill) pill.classList.add('ja');
     } else {
-      ja.style.background = 'var(--white)'; ja.style.color = 'var(--ink3)';
-      ko.style.background = 'var(--accent2)'; ko.style.color = '#fff';
+      ko.classList.add('lang-opt-active');
+      ja.classList.remove('lang-opt-active');
+      if (pill) pill.classList.remove('ja');
     }
   });
+
+  // 여행 목록 화면의 언어 버튼도 동기화
+  if (tlJaLabel && tlKoLabel) {
+    const tlPill = document.getElementById('lang-pill-tl');
+    if (lang === 'ja') {
+      tlJaLabel.classList.add('lang-opt-active');
+      tlKoLabel.classList.remove('lang-opt-active');
+      if (tlPill) tlPill.classList.add('ja');
+    } else {
+      tlKoLabel.classList.add('lang-opt-active');
+      tlJaLabel.classList.remove('lang-opt-active');
+      if (tlPill) tlPill.classList.remove('ja');
+    }
+  }
 
   // 탭
   const tabs = document.querySelectorAll('.panel-tab');
