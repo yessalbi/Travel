@@ -1309,7 +1309,8 @@ html, body {
 
 
 
-/* 지도 전체화면 오버레이 — iOS/Android 공통 */
+/* 지도 탭 — 모바일 전용, PC에선 기본 숨김 */
+.map-tab-mobile { display: none; }
 #map-overlay {
   display: none;
   position: fixed;
@@ -1321,6 +1322,44 @@ html, body {
   position: absolute;
   top: 52px; left: 0; right: 0;
   bottom: 0;
+}
+
+/* PC 전용 헤더 (탭 대신 닫기 버튼) */
+#map-overlay-pc-header {
+  display: none; /* 기본 숨김, PC에서만 표시 */
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--white);
+  border-bottom: 1.5px solid var(--sand);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  z-index: 10;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+}
+@media (min-width: 769px) {
+  #map-overlay-pc-header { display: flex; }
+  #map-overlay-tabs { display: none !important; }
+}
+
+/* 오버레이 안 장소 카드 */
+#map-overlay-place-card {
+  position: absolute;
+  top: 68px; left: 16px;
+  width: 340px; z-index: 50;
+  background: var(--white); border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  display: none; flex-direction: column; overflow: hidden;
+  max-height: calc(100vh - 96px);
+}
+#map-overlay-place-card.show { display: flex; }
+@media (max-width: 768px) {
+  #map-overlay-place-card {
+    top: auto; bottom: 0; left: 0; right: 0;
+    width: 100%; border-radius: 20px 20px 0 0;
+    max-height: 78vh;
+  }
 }
 #map-overlay-tabs {
   position: absolute;
@@ -2559,10 +2598,7 @@ html, body {
     </div>
     <div id="route-controls" style="display:none;"></div>
     <div id="map-fab">
-      <button class="fab-btn" onclick="mapZoom(1)" title="확대">＋</button>
-      <button class="fab-btn" onclick="mapZoom(-1)" title="축소">－</button>
-      <button class="fab-btn" onclick="fitDayBounds(currentDay)" title="현재 Day 핀 맞춤">⊞</button>
-      <button class="fab-btn" id="btn-my-location" onclick="toggleMyLocation()" title="현재 위치">◎</button>
+      <button class="fab-btn" id="btn-map-fullscreen" onclick="toggleMapFullscreen()" title="전체화면">⛶</button>
     </div>
   </div>
 
@@ -6078,6 +6114,26 @@ function renderSearchResults(top, resultsEl, activeMap) {
 // 오버레이 지도용 POI 카드 열기
 function openMapPlaceCardOnMap(placeId, targetMap) {
   const svc = new google.maps.places.PlacesService(targetMap || map);
+
+  // 오버레이 활성화 상태면 오버레이 안 카드 컨테이너 사용
+  const isOverlay = document.getElementById('map-overlay')?.classList.contains('active');
+  const cardContainer = isOverlay
+    ? document.getElementById('map-overlay-place-card')
+    : document.getElementById('map-place-card');
+
+  if (!cardContainer) return;
+
+  // 로딩 상태 표시
+  cardContainer.innerHTML = `
+    <div style="position:relative;">
+      <div class="mpc-photo" style="display:flex;align-items:center;justify-content:center;font-size:40px;height:180px;background:var(--stone);">🗺️</div>
+      <button class="mpc-back" onclick="${isOverlay ? 'closeOverlayPlaceCard()' : 'closeMapPlaceCard()'}">←</button>
+    </div>
+    <div class="mpc-header">
+      <div class="mpc-name">${(LANG_MAP[currentLang]||LANG_MAP.ko).infoLoading || '정보 불러오는 중…'}</div>
+    </div>`;
+  cardContainer.classList.add('show');
+
   svc.getDetails({
     placeId,
     fields: ['name','geometry','formatted_address','rating','opening_hours',
@@ -6085,28 +6141,41 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
     language: 'ko',
   }, (place, status) => {
     if (status !== google.maps.places.PlacesServiceStatus.OK || !place) return;
-    // 모바일 지도탭: Day전체 버튼 + 저장 버튼 표시
-    renderMapPlaceCard(place, { ...place, _overlayMap: true });
-    // 카드(바텀시트 ~78vh) 높이만큼 위로 오프셋해서 장소가 카드 위에 보이게
-    if (targetMap) {
-      setTimeout(() => {
-        const mapHeight = targetMap.getDiv().offsetHeight;
-        const cardHeight = mapHeight * 0.78;
-        const offset = cardHeight / 2;
-        const proj = targetMap.getProjection();
-        if (proj) {
-          const loc = place.geometry.location;
-          const point = proj.fromLatLngToPoint(loc);
-          const scale = Math.pow(2, targetMap.getZoom());
-          point.y += offset / scale;
-          const newLoc = proj.fromPointToLatLng(point);
-          targetMap.panTo(newLoc);
-        } else {
-          targetMap.panTo(place.geometry.location);
-        }
-      }, 100);
+    if (isOverlay) {
+      renderMapPlaceCardInto(place, cardContainer, targetMap);
+    } else {
+      renderMapPlaceCard(place, { ...place, _overlayMap: false });
+    }
+    // 지도 패닝
+    if (targetMap && place.geometry) {
+      setTimeout(() => { targetMap.panTo(place.geometry.location); }, 100);
     }
   });
+}
+
+function closeOverlayPlaceCard() {
+  const c = document.getElementById('map-overlay-place-card');
+  if (c) { c.classList.remove('show'); c.innerHTML = ''; }
+}
+
+// 오버레이 컨테이너에 장소 카드 렌더 (renderMapPlaceCard를 재사용)
+function renderMapPlaceCardInto(place, container, targetMap) {
+  // 잠시 id를 교체해서 renderMapPlaceCard가 올바른 컨테이너에 그리도록 함
+  const realCard = document.getElementById('map-place-card');
+  const tempId   = 'map-place-card';
+  if (realCard) realCard.id = 'map-place-card-real';
+  container.id = tempId;
+  container.classList.add('show');
+
+  renderMapPlaceCard(place, { ...place, _overlayMap: true });
+
+  // id 복원
+  container.id = 'map-overlay-place-card';
+  if (realCard) realCard.id = 'map-place-card';
+
+  // 닫기 버튼을 오버레이 전용으로 교체
+  const backBtn = container.querySelector('.mpc-back');
+  if (backBtn) backBtn.onclick = closeOverlayPlaceCard;
 }
 
 function openMapPlaceCard(place, idx) {
@@ -7257,14 +7326,28 @@ function fitAllPins() {
 
 let overlayMap = null;
 
-function switchToMapTab() {
+// ── 지도 전체화면 토글 (PC/태블릿 + 모바일 공용) ───────────────
+function toggleMapFullscreen() {
   const overlay = document.getElementById('map-overlay');
+  const isActive = overlay.classList.contains('active');
+  if (isActive) {
+    _closeMapFullscreen();
+  } else {
+    _openMapFullscreen();
+  }
+}
+
+function _openMapFullscreen() {
+  const overlay    = document.getElementById('map-overlay');
+  const overlayMapEl = document.getElementById('map-overlay-map');
   overlay.classList.add('active');
   sessionStorage.setItem('panelTab', 'map');
 
-  const overlayMapEl = document.getElementById('map-overlay-map');
+  // fullscreen 버튼 아이콘 변경
+  const fsBtn = document.getElementById('btn-map-fullscreen');
+  if (fsBtn) fsBtn.textContent = '⛶';
 
-  // 독립 지도 생성 (기존 map과 분리)
+  // 오버레이 지도 초기화 또는 위치 동기화
   if (!overlayMap && window.google && window.google.maps) {
     const center = map ? map.getCenter() : { lat: 35.6762, lng: 139.6503 };
     const zoom   = map ? map.getZoom()   : 12;
@@ -7273,10 +7356,8 @@ function switchToMapTab() {
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
-      language: 'ko',
     });
-
-    // POI 클릭 시 카드 표시
+    // POI 클릭 → 오버레이 카드 표시
     overlayMap.addListener('click', (e) => {
       if (e.placeId) {
         e.stop();
@@ -7284,13 +7365,30 @@ function switchToMapTab() {
       }
     });
   } else if (overlayMap && map) {
-    // 이미 생성된 경우 현재 일정 중심으로 이동
     overlayMap.setCenter(map.getCenter());
     overlayMap.setZoom(map.getZoom());
-    google.maps.event.trigger(overlayMap, 'resize');
+    setTimeout(() => google.maps.event.trigger(overlayMap, 'resize'), 50);
   }
-  // 맛집&장소 마커 overlayMap에 표시
   setTimeout(() => renderMapMarkers(), 150);
+}
+
+function _closeMapFullscreen() {
+  const overlay = document.getElementById('map-overlay');
+  overlay.classList.remove('active');
+  sessionStorage.removeItem('panelTab');
+  // 오버레이 카드도 숨기기
+  const oc = document.getElementById('map-overlay-place-card');
+  if (oc) oc.innerHTML = '';
+}
+
+// 모바일 탭에서 map 탭 클릭 시 호환
+function switchToMapTab() {
+  _openMapFullscreen();
+}
+
+function closeMapOverlay(tabIdx) {
+  _closeMapFullscreen();
+  switchPanelTab(tabIdx);
 }
 
 // 최근 검색 localStorage
@@ -7467,22 +7565,6 @@ document.addEventListener('click', (e) => {
     if (r) { r.style.display = 'none'; r.innerHTML = ''; }
   }
 });
-
-function closeMapOverlay(tabIdx) {
-  const overlay = document.getElementById('map-overlay');
-  overlay.classList.remove('active');
-
-  // 지도 + FAB + 경로버튼 원래 자리로 복구
-  const mapWrapper = document.getElementById('map-wrapper');
-  mapWrapper.appendChild(document.getElementById('map'));
-  mapWrapper.appendChild(document.getElementById('map-fab'));
-
-  setTimeout(() => {
-    if (window.google && map) google.maps.event.trigger(map, 'resize');
-  }, 50);
-
-  switchPanelTab(tabIdx);
-}
 
 // 새로고침 시 마지막 상태 복원
 function restoreUIState() {
@@ -8613,9 +8695,11 @@ document.addEventListener('keydown', (e) => {
   } catch(e) {}
 })();
 </script>
-<!-- 모바일 지도 전체화면 오버레이 -->
+<!-- 지도 전체화면 오버레이 (PC + 모바일 공용) -->
 <div id="map-overlay">
   <div id="map-overlay-map"></div>
+
+  <!-- 검색바 -->
   <div id="map-overlay-search" style="position:absolute;top:60px;left:12px;right:12px;z-index:20;display:flex;align-items:center;background:#fff;border-radius:24px;box-shadow:0 2px 12px rgba(0,0,0,0.18);overflow:visible">
     <span style="padding:0 4px 0 14px;font-size:16px;color:#aaa;">🔍</span>
     <input id="map-overlay-search-input" type="text" placeholder="장소 검색"
@@ -8627,12 +8711,27 @@ document.addEventListener('keydown', (e) => {
     <div id="map-overlay-search-results"
       style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);display:none;flex-direction:column;max-height:320px;overflow-y:auto;z-index:30;"></div>
   </div>
+
+  <!-- PC 전용 헤더: 닫기 버튼만 -->
+  <div id="map-overlay-pc-header">
+    <span style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--ink);">travel<span style="color:var(--accent);">.</span> 지도</span>
+    <button onclick="toggleMapFullscreen()" title="전체화면 닫기"
+      style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--sand);
+             background:var(--white);cursor:pointer;font-size:16px;display:flex;align-items:center;
+             justify-content:center;color:var(--ink2);transition:all .13s;margin-left:auto;"
+      onmouseover="this.style.background='var(--stone)'" onmouseout="this.style.background='var(--white)'">⛶</button>
+  </div>
+
+  <!-- 모바일 전용 탭바 -->
   <div id="map-overlay-tabs">
     <button class="ov-tab" onclick="closeMapOverlay(0)"><span class="ov-ico">✈️</span>여행 정보</button>
-    <button class="ov-tab" onclick="closeMapOverlay(1)"><span class="ov-ico">📅</span data-i18n="secSchedule">일별 일정</button>
+    <button class="ov-tab" onclick="closeMapOverlay(1)"><span class="ov-ico">📅</span>일별 일정</button>
     <button class="ov-tab" onclick="closeMapOverlay(2)"><span class="ov-ico">🎒</span>챙겨야할 것</button>
     <button class="ov-tab active" onclick="void(0)"><span class="ov-ico">🗺️</span>지도</button>
   </div>
+
+  <!-- map-place-card: 오버레이 안에서도 표시 -->
+  <div id="map-overlay-place-card"></div>
 </div>
 
 <!-- 일정 추가 — 장소 검색 패널 -->
