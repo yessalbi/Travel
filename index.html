@@ -1507,13 +1507,12 @@ html, body {
   border-radius: 30px;
   cursor: pointer;
   user-select: none;
-  font-size: 11px;
+  font-size: 11px !important; /* 모바일 16px 강제 방지 */
   font-weight: 700;
   line-height: 1;
   padding: 3px;
   gap: 0;
   flex-shrink: 0;
-  /* 물방울 유리 배경 */
   background: rgba(255,255,255,0.55);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
@@ -1523,8 +1522,9 @@ html, body {
     inset 0 1px 0 rgba(255,255,255,0.8),
     inset 0 -1px 0 rgba(0,0,0,0.04);
   transition: box-shadow .2s, transform .15s;
-  overflow: hidden; /* pill이 밖으로 안 나가게 */
+  /* overflow:hidden 제거 — backdrop-filter를 죽이는 원인 */
 }
+#lang-switch-btn { display: flex; } /* PC에서 항상 표시 */
 #lang-switch-btn:hover,
 #lang-switch-mobile:hover {
   box-shadow:
@@ -1538,33 +1538,30 @@ html, body {
   transform: scale(0.97) translateY(0);
 }
 
-/* 슬라이딩 pill (활성 언어 하이라이트) */
+/* 슬라이딩 pill */
 .lang-pill {
   position: absolute;
   top: 3px; bottom: 3px;
   width: calc(50% - 3px);
   border-radius: 24px;
-  /* 물방울 pill 자체 */
   background: linear-gradient(145deg,
-    rgba(255,255,255,0.9) 0%,
-    rgba(255,255,255,0.6) 40%,
-    rgba(200,220,255,0.7) 100%
+    rgba(255,255,255,0.95) 0%,
+    rgba(255,255,255,0.7) 40%,
+    rgba(210,225,255,0.8) 100%
   );
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.9);
+  border: 1px solid rgba(255,255,255,0.95);
   box-shadow:
-    0 2px 8px rgba(58,143,224,0.2),
+    0 2px 8px rgba(0,0,0,0.1),
     inset 0 1px 0 rgba(255,255,255,1),
-    inset 0 -1px 0 rgba(58,143,224,0.1);
+    inset 0 -1px 0 rgba(0,0,0,0.06);
   transition: left .3s cubic-bezier(.34,1.56,.64,1);
-  /* 기본: 오른쪽 (한국어) */
-  left: calc(50% + 0px);
+  left: calc(50%);  /* 기본: 오른쪽 (한국어) */
   pointer-events: none;
   z-index: 0;
 }
-/* 일본어 활성화 시 왼쪽으로 */
-.lang-pill.ja { left: 3px; }
+.lang-pill.ja { left: 3px; } /* 일본어 활성화 시 왼쪽 */
 
 /* 텍스트 라벨 */
 .lang-opt {
@@ -1576,15 +1573,17 @@ html, body {
   transition: color .25s, font-weight .2s;
   letter-spacing: 0.3px;
   white-space: nowrap;
+  font-size: 11px !important;
 }
+/* 한국어 활성: 파란색 */
 .lang-opt-active {
-  color: rgba(30,80,180,0.85);
+  color: rgba(30,80,180,0.9);
   font-weight: 800;
 }
-
-/* 헤더 다크 배경 위에선 다르게 */
-#header #lang-switch-btn {
-  background: rgba(255,255,255,0.45);
+/* 일본어 활성: 붉은색 */
+.lang-opt-active-ja {
+  color: rgba(180,20,30,0.9);
+  font-weight: 800;
 }
 
 /* 모바일 */
@@ -1597,12 +1596,12 @@ html, body {
     position: absolute;
     top: 8px; right: 14px;
     z-index: 1;
-    font-size: 10px;
   }
   #lang-switch-mobile .lang-opt {
     padding: 4px 8px;
   }
 }
+
 
   #header-logo {
     position: static !important;
@@ -3382,12 +3381,14 @@ function applyLang(lang) {
     if (!ja || !ko) return;
     const pill = document.getElementById(pillId);
     if (lang === 'ja') {
-      ja.classList.add('lang-opt-active');
-      ko.classList.remove('lang-opt-active');
+      ja.classList.add('lang-opt-active-ja');
+      ja.classList.remove('lang-opt-active');
+      ko.classList.remove('lang-opt-active', 'lang-opt-active-ja');
       if (pill) pill.classList.add('ja');
     } else {
       ko.classList.add('lang-opt-active');
-      ja.classList.remove('lang-opt-active');
+      ko.classList.remove('lang-opt-active-ja');
+      ja.classList.remove('lang-opt-active', 'lang-opt-active-ja');
       if (pill) pill.classList.remove('ja');
     }
   });
@@ -3396,12 +3397,14 @@ function applyLang(lang) {
   if (tlJaLabel && tlKoLabel) {
     const tlPill = document.getElementById('lang-pill-tl');
     if (lang === 'ja') {
-      tlJaLabel.classList.add('lang-opt-active');
-      tlKoLabel.classList.remove('lang-opt-active');
+      tlJaLabel.classList.add('lang-opt-active-ja');
+      tlJaLabel.classList.remove('lang-opt-active');
+      tlKoLabel.classList.remove('lang-opt-active', 'lang-opt-active-ja');
       if (tlPill) tlPill.classList.add('ja');
     } else {
       tlKoLabel.classList.add('lang-opt-active');
-      tlJaLabel.classList.remove('lang-opt-active');
+      tlKoLabel.classList.remove('lang-opt-active-ja');
+      tlJaLabel.classList.remove('lang-opt-active', 'lang-opt-active-ja');
       if (tlPill) tlPill.classList.remove('ja');
     }
   }
