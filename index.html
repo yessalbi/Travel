@@ -1501,10 +1501,13 @@ html, body {
 } /* @media (max-width: 768px) 닫힘 */
 
 /* ── 언어 전환 버튼 (물방울 글래스모피즘) ── */
+#lang-switch-mobile {
+  display: none; /* 기본 숨김 — 모바일에서만 표시 */
+}
+
 #lang-switch-btn,
 #lang-switch-mobile {
   position: relative;
-  display: flex;
   align-items: center;
   border-radius: 30px;
   cursor: pointer;
