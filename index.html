@@ -45,6 +45,7 @@
 <!-- Firebase compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script>
   firebase.initializeApp({
     apiKey: "AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ",
@@ -2316,6 +2317,24 @@ html, body {
   font-size: 10px; font-weight: 700; border-radius: 4px;
   padding: 2px 6px; letter-spacing: .5px;
 }
+/* ── 로그인 게이트 ── */
+#auth-gate input::placeholder {
+  letter-spacing: 2px;
+  font-size: 14px;
+}
+/* ── 헤더 버튼 고정 레이아웃 (언어 버튼 위치 밀림 방지) ── */
+#header-btn-row #lang-switch-btn {
+  flex-shrink: 0 !important;
+  order: -1;
+}
+#save-btn {
+  min-width: 130px;
+  text-align: center;
+}
+#share-btn {
+  min-width: 76px;
+  text-align: center;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -2325,6 +2344,37 @@ html, body {
 <div id="loading">
   <div class="logo">travel<span>.</span></div>
   <div class="spinner"></div>
+</div>
+
+<!-- 로그인 게이트 -->
+<div id="auth-gate" style="display:none;">
+  <div style="position:fixed;inset:0;background:var(--cream);z-index:9997;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;">
+    <div style="font-family:'Playfair Display',serif;font-size:36px;font-weight:700;color:var(--ink);">
+      travel<span style="color:var(--accent);">.</span>
+    </div>
+    <div style="font-size:14px;color:var(--ink3);">비밀번호를 입력해주세요</div>
+    <input id="auth-pw-input" type="password" placeholder="비밀번호 4자리" maxlength="4"
+      style="width:200px;border:2px solid var(--sand);border-radius:14px;padding:14px 20px;
+             font-family:inherit;font-size:20px;text-align:center;outline:none;
+             letter-spacing:8px;background:var(--white);color:var(--ink);
+             transition:border-color .2s;"
+      onfocus="this.style.borderColor='var(--accent)'"
+      onblur="this.style.borderColor='var(--sand)'"
+      oninput="onAuthInput(this)"
+      onkeydown="if(event.key==='Enter')tryAuth()" />
+    <div id="auth-error" style="font-size:12px;color:#E53935;min-height:18px;"></div>
+    <button onclick="tryAuth()"
+      style="padding:12px 40px;border-radius:12px;border:none;
+             background:var(--accent);color:#fff;font-family:inherit;
+             font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s;"
+      onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+      입장하기
+    </button>
+    <div style="font-size:11px;color:var(--ink3);margin-top:12px;opacity:0.5;">
+      친구에게 비밀번호를 물어보세요 🔑
+    </div>
+  </div>
 </div>
 
 <!-- 여행 목록 화면 -->
@@ -3148,7 +3198,7 @@ async function showColorPicker(e, btn, tripId) {
       picker.remove();
       // Firebase에 color 저장
       try {
-        await window.fbUpdateTrip(tripId, { color: key });
+        await window.fbSaveTrip(tripId, { color: key });
       } catch(e) {}
     };
     picker.appendChild(dot);
@@ -3800,7 +3850,7 @@ async function showTripListScreen() {
       if (!isAdminMode) {
         card.querySelector('.tl-archive-btn').addEventListener('click', (e) => {
           e.stopPropagation();
-          if (!confirm(`"${title}"$(LANG_MAP[currentLang]?.confirmArchive || LANG_MAP.ko.confirmArchive)`)) return;
+          if (!confirm(`"${title}"${LANG_MAP[currentLang]?.confirmArchive || LANG_MAP.ko.confirmArchive}`)) return;
           archiveTrip(tripId);
           card.style.transition = 'opacity .3s'; card.style.opacity = '0';
           setTimeout(() => showTripListScreen(), 320);
@@ -3811,7 +3861,7 @@ async function showTripListScreen() {
       if (isAdminMode) {
         card.querySelector('.tl-card-del').addEventListener('click', async (e) => {
           e.stopPropagation();
-          if (!confirm(`"${title}"(LANG_MAP[currentLang]?.confirmDelete || LANG_MAP.ko.confirmDelete)`)) return;
+          if (!confirm(`"${title}"${LANG_MAP[currentLang]?.confirmDelete || LANG_MAP.ko.confirmDelete}`)) return;
           try {
             await window.fbDeleteTrip(tripId);
             removeTripFromList(tripId);
@@ -3846,6 +3896,16 @@ async function showTripListScreen() {
         const emoji     = getTitleEmoji(title).trim() || '✈️';
         const dateRange = formatDateRange(meta.startDate, meta.endDate);
         const author    = meta.author || '';
+        const archiveUpdatedAt = meta.updatedAt
+          ? (() => {
+              const d = new Date(meta.updatedAt);
+              const h = d.getHours();
+              const ampm = h < 12 ? 'AM' : 'PM';
+              const h12 = h % 12 || 12;
+              const hhmm = `${ampm} ${String(h12).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+              return `${d.getMonth()+1}/${d.getDate()} (${hhmm})`;
+            })()
+          : null;
 
         const card = document.createElement('div');
         card.className = 'tl-card past-trip';
@@ -3856,7 +3916,7 @@ async function showTripListScreen() {
             <div class="tl-card-dates">${dateRange}</div>
             <div class="tl-card-dday past">여행 완료</div>
             ${author ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;">작성자 : ${author}</div>` : ''}
-            ${updatedAt ? `<div style="font-size:10px;color:var(--ink3);margin-top:4px;opacity:0.7;">수정 ${updatedAt}</div>` : ''}
+            ${archiveUpdatedAt ? `<div style="font-size:10px;color:var(--ink3);margin-top:4px;opacity:0.7;">수정 ${archiveUpdatedAt}</div>` : ''}
           </div>
           <button class="tl-archive-btn" title="현재 목록으로 복원">↩ 복원</button>
           <div class="tl-card-arrow">›</div>`;
@@ -3980,7 +4040,86 @@ function generateId() {
 }
 
 // ── 초기화 ────────────────────────────────────────────────────
+// ── 로그인 게이트 (공용 비밀번호 → Firebase Anonymous Auth) ──
+const AUTH_PW = '0009';
+let isAuthenticated = false;
+
+function showAuthGate() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('auth-gate').style.display = 'block';
+  setTimeout(() => document.getElementById('auth-pw-input')?.focus(), 100);
+}
+
+function onAuthInput(el) {
+  // 4자리 입력 시 자동 시도
+  if (el.value.length === 4) tryAuth();
+}
+
+async function tryAuth() {
+  const input = document.getElementById('auth-pw-input');
+  const error = document.getElementById('auth-error');
+  const pw = input?.value || '';
+
+  if (pw !== AUTH_PW) {
+    error.textContent = '비밀번호가 맞지 않아요';
+    input.value = '';
+    input.focus();
+    input.style.borderColor = '#E53935';
+    setTimeout(() => { input.style.borderColor = 'var(--sand)'; }, 1500);
+    return;
+  }
+
+  error.textContent = '로그인 중…';
+  try {
+    await firebase.auth().signInAnonymously();
+    isAuthenticated = true;
+    // 세션 동안 재입력 방지
+    sessionStorage.setItem('authOk', '1');
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('loading').style.display = 'flex';
+    await realInit();
+  } catch(e) {
+    console.error('Auth 실패:', e);
+    error.textContent = '로그인 실패 — 네트워크를 확인해주세요';
+    // 오프라인이면 로컬 데이터로 진행
+    if (!navigator.onLine) {
+      isAuthenticated = true;
+      sessionStorage.setItem('authOk', '1');
+      document.getElementById('auth-gate').style.display = 'none';
+      document.getElementById('loading').style.display = 'flex';
+      await realInit();
+    }
+  }
+}
+
+// 앱 진입점: 인증 상태 확인 후 게이트 or 메인 진행
 async function init() {
+  // 이미 Firebase Auth 세션이 있거나, 이번 세션에서 인증 통과했으면 바로 진행
+  const user = firebase.auth().currentUser;
+  const sessionOk = sessionStorage.getItem('authOk') === '1';
+
+  if (user || sessionOk) {
+    isAuthenticated = true;
+    if (!user && navigator.onLine) {
+      // 세션은 있는데 Firebase 토큰 만료 → 재인증 시도
+      try { await firebase.auth().signInAnonymously(); } catch(e) {}
+    }
+    await realInit();
+  } else {
+    // Firebase onAuthStateChanged로 기존 세션 확인
+    firebase.auth().onAuthStateChanged(async (u) => {
+      if (u) {
+        isAuthenticated = true;
+        sessionStorage.setItem('authOk', '1');
+        await realInit();
+      } else {
+        showAuthGate();
+      }
+    });
+  }
+}
+
+async function realInit() {
   // 왼쪽 패널 너비를 CSS 변수로 설정 (map-place-card 위치 계산용)
   const syncPanelW = () => {
     const lp = document.getElementById('left-panel');
@@ -4118,6 +4257,11 @@ function applyTripData(data) {
   if (data.routePoints) {
     routePoints = data.routePoints;
     if (map) drawRoute();
+  }
+  if (data.placesSnapshot && !navigator.onLine) {
+    placesData = data.placesSnapshot;
+    renderPlaceChips();
+    renderMapMarkers();
   }
   updateDuration();
   updateTripSummary();
@@ -4564,6 +4708,7 @@ function buildPayload() {
     budgetTotal:   parseFloat(document.getElementById('budget-total-input')?.value) || 0,
     budgetCurrency: document.getElementById('budget-currency-select')?.value || 'JPY',
     expenseData,
+    placesSnapshot: placesData,
     updatedAt:     new Date().toISOString(),
   };
 }
@@ -7302,7 +7447,15 @@ async function savePlaceItem() {
     lng:   pendingLatLng.lng,
     createdAt: new Date().toISOString(),
   };
-  await window.fbAddPlace(TRIP_ID, place);
+  try {
+    const docId = await window.fbAddPlace(TRIP_ID, place);
+    place.id = docId;
+  } catch(e) {
+    place.id = 'local-' + Date.now();
+  }
+  placesData.push(place);
+  renderPlaceChips();
+  renderMapMarkers();
   closeOverlay('place-overlay');
   showToast('📍 ' + name + ' 핀이 추가되었습니다');
 }
@@ -7521,6 +7674,7 @@ function switchPanelTab(idx) {
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
   sessionStorage.setItem('panelTab', idx);
   if (idx === 0 && map) {
+    clearDayRoutes();
     fitAllPins();
     drawAllDayRoutes();
     // 맛집&장소 마커 표시
