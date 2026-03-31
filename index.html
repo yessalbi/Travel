@@ -1161,7 +1161,7 @@ html, body {
   }
 }
 
-
+.mpc-photo {
   width: 100%; height: 180px; object-fit: cover;
   flex-shrink: 0; background: var(--stone);
   display: flex; align-items: center; justify-content: center;
@@ -1498,6 +1498,8 @@ html, body {
     font-size: 12px; padding: 4px 8px;
     z-index: 1;
   }
+} /* @media (max-width: 768px) 닫힘 */
+
 /* ── 언어 전환 버튼 (물방울 글래스모피즘) ── */
 #lang-switch-btn,
 #lang-switch-mobile {
@@ -1563,6 +1565,21 @@ html, body {
 }
 .lang-pill.ja { left: 3px; } /* 일본어 활성화 시 왼쪽 */
 
+/* 일본어일 때 pill 붉은빛으로 */
+.lang-pill.ja {
+  left: 3px;
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.95) 0%,
+    rgba(255,230,230,0.8) 40%,
+    rgba(255,200,200,0.7) 100%
+  );
+  box-shadow:
+    0 2px 8px rgba(180,20,30,0.15),
+    inset 0 1px 0 rgba(255,255,255,1),
+    inset 0 -1px 0 rgba(180,20,30,0.08);
+  border: 1px solid rgba(255,200,200,0.8);
+}
+
 /* 텍스트 라벨 */
 .lang-opt {
   position: relative;
@@ -1602,7 +1619,7 @@ html, body {
   }
 }
 
-
+@media (max-width: 768px) {
   #header-logo {
     position: static !important;
     transform: none !important;
