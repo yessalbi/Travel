@@ -1143,17 +1143,21 @@ html, body {
   .mpc-drag-handle {
     display: flex;
     justify-content: center;
-    align-items: center;
-    padding: 10px 0 4px;
+    align-items: flex-start;
+    padding-top: 10px;
     cursor: grab;
-    flex-shrink: 0;
     touch-action: none;
     user-select: none;
+    /* 사진 위에 오버레이 */
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    pointer-events: auto;
   }
   .mpc-drag-handle::after {
     content: '';
     width: 40px; height: 4px;
-    background: var(--sand);
+    background: rgba(255,255,255,0.6);
     border-radius: 2px;
   }
 }
@@ -6180,8 +6184,8 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
 
   // 로딩 상태 표시
   cardContainer.innerHTML = `
-    <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
-    <div style="position:relative;">
+    <div style="position:relative;flex-shrink:0;">
+      <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
       <div class="mpc-photo" style="display:flex;align-items:center;justify-content:center;font-size:40px;height:180px;background:var(--stone);">🗺️</div>
       <button class="mpc-back" onclick="${isOverlay ? 'closeOverlayPlaceCard()' : 'closeMapPlaceCard()'}">←</button>
     </div>
@@ -6265,8 +6269,8 @@ function openMapPlaceCard(place, idx) {
 
   // 로딩 상태 먼저 표시
   card.innerHTML = `
-    <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
-    <div style="position:relative;">
+    <div style="position:relative;flex-shrink:0;">
+      <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
       <div class="mpc-photo" style="display:flex;align-items:center;justify-content:center;font-size:40px;height:180px;background:var(--stone);">🗺️</div>
       <button class="mpc-back" onclick="closeMapPlaceCard()">←</button>
     </div>
@@ -6361,8 +6365,8 @@ function renderMapPlaceCard(d, fb) {
     </div>`).join('');
 
   card.innerHTML = `
-    <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
     <div style="position:relative;flex-shrink:0;overflow:hidden;">
+      <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
       ${photoUrl
         ? `<img src="${photoUrl}" class="mpc-photo" style="height:180px;width:100%;object-fit:cover;" />`
         : `<div class="mpc-photo" style="height:180px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--stone);">🗺️</div>`}
