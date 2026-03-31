@@ -2841,7 +2841,7 @@ let scheduleData  = {};
 let placesData    = [];
 let checklistData = {};   // { "passport": true, "license": false, ... }
 // 지출 데이터: { food: [{id, name, amountKrw, color}, ...], move: [...], ... }
-let expenseData   = { food:[], cafe:[], sight:[], move:[], shop:[] };
+let expenseData   = { food:[], cafe:[], sight:[], move:[], shop:[], hotel:[] };
 let voucherData   = {};   // { "flight-out": "base64...", ... }
 let customCheckItems = []; // [{ id, label, emoji }, ...]
 let customVoucherItems = [];
@@ -3895,7 +3895,7 @@ function applyTripData(data) {
   }
   if (data.expenseData) {
     // 기존 카테고리 구조 유지하며 병합
-    const cats = ['food','cafe','sight','move','shop'];
+    const cats = ['food','cafe','sight','move','shop','hotel'];
     cats.forEach(k => {
       if (data.expenseData[k]) expenseData[k] = data.expenseData[k];
     });
@@ -5111,6 +5111,7 @@ function calcFx() {
 // ── 카테고리별 세부 항목 색상 팔레트 ─────────────────────────
 // 각 카테고리마다 항목 순서대로 색상을 순환 배정
 const CAT_PALETTES = {
+  hotel: ['#1565C0','#1976D2','#1E88E5','#2196F3','#42A5F5','#64B5F6','#90CAF9','#BBDEFB'],
   food:  ['#E8430A','#F97316','#FBBF24','#84CC16','#06B6D4','#8B5CF6','#EC4899','#F43F5E'],
   cafe:  ['#AD6B2F','#D97706','#F59E0B','#CA8A04','#A16207','#78350F','#92400E','#B45309'],
   sight: ['#2E7D32','#16A34A','#15803D','#166534','#4ADE80','#22C55E','#86EFAC','#1D6A5A'],
@@ -5142,8 +5143,9 @@ function calcBudget() {
   });
 
   // 나머지 카테고리: expenseData 합산
-  ['food','cafe','sight','move','shop'].forEach(k => {
-    cats[k] = (expenseData[k] || []).reduce((s, e) => s + (e.amountKrw || 0), 0);
+  ['food','cafe','sight','move','shop','hotel'].forEach(k => {
+    const extra = (expenseData[k] || []).reduce((s, e) => s + (e.amountKrw || 0), 0);
+    cats[k] = (cats[k] || 0) + extra;
   });
 
   const totalSpent = Object.values(cats).reduce((s, v) => s + v, 0);
@@ -5182,7 +5184,7 @@ function calcBudget() {
   if (!catGrid) return;
 
   const catDefs = [
-    { key:'hotel', label: t.budgetCatHotel || '🏨 숙박', baseColor:'#1565C0', hasExpense: false },
+    { key:'hotel', label: t.budgetCatHotel || '🏨 숙박', baseColor:'#1565C0', hasExpense: true },
     { key:'food',  label: t.budgetCatFood  || '🍜 식비',  baseColor:'#E8430A', hasExpense: true },
     { key:'move',  label: t.budgetCatMove  || '🚇 교통',  baseColor:'#888780', hasExpense: true },
     { key:'shop',  label: t.budgetCatShop  || '🛍️ 쇼핑', baseColor:'#7B1FA2', hasExpense: true },
@@ -5192,45 +5194,69 @@ function calcBudget() {
 
   catGrid.innerHTML = '';
 
-  catDefs.forEach(({ key, label, baseColor, hasExpense }) => {
-    const amt    = cats[key];
-    const items  = hasExpense ? (expenseData[key] || []) : [];
-    const palette = CAT_PALETTES[key] || [baseColor];
+  catDefs.forEach(({ key, label, baseColor }) => {
+    const expItems = expenseData[key] || [];
+    const palette  = CAT_PALETTES[key] || [baseColor];
+
+    // 숙박: 일별카드 체크인 항목들 + expenseData 항목들을 합쳐서 표시
+    let allItems = [...expItems];
+    if (key === 'hotel') {
+      // 일별카드 체크인 항목을 가상 expense 항목으로 변환 (중복 제거된 것들)
+      const seen = {};
+      Object.values(scheduleData).forEach(dayItems => {
+        (dayItems || []).forEach(item => {
+          if (item.type !== 'hotel' || item.hotelCheckType === 'checkout') return;
+          const nameKey = (item.name || '').trim().toLowerCase();
+          if (!seen[nameKey] && parseFloat(item.hotelPrice) > 0) {
+            seen[nameKey] = true;
+            allItems.unshift({
+              id: 'schedule-' + nameKey,
+              name: item.name,
+              amountKrw: parseFloat(item.hotelPrice),
+              color: null, // 팔레트에서 나중에 배정
+            });
+          }
+        });
+      });
+    }
+
+    // 팔레트 색상 배정 (color가 없는 항목에 순서대로)
+    let palIdx = 0;
+    allItems = allItems.map(item => ({
+      ...item,
+      color: item.color || palette[palIdx++ % palette.length],
+    }));
+
+    const amt = allItems.reduce((s, e) => s + (e.amountKrw || 0), 0);
 
     const card = document.createElement('div');
     card.className = 'budget-cat-item';
 
-    // ＋💰 버튼 (숙박 제외)
-    const addBtnHtml = hasExpense
-      ? `<button class="budget-cat-add-btn" onclick="openExpensePopup('${key}')" title="지출 추가"><span style="white-space:nowrap;writing-mode:horizontal-tb;display:inline-flex;align-items:center;gap:1px;font-size:11px;">＋💰</span></button>`
-      : '';
+    // ＋💰 버튼 (모든 카테고리)
+    const addBtnHtml = `<button class="budget-cat-add-btn" onclick="openExpensePopup('${key}')" title="지출 추가"><span style="white-space:nowrap;writing-mode:horizontal-tb;display:inline-flex;align-items:center;gap:1px;font-size:11px;">＋💰</span></button>`;
 
-    // 스택 바 HTML 생성
+    // ── 스택 바: 항상 100% 채움, 항목 비율로 분할 ──
     let stackBarHtml = '';
-    if (items.length > 0 && amt > 0) {
+    if (allItems.length > 0 && amt > 0) {
       let leftPct = 0;
-      const segs = items.map((item, i) => {
+      const segs = allItems.map(item => {
         const segPct = (item.amountKrw / amt) * 100;
-        const color  = palette[i % palette.length];
-        const seg = { item, segPct, leftPct, color };
+        const seg = { item, segPct, leftPct };
         leftPct += segPct;
         return seg;
       });
-      const segHtml = segs.map(({ item, segPct, leftPct, color }) =>
+      const segHtml = segs.map(({ item, segPct, leftPct }) =>
         `<div class="bci-stack-seg"
-          style="left:${leftPct.toFixed(2)}%;width:${segPct.toFixed(2)}%;background:${color};"
-          data-name="${item.name.replace(/"/g,'&quot;')}"
-          data-amt="₩${item.amountKrw.toLocaleString()}"
+          style="left:${leftPct.toFixed(2)}%;width:${segPct.toFixed(2)}%;background:${item.color};"
+          data-name="${(item.name||'').replace(/"/g,'&quot;')}"
+          data-amt="₩${(item.amountKrw||0).toLocaleString()}"
           onmouseenter="showStackTooltip(event,this)"
           onmouseleave="hideStackTooltip()"></div>`
       ).join('');
       stackBarHtml = `<div class="bci-stack-bar">${segHtml}</div>`;
     } else {
-      // 지출 없으면 단색 바
-      const catPct = totalInput > 0 ? Math.min(amt / totalInput * 100, 100) : 0;
-      stackBarHtml = `<div class="bci-stack-bar">
-        <div class="bci-stack-seg" style="left:0;width:${catPct.toFixed(1)}%;background:${baseColor};border-radius:3px;"></div>
-      </div>`;
+      // 지출 없으면 빈 바
+      stackBarHtml = `<div class="bci-stack-bar"></div>`;
     }
 
     card.innerHTML = `
