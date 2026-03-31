@@ -1100,21 +1100,65 @@ html, body {
 }
 #map-place-card.show { display: flex; }
 
-/* 모바일: 바텀시트 */
+/* 모바일: 드래그 바텀시트 */
 @media (max-width: 768px) {
   #map-place-card {
     position: fixed !important;
-    top: auto !important; bottom: 0; left: 0 !important; right: 0;
+    top: auto !important;
+    bottom: 0; left: 0 !important; right: 0;
     width: 100% !important;
     border-radius: 20px 20px 0 0;
-    max-height: 78vh;
+    max-height: 85vh;
+    height: 85vh;
     z-index: 1100;
     box-shadow: 0 -4px 24px rgba(0,0,0,0.18);
+    overflow: hidden;
+    /* translateY로 높이 조절 */
+    transform: translateY(100%);
+    transition: transform .32s cubic-bezier(.4,0,.2,1);
+    will-change: transform;
+    touch-action: none;
+  }
+  #map-place-card.show {
+    /* half 상태: 사진+이름+평점 높이만큼 */
+    transform: translateY(var(--sheet-half-offset, 48%));
+  }
+  #map-place-card.sheet-full {
+    transform: translateY(0);
+  }
+  #map-place-card.sheet-peek {
+    transform: translateY(calc(100% - 60px));
+  }
+  /* half/peek 에선 스크롤 막기 */
+  #map-place-card:not(.sheet-full) .mpc-tab-content {
+    overflow: hidden;
   }
 }
 
-/* 상단 사진 */
-.mpc-photo {
+/* 드래그 핸들 */
+.mpc-drag-handle {
+  display: none;
+}
+@media (max-width: 768px) {
+  .mpc-drag-handle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0 4px;
+    cursor: grab;
+    flex-shrink: 0;
+    touch-action: none;
+    user-select: none;
+  }
+  .mpc-drag-handle::after {
+    content: '';
+    width: 40px; height: 4px;
+    background: var(--sand);
+    border-radius: 2px;
+  }
+}
+
+
   width: 100%; height: 180px; object-fit: cover;
   flex-shrink: 0; background: var(--stone);
   display: flex; align-items: center; justify-content: center;
@@ -1358,8 +1402,19 @@ html, body {
   #map-overlay-place-card {
     top: auto; bottom: 0; left: 0; right: 0;
     width: 100%; border-radius: 20px 20px 0 0;
-    max-height: 78vh;
+    height: 85vh; max-height: 85vh;
+    overflow: hidden;
+    transform: translateY(100%);
+    transition: transform .32s cubic-bezier(.4,0,.2,1);
+    will-change: transform;
+    touch-action: none;
   }
+  #map-overlay-place-card.show {
+    transform: translateY(var(--sheet-half-offset, 48%));
+  }
+  #map-overlay-place-card.sheet-full { transform: translateY(0); }
+  #map-overlay-place-card.sheet-peek { transform: translateY(calc(100% - 60px)); }
+  #map-overlay-place-card:not(.sheet-full) .mpc-tab-content { overflow: hidden; }
 }
 #map-overlay-tabs {
   position: absolute;
@@ -6125,6 +6180,7 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
 
   // 로딩 상태 표시
   cardContainer.innerHTML = `
+    <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
     <div style="position:relative;">
       <div class="mpc-photo" style="display:flex;align-items:center;justify-content:center;font-size:40px;height:180px;background:var(--stone);">🗺️</div>
       <button class="mpc-back" onclick="${isOverlay ? 'closeOverlayPlaceCard()' : 'closeMapPlaceCard()'}">←</button>
@@ -6132,7 +6188,12 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
     <div class="mpc-header">
       <div class="mpc-name">${(LANG_MAP[currentLang]||LANG_MAP.ko).infoLoading || '정보 불러오는 중…'}</div>
     </div>`;
+  cardContainer.classList.remove('sheet-full','sheet-peek');
   cardContainer.classList.add('show');
+  if (!isOverlay && window.innerWidth <= 768) {
+    initSheetDrag(cardContainer);
+    panMapForSheet('half', targetMap || map);
+  }
 
   svc.getDetails({
     placeId,
@@ -6141,13 +6202,14 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
     language: 'ko',
   }, (place, status) => {
     if (status !== google.maps.places.PlacesServiceStatus.OK || !place) return;
+    mapCurrentPlace = place; // panMapForSheet가 참조할 수 있도록 먼저 설정
     if (isOverlay) {
       renderMapPlaceCardInto(place, cardContainer, targetMap);
     } else {
-      renderMapPlaceCard(place, { ...place, _overlayMap: false });
+      renderMapPlaceCard(place, { ...place, _overlayMap: false, _targetMap: targetMap });
     }
-    // 지도 패닝
-    if (targetMap && place.geometry) {
+    // PC: 단순 패닝 (모바일은 panMapForSheet에서 처리)
+    if (window.innerWidth > 768 && targetMap && place.geometry) {
       setTimeout(() => { targetMap.panTo(place.geometry.location); }, 100);
     }
   });
@@ -6160,22 +6222,26 @@ function closeOverlayPlaceCard() {
 
 // 오버레이 컨테이너에 장소 카드 렌더 (renderMapPlaceCard를 재사용)
 function renderMapPlaceCardInto(place, container, targetMap) {
-  // 잠시 id를 교체해서 renderMapPlaceCard가 올바른 컨테이너에 그리도록 함
   const realCard = document.getElementById('map-place-card');
-  const tempId   = 'map-place-card';
   if (realCard) realCard.id = 'map-place-card-real';
-  container.id = tempId;
+  container.id = 'map-place-card';
+  container.classList.remove('sheet-full','sheet-peek');
   container.classList.add('show');
 
-  renderMapPlaceCard(place, { ...place, _overlayMap: true });
+  renderMapPlaceCard(place, { ...place, _overlayMap: true, _targetMap: targetMap });
 
-  // id 복원
   container.id = 'map-overlay-place-card';
   if (realCard) realCard.id = 'map-place-card';
 
-  // 닫기 버튼을 오버레이 전용으로 교체
+  // 닫기 버튼 교체
   const backBtn = container.querySelector('.mpc-back');
   if (backBtn) backBtn.onclick = closeOverlayPlaceCard;
+
+  // 모바일: 드래그 시트 초기화
+  if (window.innerWidth <= 768) {
+    initSheetDrag(container);
+    panMapForSheet('half', targetMap);
+  }
 }
 
 function openMapPlaceCard(place, idx) {
@@ -6199,6 +6265,7 @@ function openMapPlaceCard(place, idx) {
 
   // 로딩 상태 먼저 표시
   card.innerHTML = `
+    <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
     <div style="position:relative;">
       <div class="mpc-photo" style="display:flex;align-items:center;justify-content:center;font-size:40px;height:180px;background:var(--stone);">🗺️</div>
       <button class="mpc-back" onclick="closeMapPlaceCard()">←</button>
@@ -6207,7 +6274,12 @@ function openMapPlaceCard(place, idx) {
       <div class="mpc-name">${place.name}</div>
       <div class="mpc-sub">정보 불러오는 중…</div>
     </div>`;
+  card.classList.remove('sheet-full', 'sheet-peek');
   card.classList.add('show');
+  if (window.innerWidth <= 768) {
+    initSheetDrag(card);
+    panMapForSheet('half', map);
+  }
 
   const svc = new google.maps.places.PlacesService(map);
   svc.getDetails({
@@ -6216,7 +6288,7 @@ function openMapPlaceCard(place, idx) {
              'rating','user_ratings_total','opening_hours','website','types',
              'photos','reviews','price_level','geometry','place_id'],
     language: 'ko'
-  }, (d, s) => renderMapPlaceCard(s === google.maps.places.PlacesServiceStatus.OK ? d : place, place));
+  }, (d, s) => renderMapPlaceCard(s === google.maps.places.PlacesServiceStatus.OK ? d : place, { ...place, _targetMap: map }));
 }
 
 function openGoogleMaps(placeId, name, lat, lng) {
@@ -6289,7 +6361,8 @@ function renderMapPlaceCard(d, fb) {
     </div>`).join('');
 
   card.innerHTML = `
-    <div style="position:relative;flex-shrink:0;">
+    <div class="mpc-drag-handle" id="mpc-drag-handle"></div>
+    <div style="position:relative;flex-shrink:0;overflow:hidden;">
       ${photoUrl
         ? `<img src="${photoUrl}" class="mpc-photo" style="height:180px;width:100%;object-fit:cover;" />`
         : `<div class="mpc-photo" style="height:180px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--stone);">🗺️</div>`}
@@ -6374,13 +6447,127 @@ function renderMapPlaceCard(d, fb) {
         ${d.price_level ? `<div class="mpc-row"><span class="mpc-row-icon">💰</span><span class="mpc-row-text">${priceMap[d.price_level]}</span></div>` : ''}
       </div>
     </div>`;
+
+  card.classList.remove('sheet-full', 'sheet-peek');
   card.classList.add('show');
+  // 모바일: half 상태로 열고 드래그 초기화 + 지도 패닝
+  if (window.innerWidth <= 768) {
+    initSheetDrag(card);
+    panMapForSheet('half', fb && fb._targetMap ? fb._targetMap : (overlayMap || map));
+  }
 }
 
 function switchMpcTab(btn, idx) {
   const card = document.getElementById('map-place-card');
   card.querySelectorAll('.mpc-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   card.querySelectorAll('.mpc-tab-panel').forEach((p,i) => p.classList.toggle('active', i===idx));
+}
+
+// ── 모바일 바텀시트 드래그 ─────────────────────────────────────
+// 3단계: peek(60px 노출) → half(사진+이름+평점) → full(전체)
+function initSheetDrag(card) {
+  // 기존 이벤트 정리
+  if (card._sheetCleanup) card._sheetCleanup();
+
+  const handle = card.querySelector('.mpc-drag-handle');
+  if (!handle) return;
+
+  // half 기준 offset 계산: 전체 높이(85vh) - 사진(180) - 핸들(28) - 헤더(~90)
+  const sheetH  = window.innerHeight * 0.85;
+  const halfH   = 180 + 28 + 96; // 사진 + 핸들 + 이름·평점 영역
+  const halfOffset = ((sheetH - halfH) / sheetH * 100).toFixed(1) + '%';
+  card.style.setProperty('--sheet-half-offset', halfOffset);
+
+  let startY = 0, startTranslate = 0, isDragging = false;
+  let currentState = 'half'; // 'peek' | 'half' | 'full'
+
+  function getTranslateY() {
+    const style = window.getComputedStyle(card);
+    const matrix = new DOMMatrix(style.transform);
+    return matrix.m42; // translateY px
+  }
+
+  function snapToState(state, targetMap) {
+    currentState = state;
+    card.classList.remove('sheet-full', 'sheet-peek');
+    if (state === 'full')  card.classList.add('sheet-full');
+    if (state === 'peek')  card.classList.add('sheet-peek');
+    // half는 CSS default (.show 상태)
+    panMapForSheet(state, targetMap);
+  }
+
+  function onStart(e) {
+    isDragging = true;
+    startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    startTranslate = getTranslateY();
+    card.style.transition = 'none';
+    e.preventDefault();
+  }
+
+  function onMove(e) {
+    if (!isDragging) return;
+    const y = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+    const delta = y - startY;
+    const newY  = Math.max(0, startTranslate + delta);
+    card.style.transform = `translateY(${newY}px)`;
+    e.preventDefault();
+  }
+
+  function onEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    card.style.transition = '';
+    card.style.transform  = '';
+
+    const y     = e.type === 'touchend' ? e.changedTouches[0].clientY : e.clientY;
+    const delta = y - startY;
+    const targetMap = overlayMap || map;
+
+    // 스와이프 방향 + 현재 상태로 다음 상태 결정
+    if (delta < -40) {
+      // 위로 스와이프 → 한 단계 위
+      snapToState(currentState === 'peek' ? 'half' : 'full', targetMap);
+    } else if (delta > 40) {
+      // 아래로 스와이프 → 한 단계 아래
+      snapToState(currentState === 'full' ? 'half' : 'peek', targetMap);
+    } else {
+      // 미세한 움직임 → 현재 상태 유지
+      snapToState(currentState, targetMap);
+    }
+  }
+
+  handle.addEventListener('touchstart', onStart, { passive: false });
+  handle.addEventListener('touchmove',  onMove,  { passive: false });
+  handle.addEventListener('touchend',   onEnd,   { passive: false });
+
+  card._sheetCleanup = () => {
+    handle.removeEventListener('touchstart', onStart);
+    handle.removeEventListener('touchmove',  onMove);
+    handle.removeEventListener('touchend',   onEnd);
+  };
+}
+
+// 시트 상태에 따라 지도 패닝 (장소가 카드에 가려지지 않게)
+function panMapForSheet(state, targetMap) {
+  if (!targetMap) return;
+  const place = mapCurrentPlace;
+  const loc   = place?.geometry?.location;
+
+  const sheetH = window.innerHeight * 0.85;
+  let offsetPx = 0;
+  if (state === 'full')       offsetPx = sheetH * 0.45;
+  else if (state === 'half')  offsetPx = (180 + 28 + 96) * 0.65;
+  else                        offsetPx = 30;
+
+  setTimeout(() => {
+    if (!loc) return;
+    const proj = targetMap.getProjection();
+    if (!proj) { targetMap.panTo(loc); return; }
+    const point = proj.fromLatLngToPoint(loc);
+    const scale = Math.pow(2, targetMap.getZoom());
+    point.y += offsetPx / scale;
+    targetMap.panTo(proj.fromPointToLatLng(point));
+  }, 80);
 }
 
 // POI 카드에서 현재 Day 일정 추가 팝업 열기
@@ -6413,7 +6600,12 @@ function addPoiToSchedule(name, lat, lng) {
   openOverlay('schedule-overlay');
 }
 function closeMapPlaceCard() {
-  document.getElementById('map-place-card')?.classList.remove('show');
+  const card = document.getElementById('map-place-card');
+  if (card) {
+    card.classList.remove('show', 'sheet-full', 'sheet-peek');
+    // 드래그 이벤트 정리
+    if (card._sheetCleanup) { card._sheetCleanup(); card._sheetCleanup = null; }
+  }
   mapCurrentPlace = null;
   window._selectedSearchIdx = undefined;
   window._selectedOverlayIdx = undefined;
