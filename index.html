@@ -1648,13 +1648,6 @@ html, body {
     width: 100%;
     flex-wrap: nowrap;
   }
-  #header-right-wrap {
-    width: 100%;
-    justify-content: center;
-  }
-  #header-right-wrap > #lang-switch-btn { display: none !important; }
-  #save-btn  { min-width: 0 !important; }
-  #share-btn { min-width: 0 !important; }
   #header-badge-group { flex-direction: column; gap: 1px; }
   #save-btn { font-size: 12px; padding: 6px 10px; }
   #share-btn { font-size: 12px; padding: 6px 10px; }
@@ -2329,19 +2322,19 @@ html, body {
   letter-spacing: 2px;
   font-size: 14px;
 }
-/* ── 헤더 우측 래퍼: 언어 버튼 + 버튼 그룹 묶음 ── */
-#header-right-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+/* ── 헤더 버튼 고정 레이아웃 (언어 버튼 위치 밀림 방지) ── */
+#header-btn-row #lang-switch-btn {
+  flex-shrink: 0 !important;
+  order: -1;
 }
-#header > #header-right-wrap > #lang-switch-btn {
-  flex-shrink: 0;
+#save-btn {
+  min-width: 130px;
+  text-align: center;
 }
-/* 한↔일 텍스트 변경 시 버튼 크기 변동 방지: 일본어(긴 쪽) 기준 고정 */
-#save-btn  { min-width: 142px; text-align: center; box-sizing: border-box; }
-#share-btn { min-width: 80px;  text-align: center; box-sizing: border-box; }
+#share-btn {
+  min-width: 76px;
+  text-align: center;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -2360,7 +2353,7 @@ html, body {
     <div style="font-family:'Playfair Display',serif;font-size:36px;font-weight:700;color:var(--ink);">
       travel<span style="color:var(--accent);">.</span>
     </div>
-    <div style="font-size:14px;color:var(--ink3);">비밀번호를 입력해주세요</div>
+    <div style="font-size:14px;color:var(--ink3);" data-i18n-auth="desc">비밀번호를 입력해주세요</div>
     <input id="auth-pw-input" type="password" placeholder="비밀번호 4자리" maxlength="4"
       style="width:200px;border:2px solid var(--sand);border-radius:14px;padding:14px 20px;
              font-family:inherit;font-size:20px;text-align:center;outline:none;
@@ -2376,9 +2369,9 @@ html, body {
              background:var(--accent);color:#fff;font-family:inherit;
              font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s;"
       onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-      입장하기
+      <span data-i18n-auth="enter">입장하기</span>
     </button>
-    <div style="font-size:11px;color:var(--ink3);margin-top:12px;opacity:0.5;">
+    <div style="font-size:11px;color:var(--ink3);margin-top:12px;opacity:0.5;" data-i18n-auth="hint">
       친구에게 비밀번호를 물어보세요 🔑
     </div>
   </div>
@@ -2410,7 +2403,7 @@ html, body {
   background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
   <div style="background:var(--white);border-radius:20px;padding:28px;width:280px;
     box-shadow:0 20px 60px rgba(0,0,0,0.25);display:flex;flex-direction:column;gap:14px;">
-    <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--ink);">
+    <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--ink);" data-i18n-admin="title">
       🔐 관리자 인증
     </div>
     <input id="admin-pw-input" type="password" placeholder="비밀번호 입력"
@@ -2423,11 +2416,11 @@ html, body {
     <div style="display:flex;gap:8px;">
       <button onclick="closeAdminPw()"
         style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sand);
-               background:none;font-family:inherit;cursor:pointer;color:var(--ink2);">취소</button>
+               background:none;font-family:inherit;cursor:pointer;color:var(--ink2);" data-i18n-admin="cancel">취소</button>
       <button onclick="confirmAdminPw()"
         style="flex:1;padding:10px;border-radius:10px;border:none;
                background:var(--accent2);color:#fff;font-family:inherit;
-               font-weight:600;cursor:pointer;">확인</button>
+               font-weight:600;cursor:pointer;" data-i18n-admin="confirm">확인</button>
     </div>
   </div>
 </div>
@@ -2455,30 +2448,25 @@ html, body {
   <!-- 여행 제목 -->
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
 
-  <!-- 우측 전체 래퍼 (언어 버튼 + 버튼들) -->
-  <div id="header-right-wrap">
-    <!-- 언어 전환 (독립) -->
+  <!-- 우측 버튼들 -->
+  <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
     <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替">
       <div class="lang-pill" id="lang-pill-pc"></div>
       <span id="lang-ja-label" class="lang-opt">日本語</span>
       <span id="lang-ko-label" class="lang-opt lang-opt-active">한국어</span>
     </div>
-
-    <!-- 우측 버튼들 -->
-    <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
-      <button onclick="location.reload()" title="새로고침"
-        style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
-               font-size:15px;padding:5px 9px;border-radius:8px;
-               transition:all .14s;color:var(--ink3);line-height:1;flex-shrink:0;"
-        onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
-        onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">↺</button>
-      <div id="header-badge-group" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-        <span id="trip-id-badge">ID 로드 중…</span>
-        <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
-      </div>
-      <button class="header-btn ghost" id="share-btn">🔗 공유</button>
-      <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
+    <button onclick="location.reload()" title="새로고침"
+      style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
+             font-size:15px;padding:5px 9px;border-radius:8px;
+             transition:all .14s;color:var(--ink3);line-height:1;flex-shrink:0;"
+      onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
+      onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">↺</button>
+    <div id="header-badge-group" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+      <span id="trip-id-badge">ID 로드 중…</span>
+      <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
     </div>
+    <button class="header-btn ghost" id="share-btn">🔗 공유</button>
+    <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
   </div>
 </div>
 
@@ -3142,7 +3130,7 @@ function toggleAdminMode() {
     isAdminMode = false;
     sessionStorage.removeItem('adminMode');
     document.getElementById('btn-admin').classList.remove('active');
-    document.getElementById('tl-sub-text').textContent = '나의 여행 계획';
+    document.getElementById('tl-sub-text').textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).myTrips||'나의 여행 계획';
     showTripListScreen();
   } else {
     const overlay = document.getElementById('admin-pw-overlay');
@@ -3153,6 +3141,7 @@ function toggleAdminMode() {
 
 function confirmAdminPw() {
   const val = document.getElementById('admin-pw-input').value;
+  const _at = LANG_MAP[currentLang]||LANG_MAP.ko;
   if (val === ADMIN_PW) {
     isAdminMode = true;
     sessionStorage.setItem('adminMode', '1');
@@ -3160,7 +3149,7 @@ function confirmAdminPw() {
     document.getElementById('admin-pw-input').value = '';
     document.getElementById('admin-pw-error').style.display = 'none';
     document.getElementById('btn-admin').classList.add('active');
-    document.getElementById('tl-sub-text').textContent = '전체 여행 계획 (관리자)';
+    document.getElementById('tl-sub-text').textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).allTrips||'전체 여행 계획 (관리자)';
     showTripListScreen();
   } else {
     document.getElementById('admin-pw-error').style.display = 'block';
@@ -3310,6 +3299,102 @@ const LANG_MAP = {
     toastAlreadySaved:'이미 맛집&장소에 저장된 장소예요',
     toastPlaceSaved:'맛집&장소에 저장됐어요',
     toastPlaceDeleted:'삭제됐어요',
+    toastLinkCopied:'링크가 복사되었습니다! 🔗',
+    toastSavedDevice:'이 기기에 저장됐어요 📥',
+    toastSavedDone:'✅ 저장됨',
+    toastSaveFail:'저장 실패: ',
+    toastNameRequired:'이름을 입력해주세요',
+    toastPlaceNameRequired:'장소명을 입력해주세요',
+    toastPickLocation:'지도에서 위치를 클릭해주세요',
+    toastMapNotReady:'지도가 아직 준비되지 않았어요',
+    toastMapClickPin:'지도에서 숙소 위치를 클릭하세요 📍',
+    toastHotelPinDone:'숙소 위치가 등록됐어요 ✓',
+    toastRouteDeleted:'경로가 삭제되었습니다',
+    placePopupTitle:'장소 추가',
+    placePopupName:'장소명',
+    placePopupDesc:'설명 / 메모',
+    placePopupPhoto:'대표 사진 URL',
+    placePopupPhotoHint:'(없으면 자동)',
+    placePopupMapSelect:'지도에서 위치 선택',
+    placePopupPickBtn:'📍 지도에서 위치 클릭하기',
+    placePopupSaveBtn:'핀 추가',
+    pinModeBanner:'📍 지도를 클릭해서 위치를 선택하세요',
+    pinModeCancel:'취소',
+    gmapsOpen:'🗺️ Google Maps에서 보기',
+    domDepart:'출발',
+    domReturn:'귀가 출발',
+    domHotelNameLabel:'숙소 이름',
+    domHotelAddrLabel:'숙소 주소 / 위치',
+    domPinBtn:'📍 지도에서 위치 찍기',
+    domMapBtn:'🗺️ 지도에서 보기',
+    domPinDone:'📍 위치 등록됨',
+    domCancelPin:'✕ 취소',
+    tripNoTitle:'제목 없는 여행',
+    tripTraveling:'✈️ 여행 중',
+    tripDone:'여행 완료',
+    tripNoDate:'날짜 미설정',
+    tripAuthorLabel:'작성자 : ',
+    tripEditLabel:'수정 ',
+    timeJustNow:'방금 전',
+    timeMinAgo:'분 전',
+    timeHourAgo:'시간 전',
+    timeDayAgo:'일 전',
+    nightsFormat:'{n}박 {d}일',
+    authEnterPw:'비밀번호를 입력해주세요',
+    authPlaceholder:'비밀번호 4자리',
+    authEnter:'입장하기',
+    authWrong:'비밀번호가 맞지 않아요',
+    authLoading:'로그인 중…',
+    authFail:'로그인 실패 — 네트워크를 확인해주세요',
+    authHint:'친구에게 비밀번호를 물어보세요 🔑',
+    adminAuth:'🔐 관리자 인증',
+    adminPwPlaceholder:'비밀번호 입력',
+    adminPwWrong:'비밀번호가 틀렸어요',
+    transitNoLoc:'위치 핀을 찍으면 거리가 표시돼요',
+    transitCalc:'계산 중…',
+    transitNoRoute:'경로를 찾을 수 없어요',
+    transitNoPublic:'🚌 이 구간 대중교통 정보가 없어요',
+    transitNoPublicFallback:'🚌 이 구간 대중교통 정보 없음 (자동차 기준)',
+    transitFlight:'비행기 이동 구간',
+    transitAvgRoutes:'개 루트 평균',
+    transitHour:'시간',
+    transitMin:'분',
+    mapInfoLoading:'정보 불러오는 중…',
+    mapSearching:'검색 중…',
+    mapNoResult:'결과가 없어요',
+    mapNoResultWider:'결과가 없어요 — 더 넓은 지역에서 검색해 보세요',
+    mapNoResultRetry:'결과가 없어요 — 검색어를 바꾸거나 지도를 이동 후 다시 검색해보세요',
+    mapRecentSearch:'최근 검색',
+    mapAddDay:'＋ Day',
+    mapSavePlace:'🍴 저장',
+    modePickDriving:'렌트카',
+    modePickTransit:'대중교통',
+    modePickWalking:'도보',
+    modePickBicycling:'자전거',
+    weatherForecast:'실시간 예보 · Open-Meteo',
+    weatherClimate:'⚠️ 출발까지 7일 이상 남아 실제 예보가 아닌 과거 기후 평균값이에요',
+    expenseNamePh:'예: 라멘',
+    expenseHotelPh:'예: 120000',
+    mapPlaceNotReady:'지도가 준비되지 않았어요',
+    tpHour:'시 (Hour)',
+    tpMinute:'분 (Minute)',
+    tpClose:'확인',
+    schPlaceSearch:'🔍 장소 검색',
+    schPlaceSearchTitle:'장소명 입력 후 Enter',
+    schPlaceSearchBtn:'검색',
+    schPlaceNoResult:'검색 결과가 없어요',
+    schPlaceSelected:'선택됨 — 추가 버튼을 눌러 완료하세요 ✓',
+    offlineMapLabel:'📴 오프라인 — 저장된 지도',
+    budgetNotSet:'미설정',
+    budgetCatCafe:'☕ 카페',
+    budgetCatSight:'🏛️ 관광',
+    budgetCatMove:'🚇 교통',
+    budgetEditDone:'완료',
+    budgetCurrencyLabel:'현지통화',
+    budgetRateLoading:'환율 불러오는 중…',
+    budgetRateError:'환율을 불러올 수 없어요',
+    expenseAmountLabel:'금액',
+    expenseUnitLabel:'단위',
     toastOnline:'🌐 온라인 연결됨 — 최신 데이터 불러오는 중…',
     toastOnlineUpdated:'✅ 최신 데이터로 업데이트됐어요',
     offlineMsgSaved:'📴 오프라인 모드 — 마지막 저장:',
@@ -3417,6 +3502,102 @@ const LANG_MAP = {
     toastAlreadySaved:'すでにグルメ＆スポットに保存済みです',
     toastPlaceSaved:'グルメ＆スポットに保存しました',
     toastPlaceDeleted:'削除しました',
+    toastLinkCopied:'リンクがコピーされました！ 🔗',
+    toastSavedDevice:'このデバイスに保存しました 📥',
+    toastSavedDone:'✅ 保存済み',
+    toastSaveFail:'保存失敗: ',
+    toastNameRequired:'名前を入力してください',
+    toastPlaceNameRequired:'場所名を入力してください',
+    toastPickLocation:'地図で位置をクリックしてください',
+    toastMapNotReady:'地図がまだ準備できていません',
+    toastMapClickPin:'地図で宿泊施設の位置をクリックしてください 📍',
+    toastHotelPinDone:'宿泊施設の位置が登録されました ✓',
+    toastRouteDeleted:'ルートが削除されました',
+    placePopupTitle:'場所追加',
+    placePopupName:'場所名',
+    placePopupDesc:'説明 / メモ',
+    placePopupPhoto:'写真URL',
+    placePopupPhotoHint:'(なければ自動)',
+    placePopupMapSelect:'地図で位置選択',
+    placePopupPickBtn:'📍 地図で位置をクリック',
+    placePopupSaveBtn:'ピン追加',
+    pinModeBanner:'📍 地図をクリックして位置を選択してください',
+    pinModeCancel:'キャンセル',
+    gmapsOpen:'🗺️ Google Mapsで見る',
+    domDepart:'出発',
+    domReturn:'帰宅出発',
+    domHotelNameLabel:'宿泊施設名',
+    domHotelAddrLabel:'住所 / 位置',
+    domPinBtn:'📍 地図で位置を指定',
+    domMapBtn:'🗺️ 地図で見る',
+    domPinDone:'📍 位置登録済み',
+    domCancelPin:'✕ キャンセル',
+    tripNoTitle:'タイトルなしの旅行',
+    tripTraveling:'✈️ 旅行中',
+    tripDone:'旅行済み',
+    tripNoDate:'日付未設定',
+    tripAuthorLabel:'作成者 : ',
+    tripEditLabel:'更新 ',
+    timeJustNow:'たった今',
+    timeMinAgo:'分前',
+    timeHourAgo:'時間前',
+    timeDayAgo:'日前',
+    nightsFormat:'{n}泊{d}日',
+    authEnterPw:'パスワードを入力してください',
+    authPlaceholder:'パスワード4桁',
+    authEnter:'入場する',
+    authWrong:'パスワードが正しくありません',
+    authLoading:'ログイン中…',
+    authFail:'ログイン失敗 — ネットワークを確認してください',
+    authHint:'友達にパスワードを聞いてください 🔑',
+    adminAuth:'🔐 管理者認証',
+    adminPwPlaceholder:'パスワード入力',
+    adminPwWrong:'パスワードが間違っています',
+    transitNoLoc:'位置ピンを付けると距離が表示されます',
+    transitCalc:'計算中…',
+    transitNoRoute:'ルートが見つかりません',
+    transitNoPublic:'🚌 この区間の公共交通情報がありません',
+    transitNoPublicFallback:'🚌 この区間の公共交通情報なし（車基準）',
+    transitFlight:'飛行機移動区間',
+    transitAvgRoutes:'ルート平均',
+    transitHour:'時間',
+    transitMin:'分',
+    mapInfoLoading:'情報を取得中…',
+    mapSearching:'検索中…',
+    mapNoResult:'結果がありません',
+    mapNoResultWider:'結果がありません — より広い地域で検索してください',
+    mapNoResultRetry:'結果がありません — 検索語を変えるか地図を移動して再検索してください',
+    mapRecentSearch:'最近の検索',
+    mapAddDay:'＋ Day',
+    mapSavePlace:'🍴 保存',
+    modePickDriving:'レンタカー',
+    modePickTransit:'公共交通機関',
+    modePickWalking:'徒歩',
+    modePickBicycling:'自転車',
+    weatherForecast:'リアルタイム予報 · Open-Meteo',
+    weatherClimate:'⚠️ 出発まで7日以上あるため、実際の予報ではなく過去の気候平均値です',
+    expenseNamePh:'例: ラーメン',
+    expenseHotelPh:'例: 120000',
+    mapPlaceNotReady:'地図が準備できていません',
+    tpHour:'時 (Hour)',
+    tpMinute:'分 (Minute)',
+    tpClose:'確認',
+    schPlaceSearch:'🔍 場所検索',
+    schPlaceSearchTitle:'場所名を入力してEnter',
+    schPlaceSearchBtn:'検索',
+    schPlaceNoResult:'検索結果がありません',
+    schPlaceSelected:'選択済み — 追加ボタンを押して完了してください ✓',
+    offlineMapLabel:'📴 オフライン — 保存済みの地図',
+    budgetNotSet:'未設定',
+    budgetCatCafe:'☕ カフェ',
+    budgetCatSight:'🏛️ 観光',
+    budgetCatMove:'🚇 交通',
+    budgetEditDone:'完了',
+    budgetCurrencyLabel:'現地通貨',
+    budgetRateLoading:'為替レート取得中…',
+    budgetRateError:'為替レートを取得できません',
+    expenseAmountLabel:'金額',
+    expenseUnitLabel:'単位',
     toastOnline:'🌐 オンライン接続 — 最新データを取得中…',
     toastOnlineUpdated:'✅ 最新データに更新しました',
     offlineMsgSaved:'📴 オフラインモード — 最終保存:',
@@ -3735,6 +3916,119 @@ function applyLang(lang) {
   if (secBudgetEl && t.secBudget) secBudgetEl.textContent = t.secBudget;
   // 카테고리 바 재렌더
   calcBudget();
+
+  // ── 추가 다국어 적용 (동적 UI 외 하드코딩된 텍스트) ──
+
+  // 로그인 게이트
+  const authGateDesc = document.querySelector('#auth-gate [data-i18n-auth="desc"]');
+  if (authGateDesc) authGateDesc.textContent = t.authEnterPw || '비밀번호를 입력해주세요';
+  const authGateInput = document.getElementById('auth-pw-input');
+  if (authGateInput) authGateInput.placeholder = t.authPlaceholder || '비밀번호 4자리';
+  const authGateBtn = document.querySelector('#auth-gate [data-i18n-auth="enter"]');
+  if (authGateBtn) authGateBtn.textContent = t.authEnter || '입장하기';
+  const authGateHint = document.querySelector('#auth-gate [data-i18n-auth="hint"]');
+  if (authGateHint) authGateHint.textContent = t.authHint || '친구에게 비밀번호를 물어보세요 🔑';
+
+  // 관리자 팝업
+  const adminTitle = document.querySelector('#admin-pw-overlay [data-i18n-admin="title"]');
+  if (adminTitle) adminTitle.textContent = t.adminAuth || '🔐 관리자 인증';
+  const adminInput = document.getElementById('admin-pw-input');
+  if (adminInput) adminInput.placeholder = t.adminPwPlaceholder || '비밀번호 입력';
+  const adminError = document.getElementById('admin-pw-error');
+  if (adminError) adminError.textContent = t.adminPwWrong || '비밀번호가 틀렸어요';
+  const adminCancel = document.querySelector('#admin-pw-overlay [data-i18n-admin="cancel"]');
+  if (adminCancel) adminCancel.textContent = t.btnCancel || '취소';
+  const adminConfirm = document.querySelector('#admin-pw-overlay [data-i18n-admin="confirm"]');
+  if (adminConfirm) adminConfirm.textContent = t.btnConfirm || '확인';
+
+  // 헤더 버튼
+  const btnBackList = document.getElementById('btn-back-list');
+  if (btnBackList) btnBackList.textContent = '← ' + (t.btnBackList || '목록');
+
+  // 장소 추가 팝업
+  const plPopupTitle = document.querySelector('#place-overlay .popup-title');
+  if (plPopupTitle) plPopupTitle.textContent = t.placePopupTitle || '장소 추가';
+  document.querySelectorAll('#place-overlay .popup-field > label').forEach(el => {
+    const txt = el.textContent.trim();
+    if (/^장소명$|^場所名$/.test(txt)) el.textContent = t.placePopupName || '장소명';
+    if (/^설명|^説明/.test(txt)) el.textContent = t.placePopupDesc || '설명 / 메모';
+    if (/^대표 사진|^写真/.test(txt)) el.innerHTML = (t.placePopupPhoto||'대표 사진 URL') + ' <small style="color:var(--ink3)">' + (t.placePopupPhotoHint||'(없으면 자동)') + '</small>';
+    if (/^지도에서 위치|^地図で位置/.test(txt)) el.textContent = t.placePopupMapSelect || '지도에서 위치 선택';
+  });
+  const plPickBtn = document.getElementById('pl-pick-btn');
+  if (plPickBtn && !/선택됨|選択/.test(plPickBtn.textContent)) plPickBtn.textContent = t.placePopupPickBtn || '📍 지도에서 위치 클릭하기';
+  const plSaveBtn = document.getElementById('pl-save-btn');
+  if (plSaveBtn) plSaveBtn.textContent = t.placePopupSaveBtn || '핀 추가';
+  const plCancelBtn = document.querySelector('#place-overlay .btn-cancel');
+  if (plCancelBtn) plCancelBtn.textContent = t.btnCancel || '취소';
+
+  // 핀 찍기 모드 배너
+  const pinBanner = document.getElementById('pin-mode-banner');
+  if (pinBanner) {
+    const cancelBtn = pinBanner.querySelector('.cancel-pin');
+    if (cancelBtn) cancelBtn.textContent = t.pinModeCancel || '취소';
+    // 배너 텍스트 (취소 버튼 앞의 텍스트노드)
+    if (pinBanner.childNodes[0] && pinBanner.childNodes[0].nodeType === 3) {
+      pinBanner.childNodes[0].textContent = (t.pinModeBanner || '📍 지도를 클릭해서 위치를 선택하세요') + '  ';
+    }
+  }
+
+  // 장소 사진 팝업 - Google Maps 버튼
+  const gmapsBtn = document.querySelector('#place-popup-body .btn-save');
+  if (gmapsBtn) gmapsBtn.textContent = t.gmapsOpen || '🗺️ Google Maps에서 보기';
+
+  // 지출 팝업 닫기 버튼
+  const expClose = document.querySelector('#expense-overlay .btn-cancel');
+  if (expClose) expClose.textContent = t.btnClose || '닫기';
+
+  // 오프라인 지도 라벨
+  const offMapLabel = document.getElementById('offline-map-label');
+  if (offMapLabel && /오프라인|オフライン/.test(offMapLabel.textContent)) offMapLabel.textContent = t.offlineMapLabel || '📴 오프라인 — 저장된 지도';
+
+  // 일정 추가 팝업 필드 라벨
+  document.querySelectorAll('#schedule-overlay .popup-field > label').forEach(el => {
+    const txt = el.textContent.trim();
+    if (/^위치|^位置/.test(txt)) el.innerHTML = (t.labelLocation||'위치') + ' <small style="color:var(--ink3)">' + (lang==='ja'?'（任意 — カード押下時に地図表示）':'(선택 — 카드 클릭 시 지도에 표시)') + '</small>';
+  });
+
+  // 장소 검색 패널
+  const schPlaceTitle = document.querySelector('#sch-place-panel-header div[style]');
+  if (schPlaceTitle && /장소 검색|場所検索/.test(schPlaceTitle.textContent)) schPlaceTitle.textContent = t.schPlaceSearch || '🔍 장소 검색';
+  const schPlaceInput = document.getElementById('sch-place-input');
+  if (schPlaceInput) schPlaceInput.placeholder = t.schPlaceSearchTitle || '장소명 입력 후 Enter';
+  const schPlaceSearchBtn = document.getElementById('sch-place-search-btn');
+  if (schPlaceSearchBtn) schPlaceSearchBtn.textContent = t.schPlaceSearchBtn || '검색';
+
+  // 예산 미설정 텍스트
+  const budgetTotalDisp = document.getElementById('budget-total-display');
+  if (budgetTotalDisp && /미설정|未設定/.test(budgetTotalDisp.textContent)) budgetTotalDisp.textContent = t.budgetNotSet || '미설정';
+
+  // 지도 오버레이 탭 텍스트
+  document.querySelectorAll('.ov-tab').forEach(el => {
+    const txt = el.textContent.trim();
+    if (/여행 정보|旅行情報/.test(txt)) el.innerHTML = '<span class="ov-ico">✈️</span>' + (t.tab0||'✈️ 여행 정보').replace('✈️ ','');
+    if (/일별 일정|日程/.test(txt)) el.innerHTML = '<span class="ov-ico">📅</span>' + (t.tab1||'📅 일별 일정').replace('📅 ','');
+    if (/챙겨야할|持ち物/.test(txt)) el.innerHTML = '<span class="ov-ico">🎒</span>' + (t.tab2||'🎒 챙겨야할 것').replace('🎒 ','');
+    if (/지도|地図/.test(txt)) el.innerHTML = '<span class="ov-ico">🗺️</span>' + (t.tab3||'🗺️ 지도').replace('🗺️ ','');
+  });
+
+  // 시간 선택기 라벨
+  document.querySelectorAll('.tp-section-label').forEach(el => {
+    if (/시 \(Hour\)|時 \(Hour\)/.test(el.textContent)) el.textContent = t.tpHour || '시 (Hour)';
+    if (/분 \(Minute\)|分 \(Minute\)/.test(el.textContent)) el.textContent = t.tpMinute || '분 (Minute)';
+  });
+  document.querySelectorAll('.tp-close-btn').forEach(el => {
+    el.textContent = t.tpClose || '확인';
+  });
+
+  // 지도 전체화면 헤더
+  const mapOvHeader = document.querySelector('#map-overlay-pc-header span');
+  if (mapOvHeader) mapOvHeader.innerHTML = "travel<span style='color:var(--accent);'>.</span> " + (lang==='ja'?'地図':'지도');
+
+  // renderScheduleList 재호출 (이동 카드 라벨 갱신)
+  if (typeof renderScheduleList === 'function' && typeof currentDay !== 'undefined' && scheduleData[currentDay]) {
+    renderScheduleList();
+  }
   // 지출 팝업이 열려있으면 라벨 갱신
   if (document.getElementById('expense-overlay')?.classList.contains('show')) {
     const t2 = LANG_MAP[lang] || LANG_MAP.ko;
@@ -3762,10 +4056,10 @@ async function showTripListScreen() {
   adminBtn.classList.add('show');
   if (isAdminMode) {
     adminBtn.classList.add('active');
-    document.getElementById('tl-sub-text').textContent = '전체 여행 계획 (관리자)';
+    document.getElementById('tl-sub-text').textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).allTrips||'전체 여행 계획 (관리자)';
   } else {
     adminBtn.classList.remove('active');
-    document.getElementById('tl-sub-text').textContent = '나의 여행 계획';
+    document.getElementById('tl-sub-text').textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).myTrips||'나의 여행 계획';
   }
 
   const container = document.getElementById('trip-list-cards');
@@ -3812,7 +4106,7 @@ async function showTripListScreen() {
     // 현재 여행 카드들
     trips.forEach(meta => {
       const tripId    = meta.id;
-      const title     = meta.title || '제목 없는 여행';
+      const title     = meta.title || (LANG_MAP[currentLang]||LANG_MAP.ko).tripNoTitle || '제목 없는 여행';
       const emoji     = getTitleEmoji(title).trim() || '✈️';
       const startDate = meta.startDate;
       const endDate   = meta.endDate;
@@ -3830,10 +4124,11 @@ async function showTripListScreen() {
             const ampm = h < 12 ? 'AM' : 'PM';
             const h12 = h % 12 || 12;
             const hhmm = `${ampm} ${String(h12).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-            if (diff < 60)  return `방금 전 (${hhmm})`;
-            if (diff < 3600) return `${Math.floor(diff/60)}분 전 (${hhmm})`;
-            if (diff < 86400) return `${Math.floor(diff/3600)}시간 전 (${hhmm})`;
-            if (diff < 86400*7) return `${Math.floor(diff/86400)}일 전 (${hhmm})`;
+            const _t = LANG_MAP[currentLang] || LANG_MAP.ko;
+            if (diff < 60)  return `${_t.timeJustNow||'방금 전'} (${hhmm})`;
+            if (diff < 3600) return `${Math.floor(diff/60)}${_t.timeMinAgo||'분 전'} (${hhmm})`;
+            if (diff < 86400) return `${Math.floor(diff/3600)}${_t.timeHourAgo||'시간 전'} (${hhmm})`;
+            if (diff < 86400*7) return `${Math.floor(diff/86400)}${_t.timeDayAgo||'일 전'} (${hhmm})`;
             return `${d.getMonth()+1}/${d.getDate()} (${hhmm})`;
           })()
         : null;
@@ -3850,8 +4145,8 @@ async function showTripListScreen() {
           </div>
           <div class="tl-card-dates">${dateRange}</div>
           ${ddayText ? `<div class="tl-card-dday ${ddayClass}">${ddayText}</div>` : ''}
-          ${author ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;">작성자 : ${author}</div>` : ''}
-          ${updatedAt ? `<div style="font-size:10px;color:var(--ink3);margin-top:4px;opacity:0.7;">수정 ${updatedAt}</div>` : ''}
+          ${author ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;">${(LANG_MAP[currentLang]||LANG_MAP.ko).tripAuthorLabel||'작성자 : '}${author}</div>` : ''}
+          ${updatedAt ? `<div style="font-size:10px;color:var(--ink3);margin-top:4px;opacity:0.7;">${(LANG_MAP[currentLang]||LANG_MAP.ko).tripEditLabel||'수정 '}${updatedAt}</div>` : ''}
         </div>
         <button class="tl-color-btn" title="색상 테마" style="background:none;border:none;cursor:pointer;font-size:14px;padding:4px;flex-shrink:0;opacity:0.5;" onclick="event.stopPropagation();showColorPicker(event,this,'${tripId}')">🎨</button>
         ${`<button class="tl-archive-btn" title="여행 완료로 표시">✓ 완료</button>`}
@@ -3927,7 +4222,7 @@ async function showTripListScreen() {
             <div class="tl-card-title">${title}</div>
             <div class="tl-card-dates">${dateRange}</div>
             <div class="tl-card-dday past">여행 완료</div>
-            ${author ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;">작성자 : ${author}</div>` : ''}
+            ${author ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;">${(LANG_MAP[currentLang]||LANG_MAP.ko).tripAuthorLabel||'작성자 : '}${author}</div>` : ''}
             ${archiveUpdatedAt ? `<div style="font-size:10px;color:var(--ink3);margin-top:4px;opacity:0.7;">수정 ${archiveUpdatedAt}</div>` : ''}
           </div>
           <button class="tl-archive-btn" title="현재 목록으로 복원">↩ 복원</button>
@@ -3998,9 +4293,10 @@ function getDDayText(startDate, endDate) {
   if (end) end.setHours(0,0,0,0);
   const diff = Math.round((start - today) / 86400000);
   if (diff > 0) return `D-${diff}`;
-  if (diff === 0) return '🎉 오늘 출발!';
-  if (end && today <= end) return '✈️ 여행 중';
-  return '여행 완료';
+  const _t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  if (diff === 0) return '🎉 ' + (_t.setupDoneTitle || '오늘 출발!');
+  if (end && today <= end) return _t.tripTraveling || '✈️ 여행 중';
+  return _t.tripDone || '여행 완료';
 }
 
 function getDDayClass(startDate, endDate) {
@@ -4014,7 +4310,7 @@ function getDDayClass(startDate, endDate) {
 }
 
 function formatDateRange(startDate, endDate) {
-  if (!startDate) return '날짜 미설정';
+  if (!startDate) return (LANG_MAP[currentLang]||LANG_MAP.ko).tripNoDate || '날짜 미설정';
   const fmt = d => new Date(d).toLocaleDateString('ko-KR', { month:'long', day:'numeric' });
   return endDate ? `${fmt(startDate)} ~ ${fmt(endDate)}` : fmt(startDate);
 }
@@ -4073,7 +4369,7 @@ async function tryAuth() {
   const pw = input?.value || '';
 
   if (pw !== AUTH_PW) {
-    error.textContent = '비밀번호가 맞지 않아요';
+    error.textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).authWrong||'비밀번호가 맞지 않아요';
     input.value = '';
     input.focus();
     input.style.borderColor = '#E53935';
@@ -4081,7 +4377,7 @@ async function tryAuth() {
     return;
   }
 
-  error.textContent = '로그인 중…';
+  error.textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).authLoading||'로그인 중…';
   try {
     await firebase.auth().signInAnonymously();
     isAuthenticated = true;
@@ -4092,7 +4388,7 @@ async function tryAuth() {
     await realInit();
   } catch(e) {
     console.error('Auth 실패:', e);
-    error.textContent = '로그인 실패 — 네트워크를 확인해주세요';
+    error.textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).authFail||'로그인 실패 — 네트워크를 확인해주세요';
     // 오프라인이면 로컬 데이터로 진행
     if (!navigator.onLine) {
       isAuthenticated = true;
@@ -4873,18 +5169,18 @@ document.getElementById('save-btn').onclick = async () => {
     await window.offlineSave(TRIP_ID, payload);
     await captureStaticMap(currentDay);
     const btn = document.getElementById('save-btn');
-    btn.textContent = '✅ 저장됨';
+    btn.textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).toastSavedDone||'✅ 저장됨';
     setTimeout(() => { btn.innerHTML = '📥 오프라인 저장'; }, 1800);
-    showToast('이 기기에 저장됐어요 📥');
+    showToast((LANG_MAP[currentLang]||LANG_MAP.ko).toastSavedDevice||'이 기기에 저장됐어요 📥');
   } catch(e) {
-    showToast('저장 실패: ' + e.message);
+    showToast(((LANG_MAP[currentLang]||LANG_MAP.ko).toastSaveFail||'저장 실패: ') + e.message);
   }
 };
 
 // ── 공유 ─────────────────────────────────────────────────────
 document.getElementById('share-btn').onclick = () => {
   const url = location.href;
-  navigator.clipboard.writeText(url).then(() => showToast('링크가 복사되었습니다! 🔗'));
+  navigator.clipboard.writeText(url).then(() => showToast((LANG_MAP[currentLang]||LANG_MAP.ko).toastLinkCopied||'링크가 복사되었습니다! 🔗'));
 };
 
 // ── 날짜/기간 ─────────────────────────────────────────────────
@@ -4901,7 +5197,7 @@ function updateDuration() {
     sd.toLocaleDateString('ko-KR',{month:'short',day:'numeric'}) + ' ~ ' +
     ed.toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
   document.getElementById('duration-nights').textContent =
-    nights + '박 ' + totalDays + '일';
+    (() => { const _t = LANG_MAP[currentLang]||LANG_MAP.ko; return (_t.nightsFormat||'{n}박 {d}일').replace('{n}',nights).replace('{d}',totalDays); })();
   renderDayTabs();
 }
 
@@ -4956,12 +5252,16 @@ function renderDayTabs() {
 let transitModes = {};
 function transitKey(day, idx) { return day + '_' + idx; }
 
-const MODE_LIST = [
-  { id: 'driving',   icon: '🚗', label: '렌트카' },
-  { id: 'transit',   icon: '🚆', label: '대중교통' },
-  { id: 'walking',   icon: '🚶', label: '도보' },
-  { id: 'bicycling', icon: '🚲', label: '자전거' },
-];
+function getModeList() {
+  const _t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  return [
+    { id: 'driving',   icon: '🚗', label: _t.modePickDriving||'렌트카' },
+    { id: 'transit',   icon: '🚆', label: _t.modePickTransit||'대중교통' },
+    { id: 'walking',   icon: '🚶', label: _t.modePickWalking||'도보' },
+    { id: 'bicycling', icon: '🚲', label: _t.modePickBicycling||'자전거' },
+  ];
+}
+const MODE_LIST = getModeList();
 
 function toggleMemoEdit(idx) {
   const day  = currentDay;
@@ -5078,7 +5378,8 @@ function renderScheduleList() {
 function buildTransitCard(from, to, fromIdx) {
   const key  = transitKey(currentDay, fromIdx);
   const mode = transitModes[key] || 'driving';
-  const modeInfo = MODE_LIST.find(m => m.id === mode);
+  const _ML = getModeList();
+  const modeInfo = _ML.find(m => m.id === mode);
 
   const wrap = document.createElement('div');
   wrap.className = 'transit-card';
@@ -5091,7 +5392,7 @@ function buildTransitCard(from, to, fromIdx) {
         ${modeInfo.icon}
       </button>
       <div class="transit-info" id="tc-info-${fromIdx}">
-        <span class="transit-no-loc">위치 핀을 찍으면 거리가 표시돼요</span>
+        <span class="transit-no-loc">${(LANG_MAP[currentLang]||LANG_MAP.ko).transitNoLoc||'위치 핀을 찍으면 거리가 표시돼요'}</span>
       </div>
     </div>`;
   list_appendTransitCard(wrap);
@@ -5104,7 +5405,7 @@ function fetchDirections(from, to, mode, fromIdx) {
   const infoEl = document.getElementById('tc-info-' + fromIdx);
   const bodyEl = document.getElementById('tc-body-' + fromIdx);
   if (!infoEl) return;
-  infoEl.innerHTML = '<span class="transit-no-loc">계산 중…</span>';
+  infoEl.innerHTML = '<span class="transit-no-loc">' + ((LANG_MAP[currentLang]||LANG_MAP.ko).transitCalc||'계산 중…') + '</span>';
   if (bodyEl) bodyEl.classList.add('loading');
 
   const modeInfo = MODE_LIST.find(m => m.id === mode);
@@ -5135,10 +5436,11 @@ function fetchDirections(from, to, mode, fromIdx) {
         );
         const avgMin = Math.round(avgSec / 60);
         distTxt = result.routes[0].legs[0].distance.text;
+        const _tl = LANG_MAP[currentLang]||LANG_MAP.ko;
         durTxt  = avgMin >= 60
-          ? `${Math.floor(avgMin/60)}시간 ${avgMin%60 > 0 ? avgMin%60+'분' : ''}`
-          : `${avgMin}분`;
-        durTxt += ` (${result.routes.length}개 루트 평균)`;
+          ? `${Math.floor(avgMin/60)}${_tl.transitHour||'시간'} ${avgMin%60 > 0 ? avgMin%60+(_tl.transitMin||'분') : ''}`
+          : `${avgMin}${_tl.transitMin||'분'}`;
+        durTxt += ` (${result.routes.length}${(LANG_MAP[currentLang]||LANG_MAP.ko).transitAvgRoutes||'개 루트 평균'})`;
       } else {
         const leg = result.routes[0].legs[0];
         distTxt = leg.distance.text;
@@ -5169,11 +5471,11 @@ function fetchDirections(from, to, mode, fromIdx) {
             <span class="transit-sep">·</span>
             <span class="transit-time">약 ${leg.duration.text}</span>
             <span class="transit-sep">·</span>
-            <span style="font-size:11px;color:var(--red)">🚌 이 구간 대중교통 정보 없음 (자동차 기준)</span>`;
+            <span style="font-size:11px;color:var(--red)">${(LANG_MAP[currentLang]||LANG_MAP.ko).transitNoPublicFallback||'🚌 이 구간 대중교통 정보 없음 (자동차 기준)'}</span>`;
           const badge = document.getElementById(`item-travel-${currentDay}-${fromIdx}`);
           if (badge) badge.innerHTML = `<span class="item-travel-badge">🚗 ${(LANG_MAP[currentLang]||LANG_MAP.ko).travelNext} ${leg.duration.text}</span>`;
         } else {
-          infoEl.innerHTML = `<span class="transit-no-loc">🚌 이 구간 대중교통 정보가 없어요</span>`;
+          infoEl.innerHTML = `<span class="transit-no-loc">${(LANG_MAP[currentLang]||LANG_MAP.ko).transitNoPublic||'🚌 이 구간 대중교통 정보가 없어요'}</span>`;
         }
       });
     } else if (status === google.maps.DirectionsStatus.ZERO_RESULTS) {
@@ -5181,16 +5483,16 @@ function fetchDirections(from, to, mode, fromIdx) {
       const dLat = to.lat - from.lat, dLng = to.lng - from.lng;
       const distKm = Math.sqrt(dLat*dLat + dLng*dLng) * 111;
       if (distKm > 300) {
-        infoEl.innerHTML = `<span style="font-size:12px;color:var(--ink3)">비행기 이동 구간</span>`;
+        infoEl.innerHTML = `<span style="font-size:12px;color:var(--ink3)">${(LANG_MAP[currentLang]||LANG_MAP.ko).transitFlight||'비행기 이동 구간'}</span>`;
         // 수단 선택 버튼 숨기기
         const modeBtn = bodyEl ? bodyEl.querySelector('.transit-mode-btn') : null;
         if (modeBtn) { modeBtn.textContent = '✈️'; modeBtn.style.pointerEvents = 'none'; modeBtn.onclick = null; }
       } else {
-        infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
+        infoEl.innerHTML = `<span class="transit-no-loc">${(LANG_MAP[currentLang]||LANG_MAP.ko).transitNoRoute||'경로를 찾을 수 없어요'}</span>`;
       }
     } else {
       console.warn('Directions status:', status, mode, from, to);
-      infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
+      infoEl.innerHTML = `<span class="transit-no-loc">${(LANG_MAP[currentLang]||LANG_MAP.ko).transitNoRoute||'경로를 찾을 수 없어요'}</span>`;
     }
   });
 }
@@ -5342,7 +5644,7 @@ function selectTypeByValue(type) {
 
 function saveScheduleItem() {
   const name = document.getElementById('sch-name').value.trim();
-  if (!name) { showToast('이름을 입력해주세요'); return; }
+  if (!name) { showToast((LANG_MAP[currentLang]||LANG_MAP.ko).toastNameRequired||'이름을 입력해주세요'); return; }
   if (!scheduleData[currentDay]) scheduleData[currentDay] = [];
 
   const item = {
@@ -5756,12 +6058,13 @@ function addExpenseItem() {
   const unitEl = document.getElementById('expense-unit-select');
   const name   = nameEl?.value.trim();
   const raw    = parseFloat(amtEl?.value) || 0;
-  if (!name || raw <= 0) { showToast('항목명과 금액을 입력해주세요'); return; }
+  if (!name || raw <= 0) { showToast(_el.toastNameRequired||'항목명과 금액을 입력해주세요'); return; }
 
   const isKrw = unitEl?.value === 'KRW';
   const amountKrw = isKrw ? raw : Math.round(raw * (budgetExchangeRate || 1));
 
   if (!expenseData[currentExpenseCat]) expenseData[currentExpenseCat] = [];
+  const _el = LANG_MAP[currentLang]||LANG_MAP.ko;
 
   // 색상: 팔레트에서 현재 항목 수 기준 순환
   const palette = CAT_PALETTES[currentExpenseCat] || ['#888780'];
@@ -6101,8 +6404,8 @@ function setupMap() {
           <button class="mpc-back" onclick="closeMapPlaceCard()">←</button>
         </div>
         <div class="mpc-header">
-          <div class="mpc-name">정보 불러오는 중…</div>
-          <div class="mpc-sub">잠깐만요</div>
+          <div class="mpc-name">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapInfoLoading||'정보 불러오는 중…'}</div>
+          <div class="mpc-sub"></div>
         </div>`;
       card.classList.add('show');
       map.panTo(e.latLng);
@@ -6249,7 +6552,7 @@ function showMapRecentSearches() {
     document.getElementById('map-search-close-btn')?.classList.remove('show');
     return;
   }
-  el.innerHTML = `<div class="msr-section-title">최근 검색</div>`;
+  el.innerHTML = `<div class="msr-section-title">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapRecentSearch||'최근 검색'}</div>`;
   mapRecentSearches.forEach(q => {
     const item = document.createElement('div');
     item.className = 'msr-recent-item';
@@ -6301,7 +6604,7 @@ function runPlacesTextSearch(q) {
   if (!window.google) return;
   const resultsEl = document.getElementById('map-search-results');
   if (!resultsEl) return;
-  resultsEl.innerHTML = `<div class="msr-section-title">검색 중…</div>`;
+  resultsEl.innerHTML = `<div class="msr-section-title">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapSearching||'검색 중…'}</div>`;
   resultsEl.classList.add('show');
   clearMapSearchMarkers();
   closeMapPlaceCard();
@@ -6311,7 +6614,7 @@ function runPlacesTextSearch(q) {
   try {
     svc = new google.maps.places.PlacesService(activeMap || document.getElementById('map'));
   } catch(e) {
-    resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">지도가 준비되지 않았어요</div>`;
+    resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapPlaceNotReady||'지도가 준비되지 않았어요'}</div>`;
     return;
   }
 
@@ -6370,11 +6673,11 @@ function runTextSearchRaw(q, svc, resultsEl, activeMap, mapCenter, mapBounds) {
           if (s2 === google.maps.places.PlacesServiceStatus.OK && r2.length) {
             renderSearchResults(r2.slice(0, 20), resultsEl, activeMap);
           } else {
-            resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요 — 더 넓은 지역에서 검색해 보세요</div>`;
+            resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapNoResultWider||'결과가 없어요 — 더 넓은 지역에서 검색해 보세요'}</div>`;
           }
         });
       } else {
-        resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">결과가 없어요 — 검색어를 바꾸거나 지도를 이동 후 다시 검색해보세요</div>`;
+        resultsEl.innerHTML = `<div class="msr-section-title" style="color:var(--ink3);padding:14px 16px;">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapNoResultRetry||'결과가 없어요 — 검색어를 바꾸거나 지도를 이동 후 다시 검색해보세요'}</div>`;
       }
     }
   });
@@ -6424,8 +6727,9 @@ function renderSearchResults(top, resultsEl, activeMap) {
     const stars = place.rating ? `${'★'.repeat(Math.round(place.rating))}${'☆'.repeat(5-Math.round(place.rating))}` : '';
     const ratingText = place.rating ? `${place.rating} ${stars} (${(place.user_ratings_total||0).toLocaleString()})` : '';
     const openNow = place.opening_hours?.open_now;
+    const _ol = LANG_MAP[currentLang]||LANG_MAP.ko;
     const openBadge = place.opening_hours != null
-      ? (openNow ? '<span style="color:#27AE60;font-size:11px;">영업 중</span>' : '<span style="color:#E53935;font-size:11px;">영업 종료</span>') : '';
+      ? (openNow ? '<span style="color:#27AE60;font-size:11px;">' + (_ol.openNow||'영업 중') + '</span>' : '<span style="color:#E53935;font-size:11px;">' + (_ol.closedNow||'영업 종료') + '</span>') : '';
     item.innerHTML = `
       <div class="msr-result-num" style="transition:transform .15s,background .15s">${i+1}</div>
       <div class="msr-result-body">
@@ -6575,7 +6879,7 @@ function openMapPlaceCard(place, idx) {
     </div>
     <div class="mpc-header">
       <div class="mpc-name">${place.name}</div>
-      <div class="mpc-sub">정보 불러오는 중…</div>
+      <div class="mpc-sub">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapInfoLoading||'정보 불러오는 중…'}</div>
     </div>`;
   card.classList.remove('sheet-full', 'sheet-peek');
   card.classList.add('show');
@@ -7449,8 +7753,9 @@ function confirmPinLocation(latLng) {
 }
 async function savePlaceItem() {
   const name = document.getElementById('pl-name').value.trim();
-  if (!name) { showToast('장소명을 입력해주세요'); return; }
-  if (!pendingLatLng) { showToast('지도에서 위치를 클릭해주세요'); return; }
+  const _pt = LANG_MAP[currentLang]||LANG_MAP.ko;
+  if (!name) { showToast(_pt.toastPlaceNameRequired||'장소명을 입력해주세요'); return; }
+  if (!pendingLatLng) { showToast(_pt.toastPickLocation||'지도에서 위치를 클릭해주세요'); return; }
   const place = {
     name,
     desc:  document.getElementById('pl-desc').value,
@@ -7587,7 +7892,7 @@ function showPlacePopup(place) {
       </div>
       <div class="mpc-header">
         <div class="mpc-name">${place.name}</div>
-        <div class="mpc-sub">정보 불러오는 중…</div>
+        <div class="mpc-sub">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapInfoLoading||'정보 불러오는 중…'}</div>
       </div>`;
     card.classList.add('show');
 
@@ -7909,7 +8214,7 @@ function showOverlayRecent() {
   const list = getOverlayRecent();
   const resultsEl = document.getElementById('map-overlay-search-results');
   if (!list.length || !resultsEl) return;
-  resultsEl.innerHTML = `<div style="padding:8px 14px 4px;font-size:11px;color:#aaa;font-weight:600;letter-spacing:0.3px;">최근 검색</div>`;
+  resultsEl.innerHTML = `<div style="padding:8px 14px 4px;font-size:11px;color:#aaa;font-weight:600;letter-spacing:0.3px;">${(LANG_MAP[currentLang]||LANG_MAP.ko).mapRecentSearch||'최근 검색'}</div>`;
   list.forEach(q => {
     const item = document.createElement('div');
     item.style.cssText = 'padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0ede8;display:flex;align-items:center;gap:10px;';
@@ -7938,7 +8243,7 @@ function mapOverlaySearch() {
   saveOverlayRecent(q); // 최근 검색 저장
   const svc = new google.maps.places.PlacesService(overlayMap);
   const resultsEl = document.getElementById('map-overlay-search-results');
-  resultsEl.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#aaa;">검색 중…</div>';
+  resultsEl.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#aaa;">' + ((LANG_MAP[currentLang]||LANG_MAP.ko).mapSearching||'검색 중…') + '</div>';
   resultsEl.style.display = 'flex';
 
   clearMapSearchMarkers();
@@ -7981,7 +8286,7 @@ function mapOverlaySearch() {
 
   function renderOverlayResults(results) {
     if (!results.length) {
-      resultsEl.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#aaa;">결과가 없어요 — 지도를 이동하거나 검색어를 바꿔보세요</div>';
+      resultsEl.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:#aaa;">' + ((LANG_MAP[currentLang]||LANG_MAP.ko).mapNoResultRetry||'결과가 없어요 — 지도를 이동하거나 검색어를 바꿔보세요') + '</div>';
       return;
     }
     resultsEl.innerHTML = '';
@@ -8333,9 +8638,10 @@ function renderWeatherSection({ data, isForecast }, startDate, endDate) {
     daysEl.appendChild(card);
   });
 
+  const _wt = LANG_MAP[currentLang]||LANG_MAP.ko;
   noteEl.textContent = isForecast
-    ? '실시간 예보 · Open-Meteo'
-    : '⚠️ 출발까지 7일 이상 남아 실제 예보가 아닌 과거 기후 평균값이에요';
+    ? (_wt.weatherForecast||'실시간 예보 · Open-Meteo')
+    : (_wt.weatherClimate||'⚠️ 출발까지 7일 이상 남아 실제 예보가 아닌 과거 기후 평균값이에요');
   section.style.display = 'block';
 
   // Day 탭 뱃지 업데이트
@@ -8629,10 +8935,10 @@ let domPinMode = false;
 let domHotelMarker = null;
 
 function startDomHotelPin() {
-  if (!map) { showToast('지도가 아직 준비되지 않았어요'); return; }
+  if (!map) { showToast((LANG_MAP[currentLang]||LANG_MAP.ko).toastMapNotReady||'지도가 아직 준비되지 않았어요'); return; }
   domPinMode = true;
   document.getElementById('map').style.cursor = 'crosshair';
-  showToast('지도에서 숙소 위치를 클릭하세요 📍');
+  showToast((LANG_MAP[currentLang]||LANG_MAP.ko).toastMapClickPin||'지도에서 숙소 위치를 클릭하세요 📍');
   const btn = document.getElementById('dom-pin-btn');
   if (btn) { btn.textContent = '✕ 취소'; btn.onclick = cancelDomHotelPin; }
 }
@@ -8652,7 +8958,7 @@ function confirmDomHotelPin(latLng) {
   // 카드 UI 업데이트
   switchFlightSection(true);
   autoSave();
-  showToast('숙소 위치가 등록됐어요 ✓');
+  showToast((LANG_MAP[currentLang]||LANG_MAP.ko).toastHotelPinDone||'숙소 위치가 등록됐어요 ✓');
 }
 
 function moveToDomHotel() {
@@ -8702,37 +9008,37 @@ function switchFlightSection(domestic) {
 
   if (domestic) {
     section.innerHTML = `
-      <div class="section-label" data-i18n="secDomestic">🚗 국내 여행</div>
+      <div class="section-label" data-i18n="secDomestic">${(LANG_MAP[currentLang]||LANG_MAP.ko).secDomestic||'🚗 국내 여행'}</div>
       <div class="domestic-card">
         <div class="domestic-row-h">
-          <span class="lbl">출발</span>
+          <span class="lbl">${(LANG_MAP[currentLang]||LANG_MAP.ko).domDepart||'출발'}</span>
           <div class="time-picker" id="tp-dom-depart"></div>
         </div>
         <hr class="domestic-divider">
         <div class="domestic-row">
-          <span class="lbl">숙소 이름</span>
-          <input type="text" id="dom-hotel-name" placeholder="예: 강릉 씨마크 호텔" />
+          <span class="lbl">${(LANG_MAP[currentLang]||LANG_MAP.ko).domHotelNameLabel||'숙소 이름'}</span>
+          <input type="text" id="dom-hotel-name" placeholder="${(LANG_MAP[currentLang]||LANG_MAP.ko).domHotelNamePh||'예: 강릉 씨마크 호텔'}" />
         </div>
         <div class="domestic-row">
-          <span class="lbl">숙소 주소 / 위치</span>
-          <input type="text" id="dom-hotel-addr" placeholder="예: 강원도 강릉시 창해로..." />
+          <span class="lbl">${(LANG_MAP[currentLang]||LANG_MAP.ko).domHotelAddrLabel||'숙소 주소 / 위치'}</span>
+          <input type="text" id="dom-hotel-addr" placeholder="${(LANG_MAP[currentLang]||LANG_MAP.ko).domHotelAddrPh||'예: 강원도 강릉시 창해로...'}" />
         </div>
         <div style="display:flex;gap:8px;margin-top:2px;">
           <button class="item-act-btn item-edit" id="dom-pin-btn"
             onclick="startDomHotelPin()" style="flex:1;padding:8px;">
-            📍 지도에서 위치 찍기
+            ${(LANG_MAP[currentLang]||LANG_MAP.ko).domPinBtn||'📍 지도에서 위치 찍기'}
           </button>
           <button class="item-act-btn" id="dom-map-btn"
             onclick="moveToDomHotel()"
             style="flex:1;padding:8px;background:var(--stone);color:var(--ink2);"
             ${domHotelLatLng ? '' : 'disabled'}>
-            🗺️ 지도에서 보기
+            ${(LANG_MAP[currentLang]||LANG_MAP.ko).domMapBtn||'🗺️ 지도에서 보기'}
           </button>
         </div>
-        ${domHotelLatLng ? '<div style="font-size:11px;color:var(--green);margin-top:2px;">📍 위치 등록됨</div>' : ''}
+        ${domHotelLatLng ? '<div style="font-size:11px;color:var(--green);margin-top:2px;">' + ((LANG_MAP[currentLang]||LANG_MAP.ko).domPinDone||'📍 위치 등록됨') + '</div>' : ''}
         <hr class="domestic-divider">
         <div class="domestic-row-h">
-          <span class="lbl">귀가 출발</span>
+          <span class="lbl">${(LANG_MAP[currentLang]||LANG_MAP.ko).domReturn||'귀가 출발'}</span>
           <div class="time-picker" id="tp-dom-return"></div>
         </div>
       </div>`;
@@ -9005,7 +9311,7 @@ function runSchPlaceSearch() {
   const q = document.getElementById('sch-place-input').value.trim();
   if (!q || !schPlaceMap) return;
   const resultsEl = document.getElementById('sch-place-results');
-  resultsEl.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--ink3);">검색 중…</div>';
+  resultsEl.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--ink3);">' + ((LANG_MAP[currentLang]||LANG_MAP.ko).mapSearching||'검색 중…') + '</div>';
   schPlaceMarkers.forEach(m => m.setMap(null));
   schPlaceMarkers = [];
 
@@ -9016,7 +9322,7 @@ function runSchPlaceSearch() {
 
   const renderSchResults = (results) => {
     if (!results || !results.length) {
-      resultsEl.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--ink3);">검색 결과가 없어요</div>';
+      resultsEl.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--ink3);">' + ((LANG_MAP[currentLang]||LANG_MAP.ko).schPlaceNoResult||'검색 결과가 없어요') + '</div>';
       return;
     }
     resultsEl.innerHTML = '';
@@ -9100,7 +9406,7 @@ function selectSchPlace(place, idx) {
 
   // ✅ 패널은 닫지 않음 — 추가 버튼을 눌러야 팝업+패널 모두 닫힘
   // 선택 완료 토스트만 표시
-  showToast(`"${place.name}" 선택됨 — 추가 버튼을 눌러 완료하세요 ✓`);
+  showToast(`"${place.name}" ${(LANG_MAP[currentLang]||LANG_MAP.ko).schPlaceSelected||'선택됨 — 추가 버튼을 눌러 완료하세요 ✓'}`);
 }
 
 function openOverlay(id)  { document.getElementById(id).classList.add('show'); }
