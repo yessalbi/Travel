@@ -2322,17 +2322,22 @@ html, body {
   letter-spacing: 2px;
   font-size: 14px;
 }
-/* ── 헤더 버튼 고정 레이아웃 (언어 버튼 위치 밀림 방지) ── */
-#header-btn-row #lang-switch-btn {
-  flex-shrink: 0 !important;
-  order: -1;
+/* ── 언어 버튼 독립 레이어 (header-btn-row와 완전 분리) ── */
+#header > #lang-switch-btn {
+  flex-shrink: 0;
+  z-index: 2;
+  margin-right: -6px;
 }
-#save-btn {
-  min-width: 130px;
+#header-btn-row {
+  flex-shrink: 0;
+}
+/* 오른쪽 버튼들 텍스트 변경 시 크기 변동 방지 */
+#header-btn-row #save-btn {
+  min-width: 128px;
   text-align: center;
 }
-#share-btn {
-  min-width: 76px;
+#header-btn-row #share-btn {
+  min-width: 72px;
   text-align: center;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -2448,13 +2453,15 @@ html, body {
   <!-- 여행 제목 -->
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
 
+  <!-- 언어 전환 (독립 레이어) -->
+  <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替">
+    <div class="lang-pill" id="lang-pill-pc"></div>
+    <span id="lang-ja-label" class="lang-opt">日本語</span>
+    <span id="lang-ko-label" class="lang-opt lang-opt-active">한국어</span>
+  </div>
+
   <!-- 우측 버튼들 -->
   <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
-    <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替">
-      <div class="lang-pill" id="lang-pill-pc"></div>
-      <span id="lang-ja-label" class="lang-opt">日本語</span>
-      <span id="lang-ko-label" class="lang-opt lang-opt-active">한국어</span>
-    </div>
     <button onclick="location.reload()" title="새로고침"
       style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
              font-size:15px;padding:5px 9px;border-radius:8px;
