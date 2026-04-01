@@ -1648,6 +1648,13 @@ html, body {
     width: 100%;
     flex-wrap: nowrap;
   }
+  #header-right-wrap {
+    width: 100%;
+    justify-content: center;
+  }
+  #header-right-wrap > #lang-switch-btn { display: none !important; }
+  #save-btn  { min-width: 0 !important; }
+  #share-btn { min-width: 0 !important; }
   #header-badge-group { flex-direction: column; gap: 1px; }
   #save-btn { font-size: 12px; padding: 6px 10px; }
   #share-btn { font-size: 12px; padding: 6px 10px; }
@@ -2322,24 +2329,19 @@ html, body {
   letter-spacing: 2px;
   font-size: 14px;
 }
-/* ── 언어 버튼 독립 레이어 (header-btn-row와 완전 분리) ── */
-#header > #lang-switch-btn {
-  flex-shrink: 0;
-  z-index: 2;
-  margin-right: -6px;
-}
-#header-btn-row {
+/* ── 헤더 우측 래퍼: 언어 버튼 + 버튼 그룹 묶음 ── */
+#header-right-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-shrink: 0;
 }
-/* 오른쪽 버튼들 텍스트 변경 시 크기 변동 방지 */
-#header-btn-row #save-btn {
-  min-width: 128px;
-  text-align: center;
+#header > #header-right-wrap > #lang-switch-btn {
+  flex-shrink: 0;
 }
-#header-btn-row #share-btn {
-  min-width: 72px;
-  text-align: center;
-}
+/* 한↔일 텍스트 변경 시 버튼 크기 변동 방지: 일본어(긴 쪽) 기준 고정 */
+#save-btn  { min-width: 142px; text-align: center; box-sizing: border-box; }
+#share-btn { min-width: 80px;  text-align: center; box-sizing: border-box; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -2453,27 +2455,30 @@ html, body {
   <!-- 여행 제목 -->
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
 
-  <!-- 언어 전환 (독립 레이어) -->
-  <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替">
-    <div class="lang-pill" id="lang-pill-pc"></div>
-    <span id="lang-ja-label" class="lang-opt">日本語</span>
-    <span id="lang-ko-label" class="lang-opt lang-opt-active">한국어</span>
-  </div>
-
-  <!-- 우측 버튼들 -->
-  <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
-    <button onclick="location.reload()" title="새로고침"
-      style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
-             font-size:15px;padding:5px 9px;border-radius:8px;
-             transition:all .14s;color:var(--ink3);line-height:1;flex-shrink:0;"
-      onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
-      onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">↺</button>
-    <div id="header-badge-group" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-      <span id="trip-id-badge">ID 로드 중…</span>
-      <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
+  <!-- 우측 전체 래퍼 (언어 버튼 + 버튼들) -->
+  <div id="header-right-wrap">
+    <!-- 언어 전환 (독립) -->
+    <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替">
+      <div class="lang-pill" id="lang-pill-pc"></div>
+      <span id="lang-ja-label" class="lang-opt">日本語</span>
+      <span id="lang-ko-label" class="lang-opt lang-opt-active">한국어</span>
     </div>
-    <button class="header-btn ghost" id="share-btn">🔗 공유</button>
-    <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
+
+    <!-- 우측 버튼들 -->
+    <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
+      <button onclick="location.reload()" title="새로고침"
+        style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
+               font-size:15px;padding:5px 9px;border-radius:8px;
+               transition:all .14s;color:var(--ink3);line-height:1;flex-shrink:0;"
+        onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
+        onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">↺</button>
+      <div id="header-badge-group" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <span id="trip-id-badge">ID 로드 중…</span>
+        <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
+      </div>
+      <button class="header-btn ghost" id="share-btn">🔗 공유</button>
+      <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
+    </div>
   </div>
 </div>
 
