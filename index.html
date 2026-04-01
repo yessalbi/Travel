@@ -3889,9 +3889,9 @@ function applyLang(lang) {
   const newTripText = document.getElementById('new-trip-text');
   if (newTripText) newTripText.textContent = t.newTripBtnFull;
 
-  // 목록 버튼 (좌측 상단) — title 속성
+  // 목록 버튼 (좌측 상단) — title + textContent
   const btnBackList = document.getElementById('btn-back-list');
-  if (btnBackList) btnBackList.title = t.btnBackList;
+  if (btnBackList) { btnBackList.title = t.btnBackList; btnBackList.textContent = '← ' + (t.btnBackList || '목록'); }
 
   // ── 예산 트래커 다국어 ──
   const _bset = (id, key) => { const el = document.getElementById(id); if (el && t[key]) el.textContent = t[key]; };
@@ -3941,9 +3941,7 @@ function applyLang(lang) {
   const adminConfirm = document.querySelector('#admin-pw-overlay [data-i18n-admin="confirm"]');
   if (adminConfirm) adminConfirm.textContent = t.btnConfirm || '확인';
 
-  // 헤더 버튼
-  const btnBackList = document.getElementById('btn-back-list');
-  if (btnBackList) btnBackList.textContent = '← ' + (t.btnBackList || '목록');
+  // 헤더 버튼 (btnBackList는 위에서 처리)
 
   // 장소 추가 팝업
   const plPopupTitle = document.querySelector('#place-overlay .popup-title');
