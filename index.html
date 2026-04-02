@@ -46,6 +46,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
   firebase.initializeApp({
     apiKey: "AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ",
@@ -2346,6 +2347,92 @@ html, body {
   text-align: center;
   box-sizing: border-box;
 }
+/* ── 구역 하이라이트 토글 ── */
+#zone-toggle-wrap {
+  position: absolute; bottom: 80px; left: 16px; z-index: 10;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.zone-toggle-btn {
+  padding: 7px 14px; border-radius: 10px;
+  border: none; background: var(--white);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  font-family: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer; color: var(--ink2); transition: all .14s;
+  display: flex; align-items: center; gap: 6px;
+}
+.zone-toggle-btn:hover { background: var(--stone); }
+.zone-toggle-btn.active { background: var(--accent2); color: #fff; }
+/* ── 동행자 위치 패널 ── */
+#companion-panel {
+  position: absolute; top: 70px; right: 16px; z-index: 10;
+  width: 220px; background: var(--white); border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.14); padding: 12px;
+  display: none; flex-direction: column; gap: 8px;
+  max-height: 300px; overflow-y: auto;
+}
+#companion-panel.show { display: flex; }
+.companion-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 8px; background: var(--stone);
+  font-size: 12px; cursor: pointer; transition: background .12s;
+}
+.companion-item:hover { background: var(--sand); }
+.companion-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+}
+.companion-name { font-weight: 600; color: var(--ink); flex: 1; }
+.companion-time { font-size: 10px; color: var(--ink3); }
+@media (max-width: 768px) {
+  #companion-panel { top: auto; bottom: 60px; right: 8px; left: 8px; width: auto; }
+  #zone-toggle-wrap { bottom: 60px; }
+}
+/* ── 일정 댓글 ── */
+.item-comments-wrap {
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px solid var(--sand);
+}
+.comment-list { display: flex; flex-direction: column; gap: 4px; }
+.comment-bubble {
+  display: flex; gap: 6px; align-items: flex-start;
+  padding: 4px 0;
+}
+.comment-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent2); color: #fff;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.comment-body {
+  flex: 1; min-width: 0;
+}
+.comment-author { font-size: 10px; font-weight: 600; color: var(--ink2); }
+.comment-text { font-size: 12px; color: var(--ink); line-height: 1.4; margin-top: 1px; }
+.comment-time { font-size: 10px; color: var(--ink3); margin-top: 1px; }
+.comment-input-wrap {
+  display: flex; gap: 6px; margin-top: 6px; align-items: center;
+}
+.comment-input {
+  flex: 1; border: 1.5px solid var(--sand); border-radius: 16px;
+  padding: 6px 12px; font-family: inherit; font-size: 12px;
+  outline: none; background: var(--stone); color: var(--ink);
+}
+.comment-input:focus { border-color: var(--accent2); background: var(--white); }
+.comment-send-btn {
+  border: none; background: var(--accent2); color: #fff;
+  border-radius: 50%; width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 12px; flex-shrink: 0;
+  transition: opacity .13s;
+}
+.comment-send-btn:hover { opacity: .85; }
+.item-comment-toggle {
+  font-size: 11px; color: var(--ink3); border: none;
+  background: none; cursor: pointer; padding: 2px 0;
+  font-family: inherit; display: flex; align-items: center; gap: 4px;
+}
+.item-comment-toggle:hover { color: var(--accent2); }
 /* ── 주변 편의시설 퀵 검색 ── */
 .quick-search-pills {
   display: flex; gap: 6px; flex-wrap: wrap;
@@ -2860,7 +2947,25 @@ html, body {
       <button id="map-search-close-btn" onclick="closeMapSearchResults()" title="검색 결과 닫기">✕</button>
     </div>
     <div id="route-controls" style="display:none;"></div>
+    <!-- 동행자 위치 패널 -->
+    <div id="companion-panel">
+      <div style="font-size:12px;font-weight:600;color:var(--ink);display:flex;align-items:center;justify-content:space-between;">
+        <span id="companion-title">👥 동행자 위치</span>
+        <button id="companion-toggle-btn" onclick="toggleCompanionSharing()"
+          style="font-size:10px;padding:3px 8px;border-radius:12px;border:1.5px solid var(--accent2);
+                 background:none;color:var(--accent2);cursor:pointer;font-family:inherit;font-weight:600;">
+          <span id="companion-toggle-label">위치 공유 시작</span>
+        </button>
+      </div>
+      <div id="companion-list"></div>
+    </div>
+    <div id="zone-toggle-wrap">
+      <button class="zone-toggle-btn" id="btn-zone-toggle" onclick="toggleZoneHighlight()">
+        🗺️ <span id="zone-toggle-label">구역 하이라이트</span>
+      </button>
+    </div>
     <div id="map-fab">
+      <button class="fab-btn" id="btn-companion" onclick="toggleCompanionPanel()" title="동행자">👥</button>
       <button class="fab-btn" id="btn-map-fullscreen" onclick="toggleMapFullscreen()" title="전체화면">⛶</button>
     </div>
   </div>
@@ -3434,6 +3539,19 @@ const LANG_MAP = {
     budgetRateError:'환율을 불러올 수 없어요',
     expenseAmountLabel:'금액',
     expenseUnitLabel:'단위',
+    zoneToggle:'구역 하이라이트',
+    zoneOff:'끄기',
+    companionTitle:'👥 동행자 위치',
+    companionStart:'위치 공유 시작',
+    companionStop:'위치 공유 중지',
+    companionEmpty:'아직 위치를 공유하는 동행자가 없어요',
+    companionMe:'나',
+    companionAgo:'전',
+    commentTitle:'💬 댓글',
+    commentPlaceholder:'댓글을 입력하세요...',
+    commentEmpty:'아직 댓글이 없어요',
+    commentSend:'보내기',
+    commentJustNow:'방금',
     toastOnline:'🌐 온라인 연결됨 — 최신 데이터 불러오는 중…',
     toastOnlineUpdated:'✅ 최신 데이터로 업데이트됐어요',
     offlineMsgSaved:'📴 오프라인 모드 — 마지막 저장:',
@@ -3637,6 +3755,19 @@ const LANG_MAP = {
     budgetRateError:'為替レートを取得できません',
     expenseAmountLabel:'金額',
     expenseUnitLabel:'単位',
+    zoneToggle:'エリアハイライト',
+    zoneOff:'オフ',
+    companionTitle:'👥 同行者の位置',
+    companionStart:'位置共有を開始',
+    companionStop:'位置共有を停止',
+    companionEmpty:'まだ位置を共有している同行者がいません',
+    companionMe:'自分',
+    companionAgo:'前',
+    commentTitle:'💬 コメント',
+    commentPlaceholder:'コメントを入力...',
+    commentEmpty:'まだコメントがありません',
+    commentSend:'送信',
+    commentJustNow:'たった今',
     toastOnline:'🌐 オンライン接続 — 最新データを取得中…',
     toastOnlineUpdated:'✅ 最新データに更新しました',
     offlineMsgSaved:'📴 オフラインモード — 最終保存:',
@@ -3995,6 +4126,14 @@ function applyLang(lang) {
       quickPillsEl.appendChild(btn);
     });
   }
+
+  // 구역 하이라이트 / 동행자 / 댓글 다국어
+  const zoneLabel = document.getElementById('zone-toggle-label');
+  if (zoneLabel) zoneLabel.textContent = zoneEnabled ? (t.zoneOff||'끄기') : (t.zoneToggle||'구역 하이라이트');
+  const compTitle = document.getElementById('companion-title');
+  if (compTitle) compTitle.textContent = t.companionTitle||'👥 동행자 위치';
+  const compToggle = document.getElementById('companion-toggle-label');
+  if (compToggle) compToggle.textContent = companionSharing ? (t.companionStop||'위치 공유 중지') : (t.companionStart||'위치 공유 시작');
 
   // 헤더 버튼 (btnBackList는 위에서 처리)
 
@@ -4523,6 +4662,8 @@ async function realInit() {
     console.error('Firebase 로드 실패:', e);
   }
   document.getElementById('loading').style.display = 'none';
+  // 댓글 수 로드
+  if (typeof loadAllCommentCounts === 'function') loadAllCommentCounts();
 }
 
 // ── Firebase 로드 ─────────────────────────────────────────────
@@ -5536,9 +5677,18 @@ function renderScheduleList() {
       </div>
       <div class="item-actions">
         <button class="item-act-btn-memo" onclick="toggleMemoEdit(${idx})" title="${(LANG_MAP[currentLang]||LANG_MAP.ko).itemMemo}">${(LANG_MAP[currentLang]||LANG_MAP.ko).itemMemo}</button>
+        <button class="item-comment-toggle" onclick="toggleComments(${idx})">💬 <span id="comment-count-${currentDay}-${idx}">${getCommentCount(currentDay, idx)}</span></button>
         <button class="item-act-btn item-edit" onclick="openEditSchedule(${idx})">${(LANG_MAP[currentLang]||LANG_MAP.ko).itemEdit}</button>
         <button class="item-act-btn item-del"  onclick="deleteScheduleItem(${idx})">✕</button>
       </div>`;
+
+    // 댓글 영역 (접혀 있음)
+    const commentWrap = document.createElement('div');
+    commentWrap.className = 'item-comments-wrap';
+    commentWrap.id = 'comments-wrap-' + currentDay + '-' + idx;
+    commentWrap.style.display = 'none';
+    div.appendChild(commentWrap);
+
     list.appendChild(div);
 
     // ── 이동 카드 (마지막 카드 뒤엔 없음)
@@ -5731,6 +5881,116 @@ function fmtTime(t) {
 }
 
 // 일정 카드 클릭 → 위치 있으면 지도 이동
+// ── 일정 댓글 시스템 ──────────────────────────────────────
+let commentsData = {}; // { "day_idx": [{author, text, ts}, ...] }
+let commentListeners = {};
+
+function getCommentCount(day, idx) {
+  const key = day + '_' + idx;
+  const comments = commentsData[key] || [];
+  return comments.length > 0 ? comments.length : '';
+}
+
+function toggleComments(idx) {
+  const wrap = document.getElementById('comments-wrap-' + currentDay + '-' + idx);
+  if (!wrap) return;
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    renderCommentSection(currentDay, idx, wrap);
+    watchComments(currentDay, idx);
+  }
+}
+
+function renderCommentSection(day, idx, wrap) {
+  const t = LANG_MAP[currentLang]||LANG_MAP.ko;
+  const key = day + '_' + idx;
+  const comments = commentsData[key] || [];
+
+  let html = '<div class="comment-list">';
+  if (comments.length === 0) {
+    html += `<div style="font-size:11px;color:var(--ink3);text-align:center;padding:6px;">${t.commentEmpty||'아직 댓글이 없어요'}</div>`;
+  } else {
+    comments.forEach(c => {
+      const initial = (c.author||'?')[0];
+      const ago = c.ts ? (() => {
+        const diff = Math.floor((Date.now() - c.ts) / 1000);
+        if (diff < 30) return t.commentJustNow||'방금';
+        if (diff < 60) return diff + 's';
+        if (diff < 3600) return Math.floor(diff/60) + (t.timeMinAgo||'분 전');
+        if (diff < 86400) return Math.floor(diff/3600) + (t.timeHourAgo||'시간 전');
+        return Math.floor(diff/86400) + (t.timeDayAgo||'일 전');
+      })() : '';
+      html += `<div class="comment-bubble">
+        <div class="comment-avatar">${initial}</div>
+        <div class="comment-body">
+          <div class="comment-author">${c.author||'?'} <span class="comment-time">${ago}</span></div>
+          <div class="comment-text">${(c.text||'').replace(/</g,'&lt;')}</div>
+        </div>
+      </div>`;
+    });
+  }
+  html += '</div>';
+  html += `<div class="comment-input-wrap">
+    <input class="comment-input" id="comment-input-${day}-${idx}" placeholder="${t.commentPlaceholder||'댓글을 입력하세요...'}"
+      onkeydown="if(event.key==='Enter')addComment(${day},${idx})" />
+    <button class="comment-send-btn" onclick="addComment(${day},${idx})">↑</button>
+  </div>`;
+  wrap.innerHTML = html;
+}
+
+function addComment(day, idx) {
+  const input = document.getElementById('comment-input-' + day + '-' + idx);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  const key = day + '_' + idx;
+  const author = getCompanionName();
+  const comment = { author, text, ts: Date.now() };
+
+  if (!commentsData[key]) commentsData[key] = [];
+  commentsData[key].push(comment);
+
+  // Firebase에 저장
+  if (TRIP_ID) {
+    rtdb.ref(`comments/${TRIP_ID}/${key}`).set(commentsData[key]).catch(console.warn);
+  }
+
+  input.value = '';
+  const wrap = document.getElementById('comments-wrap-' + day + '-' + idx);
+  if (wrap) renderCommentSection(day, idx, wrap);
+
+  // 댓글 수 업데이트
+  const countEl = document.getElementById('comment-count-' + day + '-' + idx);
+  if (countEl) countEl.textContent = commentsData[key].length;
+}
+
+function watchComments(day, idx) {
+  const key = day + '_' + idx;
+  if (commentListeners[key]) return; // 이미 감시 중
+  if (!TRIP_ID) return;
+
+  commentListeners[key] = rtdb.ref(`comments/${TRIP_ID}/${key}`).on('value', snap => {
+    commentsData[key] = snap.val() || [];
+    const wrap = document.getElementById('comments-wrap-' + day + '-' + idx);
+    if (wrap && wrap.style.display !== 'none') renderCommentSection(day, idx, wrap);
+    const countEl = document.getElementById('comment-count-' + day + '-' + idx);
+    if (countEl) countEl.textContent = commentsData[key].length || '';
+  });
+}
+
+// 초기 로드 시 모든 Day의 댓글 수 가져오기
+function loadAllCommentCounts() {
+  if (!TRIP_ID) return;
+  rtdb.ref(`comments/${TRIP_ID}`).once('value', snap => {
+    const data = snap.val() || {};
+    Object.entries(data).forEach(([key, comments]) => {
+      commentsData[key] = comments || [];
+    });
+  }).catch(() => {});
+}
+
 function onScheduleItemClick(idx) {
   const item = (scheduleData[currentDay] || [])[idx];
   if (!item || !item.lat || !item.lng) return;
@@ -7915,6 +8175,224 @@ function fitDayBounds(day) {
   const bounds = new google.maps.LatLngBounds();
   locs.forEach(it => bounds.extend({ lat: it.lat, lng: it.lng }));
   map.fitBounds(bounds, 60);
+}
+
+// ── 동행자 실시간 위치 공유 ─────────────────────────────────
+let companionSharing = false;
+let companionWatchId = null;
+let companionMarkers = {};
+let companionRef = null;
+let companionUnsub = null;
+const rtdb = firebase.database();
+
+function getCompanionName() {
+  return document.getElementById('trip-author')?.value?.trim()
+    || localStorage.getItem('companionName')
+    || ((LANG_MAP[currentLang]||LANG_MAP.ko).companionMe||'나');
+}
+
+function toggleCompanionPanel() {
+  const panel = document.getElementById('companion-panel');
+  const btn = document.getElementById('btn-companion');
+  panel.classList.toggle('show');
+  if (btn) btn.classList.toggle('active', panel.classList.contains('show'));
+  if (panel.classList.contains('show')) renderCompanionList();
+}
+
+function toggleCompanionSharing() {
+  if (companionSharing) stopCompanionSharing();
+  else startCompanionSharing();
+}
+
+function startCompanionSharing() {
+  if (!TRIP_ID || !navigator.geolocation) return;
+  companionSharing = true;
+  const t = LANG_MAP[currentLang]||LANG_MAP.ko;
+  const toggleBtn = document.getElementById('companion-toggle-btn');
+  if (toggleBtn) { toggleBtn.style.background='var(--accent2)'; toggleBtn.style.color='#fff'; }
+  document.getElementById('companion-toggle-label').textContent = t.companionStop||'위치 공유 중지';
+
+  const name = getCompanionName();
+  const uid = firebase.auth().currentUser?.uid || 'anon-' + Math.random().toString(36).slice(2,6);
+  companionRef = rtdb.ref(`companions/${TRIP_ID}/${uid}`);
+
+  companionWatchId = navigator.geolocation.watchPosition(pos => {
+    companionRef.set({
+      name,
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      ts: Date.now(),
+    });
+  }, null, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+
+  // 다른 동행자 위치 감시
+  companionUnsub = rtdb.ref(`companions/${TRIP_ID}`).on('value', snap => {
+    const data = snap.val() || {};
+    renderCompanionMarkers(data, uid);
+    renderCompanionList(data, uid);
+  });
+
+  // 탭/앱 종료 시 정리
+  window.addEventListener('beforeunload', () => {
+    if (companionRef) companionRef.remove();
+  });
+}
+
+function stopCompanionSharing() {
+  companionSharing = false;
+  const t = LANG_MAP[currentLang]||LANG_MAP.ko;
+  const toggleBtn = document.getElementById('companion-toggle-btn');
+  if (toggleBtn) { toggleBtn.style.background=''; toggleBtn.style.color='var(--accent2)'; }
+  document.getElementById('companion-toggle-label').textContent = t.companionStart||'위치 공유 시작';
+  if (companionWatchId !== null) { navigator.geolocation.clearWatch(companionWatchId); companionWatchId = null; }
+  if (companionRef) { companionRef.remove(); companionRef = null; }
+  if (companionUnsub) { rtdb.ref(`companions/${TRIP_ID}`).off('value', companionUnsub); companionUnsub = null; }
+  Object.values(companionMarkers).forEach(m => m.setMap(null));
+  companionMarkers = {};
+}
+
+const COMPANION_COLORS = ['#E53935','#1E88E5','#43A047','#FB8C00','#8E24AA','#00ACC1','#D81B60','#6D4C41'];
+
+function renderCompanionMarkers(data, myUid) {
+  if (!map || !window.google) return;
+  const entries = Object.entries(data || {});
+
+  // 오래된 마커 제거
+  Object.keys(companionMarkers).forEach(uid => {
+    if (!data[uid]) { companionMarkers[uid].setMap(null); delete companionMarkers[uid]; }
+  });
+
+  entries.forEach(([uid, info], idx) => {
+    if (!info.lat || !info.lng) return;
+    const isMe = uid === myUid;
+    const color = isMe ? '#4A90E2' : COMPANION_COLORS[idx % COMPANION_COLORS.length];
+    const initial = (info.name || '?')[0];
+
+    if (companionMarkers[uid]) {
+      companionMarkers[uid].setPosition({ lat: info.lat, lng: info.lng });
+    } else {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="14" fill="${color}" stroke="#fff" stroke-width="3"/><text x="16" y="21" text-anchor="middle" fill="#fff" font-size="13" font-weight="700" font-family="sans-serif">${initial}</text></svg>`;
+      companionMarkers[uid] = new google.maps.Marker({
+        position: { lat: info.lat, lng: info.lng },
+        map,
+        icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize: new google.maps.Size(32, 32), anchor: new google.maps.Point(16, 16) },
+        zIndex: 900,
+        title: info.name || uid,
+      });
+    }
+  });
+}
+
+function renderCompanionList(data, myUid) {
+  const list = document.getElementById('companion-list');
+  if (!list) return;
+  const t = LANG_MAP[currentLang]||LANG_MAP.ko;
+  const entries = Object.entries(data || {});
+
+  if (!entries.length) {
+    list.innerHTML = `<div style="font-size:11px;color:var(--ink3);text-align:center;padding:8px;">${t.companionEmpty||'아직 위치를 공유하는 동행자가 없어요'}</div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  entries.forEach(([uid, info], idx) => {
+    const isMe = uid === myUid;
+    const color = isMe ? '#4A90E2' : COMPANION_COLORS[idx % COMPANION_COLORS.length];
+    const ago = info.ts ? (() => {
+      const diff = Math.floor((Date.now() - info.ts) / 1000);
+      if (diff < 10) return t.commentJustNow||'방금';
+      if (diff < 60) return diff + (t.companionAgo||'초 전');
+      if (diff < 3600) return Math.floor(diff/60) + (t.timeMinAgo||'분 전');
+      return Math.floor(diff/3600) + (t.timeHourAgo||'시간 전');
+    })() : '';
+
+    const div = document.createElement('div');
+    div.className = 'companion-item';
+    div.innerHTML = `<div class="companion-dot" style="background:${color};"></div>
+      <span class="companion-name">${info.name||'?'}${isMe?' ('+( t.companionMe||'나')+')':''}</span>
+      <span class="companion-time">${ago}</span>`;
+    div.onclick = () => {
+      if (map && info.lat && info.lng) { map.panTo({ lat: info.lat, lng: info.lng }); map.setZoom(16); }
+    };
+    list.appendChild(div);
+  });
+}
+
+// ── 구역 하이라이트 (일정 핀 클러스터 → 색상 원) ─────────────
+let zoneCircles = [];
+let zoneEnabled = false;
+
+function toggleZoneHighlight() {
+  zoneEnabled = !zoneEnabled;
+  const btn = document.getElementById('btn-zone-toggle');
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  if (btn) {
+    btn.classList.toggle('active', zoneEnabled);
+    document.getElementById('zone-toggle-label').textContent =
+      zoneEnabled ? (t.zoneOff||'끄기') : (t.zoneToggle||'구역 하이라이트');
+  }
+  if (zoneEnabled) drawZoneHighlights();
+  else clearZoneHighlights();
+}
+
+function clearZoneHighlights() {
+  zoneCircles.forEach(c => c.setMap(null));
+  zoneCircles = [];
+}
+
+function drawZoneHighlights() {
+  if (!map || !window.google) return;
+  clearZoneHighlights();
+
+  // 각 Day별로 핀 클러스터의 중심점 + 반경 계산
+  const days = Object.keys(scheduleData).map(Number).sort((a,b) => a-b);
+
+  days.forEach(day => {
+    const items = (scheduleData[day] || []).filter(it => it.lat && it.lng);
+    if (items.length === 0) return;
+
+    // 중심 계산
+    const cLat = items.reduce((s,i) => s + i.lat, 0) / items.length;
+    const cLng = items.reduce((s,i) => s + i.lng, 0) / items.length;
+
+    // 반경 계산 (핀들의 최대 거리, 최소 300m)
+    let maxDist = 300;
+    items.forEach(it => {
+      const d = Math.sqrt(Math.pow((it.lat - cLat)*111000, 2) + Math.pow((it.lng - cLng)*111000*Math.cos(cLat*Math.PI/180), 2));
+      if (d > maxDist) maxDist = d;
+    });
+    maxDist = Math.min(maxDist * 1.3, 5000); // 최대 5km
+
+    const col = DAY_COLORS[(day - 1) % DAY_COLORS.length];
+    const circle = new google.maps.Circle({
+      map,
+      center: { lat: cLat, lng: cLng },
+      radius: maxDist,
+      fillColor: col.stroke,
+      fillOpacity: 0.08,
+      strokeColor: col.stroke,
+      strokeOpacity: 0.35,
+      strokeWeight: 2,
+      clickable: false,
+      zIndex: -1,
+    });
+    zoneCircles.push(circle);
+
+    // Day 라벨 마커
+    const labelSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="22"><rect width="40" height="22" rx="11" fill="${col.stroke}" opacity="0.85"/><text x="20" y="15" text-anchor="middle" fill="#fff" font-size="11" font-weight="700" font-family="sans-serif">Day${day}</text></svg>`;
+    const marker = new google.maps.Marker({
+      position: { lat: cLat, lng: cLng },
+      map,
+      icon: {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(labelSvg),
+        scaledSize: new google.maps.Size(40, 22),
+        anchor: new google.maps.Point(20, 11),
+      },
+      zIndex: 500,
+      clickable: false,
+    });
+    zoneCircles.push(marker); // cleanup 시 같이 제거
+  });
 }
 
 // ── 맛집 핀 ───────────────────────────────────────────────────
