@@ -2346,6 +2346,20 @@ html, body {
   text-align: center;
   box-sizing: border-box;
 }
+/* ── 주변 편의시설 퀵 검색 ── */
+.quick-search-pills {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 6px 0 2px;
+}
+.quick-pill {
+  padding: 5px 10px; border-radius: 20px;
+  border: 1.5px solid var(--sand); background: var(--white);
+  font-family: inherit; font-size: 11px; font-weight: 500;
+  color: var(--ink2); cursor: pointer; transition: all .14s;
+  display: flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.quick-pill:hover { border-color: var(--accent2); color: var(--accent2); background: #EBF3FE; }
+.quick-pill:active { transform: scale(0.96); }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -2835,6 +2849,13 @@ html, body {
         <button id="map-search-clear" onclick="clearMapSearch()" title="지우기">✕</button>
         <button id="map-search-btn" onclick="mapSearch()" title="검색">🔍</button>
       </div>
+      <div class="quick-search-pills" id="quick-search-pills">
+        <button class="quick-pill" onclick="quickNearbySearch('편의점')">🏪 편의점</button>
+        <button class="quick-pill" onclick="quickNearbySearch('ATM')">🏧 ATM</button>
+        <button class="quick-pill" onclick="quickNearbySearch('약국')">💊 약국</button>
+        <button class="quick-pill" onclick="quickNearbySearch('카페')">☕ 카페</button>
+        <button class="quick-pill" onclick="quickNearbySearch('음식점')">🍜 맛집</button>
+      </div>
       <div id="map-search-results"></div>
       <button id="map-search-close-btn" onclick="closeMapSearchResults()" title="검색 결과 닫기">✕</button>
     </div>
@@ -3050,6 +3071,11 @@ html, body {
 
     <!-- 지출 입력 폼 -->
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+      <!-- Day 선택 -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="font-size:11px;color:var(--ink3);font-weight:500;flex-shrink:0;">Day</div>
+        <div id="expense-day-tabs" style="display:flex;gap:4px;flex-wrap:wrap;flex:1;"></div>
+      </div>
       <div style="display:flex;gap:8px;">
         <div style="flex:1;">
           <div style="font-size:11px;color:var(--ink3);font-weight:500;margin-bottom:4px;" id="expense-name-label">항목명</div>
@@ -3954,6 +3980,22 @@ function applyLang(lang) {
   const adminConfirm = document.querySelector('#admin-pw-overlay [data-i18n-admin="confirm"]');
   if (adminConfirm) adminConfirm.textContent = t.btnConfirm || '확인';
 
+  // 주변 편의시설 퀵 검색 다국어
+  const quickLabels = lang === 'ja'
+    ? [['편의점','🏪 コンビニ'],['ATM','🏧 ATM'],['약국','💊 薬局'],['카페','☕ カフェ'],['음식점','🍜 グルメ']]
+    : [['편의점','🏪 편의점'],['ATM','🏧 ATM'],['약국','💊 약국'],['카페','☕ 카페'],['음식점','🍜 맛집']];
+  const quickPillsEl = document.getElementById('quick-search-pills');
+  if (quickPillsEl) {
+    quickPillsEl.innerHTML = '';
+    quickLabels.forEach(([kw, label]) => {
+      const btn = document.createElement('button');
+      btn.className = 'quick-pill';
+      btn.textContent = label;
+      btn.onclick = () => quickNearbySearch(lang === 'ja' ? kw.replace('편의점','コンビニ').replace('약국','薬局').replace('카페','カフェ').replace('음식점','レストラン') : kw);
+      quickPillsEl.appendChild(btn);
+    });
+  }
+
   // 헤더 버튼 (btnBackList는 위에서 처리)
 
   // 장소 추가 팝업
@@ -4619,6 +4661,102 @@ const CHECKLIST_ITEMS = [
   { id: 'visit-japan', label: 'Visit Japan Web',  emoji: '🇯🇵' },
 ];
 
+// ── 여행지별 스마트 체크리스트 추천 ──
+const SMART_CHECKLIST = {
+  japan: [
+    { id:'sc-vjw',    label:'Visit Japan Web 등록', labelJa:'Visit Japan Web登録', emoji:'🇯🇵' },
+    { id:'sc-suica',  label:'교통카드 (Suica/ICOCA)', labelJa:'交通カード (Suica/ICOCA)', emoji:'🚃' },
+    { id:'sc-wifi',   label:'포켓 와이파이 / eSIM', labelJa:'ポケットWi-Fi / eSIM', emoji:'📶' },
+    { id:'sc-yen',    label:'엔화 환전', labelJa:'円の両替', emoji:'💴' },
+    { id:'sc-jrpass', label:'JR패스 확인', labelJa:'JRパス確認', emoji:'🚄' },
+  ],
+  domestic: [
+    { id:'sc-navi',   label:'네비 목적지 설정', labelJa:'ナビ目的地設定', emoji:'🗺️' },
+    { id:'sc-hwy',    label:'하이패스 충전', labelJa:'ハイパス充電', emoji:'🛣️' },
+    { id:'sc-charger',label:'충전기 (차량용)', labelJa:'充電器（車用）', emoji:'🔋' },
+  ],
+  sea: [
+    { id:'sc-swim',   label:'수영복', labelJa:'水着', emoji:'🩱' },
+    { id:'sc-sun',    label:'선크림', labelJa:'日焼け止め', emoji:'🧴' },
+    { id:'sc-towel',  label:'비치타올', labelJa:'ビーチタオル', emoji:'🏖️' },
+  ],
+  general: [
+    { id:'sc-meds',   label:'상비약 (두통/소화제)', labelJa:'常備薬（頭痛/胃腸薬）', emoji:'💊' },
+    { id:'sc-plug',   label:'멀티탭 / 충전 케이블', labelJa:'マルチタップ/充電ケーブル', emoji:'🔌' },
+    { id:'sc-bag',    label:'에코백 / 접이식 가방', labelJa:'エコバッグ/折りたたみバッグ', emoji:'👜' },
+  ],
+};
+
+function getSmartChecklistForTrip() {
+  const title = (document.getElementById('trip-title')?.value || '').toLowerCase();
+  const suggestions = [];
+  const added = new Set([...customCheckItems.map(i=>i.id), ...deletedCheckIds]);
+
+  // 일본 관련
+  const jpKeywords = ['일본','japan','도쿄','tokyo','오사카','osaka','교토','kyoto','후쿠오카','fukuoka','삿포로','sapporo','나고야','nagoya','오키나와','시즈오카','나라','히로시마'];
+  if (jpKeywords.some(k => title.includes(k))) {
+    SMART_CHECKLIST.japan.forEach(item => { if (!added.has(item.id)) suggestions.push(item); });
+  }
+
+  // 국내 관련
+  const domKeywords = ['국내','서울','부산','제주','강릉','속초','여수','통영','경주','전주'];
+  if (domKeywords.some(k => title.includes(k))) {
+    SMART_CHECKLIST.domestic.forEach(item => { if (!added.has(item.id)) suggestions.push(item); });
+  }
+
+  // 바다 관련
+  const seaKeywords = ['해변','바다','beach','오키나와','제주','발리','bali','보라카이','세부','다낭','나트랑','파타야','하와이'];
+  if (seaKeywords.some(k => title.includes(k))) {
+    SMART_CHECKLIST.sea.forEach(item => { if (!added.has(item.id)) suggestions.push(item); });
+  }
+
+  // 범용 (항상)
+  SMART_CHECKLIST.general.forEach(item => { if (!added.has(item.id)) suggestions.push(item); });
+
+  return suggestions;
+}
+
+function renderSmartSuggestions() {
+  let wrap = document.getElementById('smart-suggest-wrap');
+  if (!wrap) {
+    const checkSection = document.getElementById('checklist-section');
+    if (!checkSection) return;
+    wrap = document.createElement('div');
+    wrap.id = 'smart-suggest-wrap';
+    wrap.style.cssText = 'margin-bottom:16px;';
+    checkSection.insertBefore(wrap, checkSection.firstChild);
+  }
+
+  const suggestions = getSmartChecklistForTrip();
+  if (!suggestions.length) { wrap.innerHTML = ''; return; }
+
+  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  const title = currentLang === 'ja' ? '💡 おすすめの持ち物' : '💡 추천 준비물';
+  wrap.innerHTML = '<div style="font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:8px;">' + title + '</div>';
+
+  const pills = document.createElement('div');
+  pills.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
+
+  suggestions.forEach(item => {
+    const label = currentLang === 'ja' ? (item.labelJa || item.label) : item.label;
+    const btn = document.createElement('button');
+    btn.style.cssText = 'padding:5px 10px;border-radius:20px;border:1.5px dashed var(--accent2);background:none;color:var(--accent2);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;transition:all .14s;';
+    btn.innerHTML = item.emoji + ' ' + label + ' <span style="font-size:13px;">+</span>';
+    btn.onmouseover = () => { btn.style.background='#EBF3FE'; };
+    btn.onmouseout  = () => { btn.style.background='none'; };
+    btn.onclick = () => {
+      customCheckItems.push({ id: item.id, label: item.label, emoji: item.emoji });
+      renderChecklist();
+      renderSmartSuggestions(); // 추가하면 목록에서 사라짐
+      autoSave();
+      showToast(label + ' ' + (currentLang==='ja'?'追加しました':'추가됨'));
+    };
+    pills.appendChild(btn);
+  });
+
+  wrap.appendChild(pills);
+}
+
 // ── 커스텀 항목 추가/수정/삭제 ────────────────────────────────
 const EMOJI_SUGGESTIONS = ['📋','🎫','🎟️','💊','🔑','💳','📱','🔋','🧳','👟','🕶️','🧴','💉','📷','🎧','🪥','🧺','🪪','📝','💰'];
 let checkInlineEditId = null;
@@ -5069,9 +5207,21 @@ async function captureStaticMap(dayNum) {
     });
     const imageB64 = canvas.toDataURL('image/jpeg', 0.75);
 
+    // 핀 위치 데이터도 함께 저장
+    const dayItems = scheduleData[day] || [];
+    const pins = dayItems.filter(it => it.lat && it.lng).map((it, i) => ({
+      lat: it.lat, lng: it.lng, name: it.name, idx: i + 1,
+    }));
+    const mapBounds = map ? {
+      ne: { lat: map.getBounds().getNorthEast().lat(), lng: map.getBounds().getNorthEast().lng() },
+      sw: { lat: map.getBounds().getSouthWest().lat(), lng: map.getBounds().getSouthWest().lng() },
+    } : null;
+
     await window.offlineSave(snapKey, {
       imageB64,
       day,
+      pins,
+      mapBounds,
       savedAt: new Date().toISOString(),
     });
     console.log(`[오프라인 지도] Day${day} 스냅샷 저장 완료 (${Math.round(imageB64.length/1024)}KB)`);
@@ -5100,6 +5250,26 @@ async function showOfflineMap() {
     imgEl.src = d.imageB64;
     layer.style.display = 'block';
     if (mapEl) mapEl.style.display = 'none';
+
+    // SVG 핀 오버레이 렌더
+    const svgEl = document.getElementById('offline-map-pins');
+    if (svgEl && d.pins && d.pins.length && d.mapBounds) {
+      const b = d.mapBounds;
+      const layerW = layer.offsetWidth || window.innerWidth;
+      const layerH = layer.offsetHeight || 400;
+      let svgContent = '';
+      d.pins.forEach(pin => {
+        // 위도/경도 → 픽셀 좌표 변환
+        const px = ((pin.lng - b.sw.lng) / (b.ne.lng - b.sw.lng)) * layerW;
+        const py = ((b.ne.lat - pin.lat) / (b.ne.lat - b.sw.lat)) * layerH;
+        svgContent += `<g style="cursor:pointer;" onclick="showToast('${(pin.name||'').replace(/'/g,"\\'")} (오프라인)')">
+          <circle cx="${px}" cy="${py}" r="12" fill="#5B4CF5" stroke="#fff" stroke-width="2" opacity="0.9"/>
+          <text x="${px}" y="${py+4}" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">${pin.idx}</text>
+        </g>`;
+      });
+      svgEl.innerHTML = svgContent;
+      svgEl.style.pointerEvents = 'auto';
+    }
 
     const t = new Date(d.savedAt).toLocaleString('ko-KR',
       { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
@@ -6039,6 +6209,38 @@ function openExpensePopup(catKey) {
   }
   document.getElementById('expense-krw-preview').textContent = '';
 
+  // Day 탭 렌더
+  const dayTabsEl = document.getElementById('expense-day-tabs');
+  if (dayTabsEl) {
+    dayTabsEl.innerHTML = '';
+    for (let d = 1; d <= totalDays; d++) {
+      const btn = document.createElement('button');
+      btn.style.cssText = 'padding:4px 10px;border-radius:14px;border:1.5px solid var(--sand);background:' +
+        (d === currentDay ? 'var(--ink)' : 'var(--white)') + ';color:' +
+        (d === currentDay ? '#fff' : 'var(--ink3)') + ';font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .13s;';
+      btn.textContent = 'D' + d;
+      btn.onclick = () => {
+        window._expenseDay = d;
+        dayTabsEl.querySelectorAll('button').forEach(b => { b.style.background='var(--white)'; b.style.color='var(--ink3)'; });
+        btn.style.background = 'var(--ink)'; btn.style.color = '#fff';
+        renderExpenseList();
+      };
+      dayTabsEl.appendChild(btn);
+    }
+    // 전체 보기 버튼
+    const allBtn = document.createElement('button');
+    allBtn.style.cssText = 'padding:4px 10px;border-radius:14px;border:1.5px solid var(--sand);background:var(--stone);color:var(--ink2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;';
+    allBtn.textContent = 'ALL';
+    allBtn.onclick = () => {
+      window._expenseDay = null;
+      dayTabsEl.querySelectorAll('button').forEach(b => { b.style.background='var(--white)'; b.style.color='var(--ink3)'; });
+      allBtn.style.background = 'var(--ink)'; allBtn.style.color = '#fff';
+      renderExpenseList();
+    };
+    dayTabsEl.appendChild(allBtn);
+    window._expenseDay = currentDay; // 기본: 현재 Day
+  }
+
   // 목록 렌더
   renderExpenseList();
   openOverlay('expense-overlay');
@@ -6089,6 +6291,7 @@ function addExpenseItem() {
     rawAmount: raw,
     rawUnit: isKrw ? 'KRW' : (document.getElementById('budget-currency-select')?.value || 'JPY'),
     color,
+    day: window._expenseDay || currentDay,
   });
 
   nameEl.value = '';
@@ -6098,6 +6301,20 @@ function addExpenseItem() {
   calcBudget();
   autoSave();
   nameEl.focus();
+}
+
+function editExpenseItem(catKey, id) {
+  const item = (expenseData[catKey]||[]).find(e => e.id === id);
+  if (!item) return;
+  const nameEl = document.getElementById('expense-name-input');
+  const amtEl  = document.getElementById('expense-amount-input');
+  const unitEl = document.getElementById('expense-unit-select');
+  if (nameEl) nameEl.value = item.name;
+  if (amtEl)  amtEl.value  = item.rawAmount || item.amountKrw;
+  if (unitEl) unitEl.value = (item.rawUnit && item.rawUnit !== 'KRW') ? 'foreign' : 'KRW';
+  // 기존 항목 삭제 후 재추가 (편집 = 삭제+추가)
+  deleteExpenseItem(catKey, id);
+  nameEl?.focus();
 }
 
 function deleteExpenseItem(catKey, id) {
@@ -6117,7 +6334,10 @@ function renderExpenseList() {
   const totDisp = document.getElementById('expense-total-display');
   if (!wrap) return;
 
-  const items = expenseData[currentExpenseCat] || [];
+  let items = expenseData[currentExpenseCat] || [];
+  // Day 필터 적용
+  const filterDay = window._expenseDay;
+  if (filterDay) items = items.filter(e => (e.day || 0) === filterDay);
   wrap.innerHTML = '';
 
   if (items.length === 0) {
@@ -6133,10 +6353,12 @@ function renderExpenseList() {
     const rawTxt = item.rawUnit && item.rawUnit !== 'KRW'
       ? ` (${currencySymbol(item.rawUnit)}${item.rawAmount.toLocaleString()})`
       : '';
+    const dayLabel = item.day ? '<span style="font-size:10px;color:var(--ink3);margin-right:4px;">D' + item.day + '</span>' : '';
     div.innerHTML = `
       <div class="expense-item-dot" style="background:${item.color};"></div>
-      <div class="expense-item-name">${item.name}</div>
+      <div class="expense-item-name">${dayLabel}${item.name}</div>
       <div class="expense-item-amount">₩${item.amountKrw.toLocaleString()}${rawTxt}</div>
+      <button class="expense-item-del" style="font-size:11px;" onclick="editExpenseItem('${currentExpenseCat}','${item.id}')" title="편집">✏</button>
       <button class="expense-item-del" onclick="deleteExpenseItem('${currentExpenseCat}','${item.id}')">✕</button>`;
     wrap.appendChild(div);
   });
@@ -6589,6 +6811,13 @@ function showMapRecentSearches() {
 }
 
 // 검색 실행
+function quickNearbySearch(keyword) {
+  const input = document.getElementById('map-search-input');
+  if (input) input.value = keyword + ' 근처';
+  document.getElementById('map-search-clear')?.classList.add('show');
+  mapSearch();
+}
+
 function mapSearch() {
   const q = (document.getElementById('map-search-input')?.value || '').trim();
   if (!q) return;
@@ -8018,6 +8247,8 @@ function switchPanelTab(idx) {
   if (idx === 2 && map) {
     // 챙겨야할 것 탭 — 마커 숨기기
     markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(null); });
+    // 스마트 체크리스트 추천
+    renderSmartSuggestions();
   }
 }
 
@@ -8486,6 +8717,8 @@ function setupFinish() {
   switchFlightSection(detectDomestic(title));
   autoSave();
   showToast('여행 정보가 저장되었습니다 ✓');
+  // 스마트 체크리스트 갱신
+  if (typeof renderSmartSuggestions === 'function') renderSmartSuggestions();
   // 여행 제목으로 지도 자동 이동
   if (map) geocodeAndMoveMap(title);
   else document.addEventListener('maps-ready', () => geocodeAndMoveMap(title), { once: true });
