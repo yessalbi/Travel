@@ -1648,9 +1648,13 @@ html, body {
     width: 100%;
     flex-wrap: nowrap;
   }
-  #header-badge-group { flex-direction: column; gap: 1px; }
-  #save-btn { font-size: 12px; padding: 6px 10px; }
-  #share-btn { font-size: 12px; padding: 6px 10px; }
+  #header-right-wrap {
+    width: 100%;
+    justify-content: center;
+  }
+  #header-right-wrap > #lang-switch-btn { display: none !important; }
+  #save-btn  { min-width: 0 !important; font-size: 12px; padding: 6px 10px; }
+  #share-btn { min-width: 0 !important; font-size: 12px; padding: 6px 10px; }
   #main { padding-top: 0; }
   #toast { top: 10px; bottom: auto; transform: translateX(-50%) translateY(-20px); opacity: 0; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
@@ -2322,18 +2326,25 @@ html, body {
   letter-spacing: 2px;
   font-size: 14px;
 }
-/* ── 헤더 버튼 고정 레이아웃 (언어 버튼 위치 밀림 방지) ── */
-#header-btn-row #lang-switch-btn {
-  flex-shrink: 0 !important;
-  order: -1;
+/* ── 헤더 우측: 언어 버튼 분리 + 버튼 크기 고정 ── */
+#header-right-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+#header-right-wrap > #lang-switch-btn {
+  flex-shrink: 0;
 }
 #save-btn {
-  min-width: 130px;
+  min-width: 148px;
   text-align: center;
+  box-sizing: border-box;
 }
 #share-btn {
-  min-width: 76px;
+  min-width: 80px;
   text-align: center;
+  box-sizing: border-box;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -2448,25 +2459,27 @@ html, body {
   <!-- 여행 제목 -->
   <h1 id="trip-title-display">여행 계획판 <span>✈</span></h1>
 
-  <!-- 우측 버튼들 -->
-  <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
+  <!-- 우측 전체 (언어 버튼 + 기능 버튼) -->
+  <div id="header-right-wrap">
     <div id="lang-switch-btn" onclick="toggleLang()" title="언어 전환 / 言語切替">
       <div class="lang-pill" id="lang-pill-pc"></div>
       <span id="lang-ja-label" class="lang-opt">日本語</span>
       <span id="lang-ko-label" class="lang-opt lang-opt-active">한국어</span>
     </div>
-    <button onclick="location.reload()" title="새로고침"
-      style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
-             font-size:15px;padding:5px 9px;border-radius:8px;
-             transition:all .14s;color:var(--ink3);line-height:1;flex-shrink:0;"
-      onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
-      onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">↺</button>
-    <div id="header-badge-group" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-      <span id="trip-id-badge">ID 로드 중…</span>
-      <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
+    <div id="header-btn-row" style="display:flex;align-items:center;gap:10px;">
+      <button onclick="location.reload()" title="새로고침"
+        style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
+               font-size:15px;padding:5px 9px;border-radius:8px;
+               transition:all .14s;color:var(--ink3);line-height:1;flex-shrink:0;"
+        onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
+        onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">↺</button>
+      <div id="header-badge-group" style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <span id="trip-id-badge">ID 로드 중…</span>
+        <span id="build-badge" style="font-size:10px;color:var(--ink3);letter-spacing:-0.3px;">Build : ···</span>
+      </div>
+      <button class="header-btn ghost" id="share-btn">🔗 공유</button>
+      <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
     </div>
-    <button class="header-btn ghost" id="share-btn">🔗 공유</button>
-    <button class="header-btn primary" id="save-btn" title="기기에 오프라인 저장">📥 오프라인 저장</button>
   </div>
 </div>
 
@@ -3237,7 +3250,7 @@ const LANG_MAP = {
     setupNoteLabel:'여행 메모', setupNotePh:'예: 친구 3명, 자유여행',
     setupStartLabel:'출발일', setupEndLabel:'귀국일', setupDoneTitle:'여행 준비 완료! 🎉',
     myTrips:'나의 여행 계획', allTrips:'전체 여행 계획 (관리자)',
-    archiveBtn:'✓ 완료', unarchiveBtn:'↩ 복원', pastTrip:'여행 완료', newTripBtn:'새 여행 만들기',
+    archiveBtn:'✓ 완료', unarchiveBtn:'↩ 복원', pastTrip:'여행 완료', newTripBtn:'＋ 새 여행 만들기',
     domHotelName:'숙소명', domHotelAddr:'주소',
     domHotelNamePh:'예: 롯데호텔 서울', domHotelAddrPh:'예: 서울 중구 을지로 30',
     checkPh:'항목 이름 입력...', plNamePh:'예: 이치란 라멘 신주쿠점', plDescPh:'예: 예약 필수, 런치 추천',
@@ -3264,7 +3277,7 @@ const LANG_MAP = {
     setupAuthorOptional:'(선택)',
     btnNext:'다음 →', btnBack:'← 이전', btnStart:'🚀 시작하기',
     btnBackList:'목록',
-    newTripBtnFull:'새 여행 만들기',
+    newTripBtnFull:'＋ 새 여행 만들기',
     airlinePlaceholderText:'항공사를 입력해주세요',
     dateSelectText:'날짜를 선택하세요',
     editHint:'✏️ 편집', editSpanLabel:'편집', doneSpanLabel:'완료',
@@ -3440,7 +3453,7 @@ const LANG_MAP = {
     setupNoteLabel:'旅行メモ', setupNotePh:'例: 友達3人、個人旅行',
     setupStartLabel:'出発日', setupEndLabel:'帰国日', setupDoneTitle:'旅行の準備完了！🎉',
     myTrips:'マイ旅行プラン', allTrips:'全旅行プラン（管理者）',
-    archiveBtn:'✓ 完了', unarchiveBtn:'↩ 復元', pastTrip:'旅行済み', newTripBtn:'新しい旅行を作成',
+    archiveBtn:'✓ 完了', unarchiveBtn:'↩ 復元', pastTrip:'旅行済み', newTripBtn:'＋ 新しい旅行を作成',
     domHotelName:'宿泊施設名', domHotelAddr:'住所',
     domHotelNamePh:'例: 新宿グランドホテル', domHotelAddrPh:'例: 東京都新宿区西新宿',
     checkPh:'項目名を入力...', plNamePh:'例: 一蘭ラーメン新宿店', plDescPh:'例: 要予約、ランチがおすすめ',
@@ -3467,7 +3480,7 @@ const LANG_MAP = {
     setupAuthorOptional:'（任意）',
     btnNext:'次へ →', btnBack:'← 戻る', btnStart:'🚀 開始する',
     btnBackList:'一覧',
-    newTripBtnFull:'新しい旅行を作成',
+    newTripBtnFull:'＋ 新しい旅行を作成',
     airlinePlaceholderText:'航空会社を入力してください',
     dateSelectText:'日付を選択してください',
     editHint:'✏️ 編集', editSpanLabel:'編集', doneSpanLabel:'完了',
