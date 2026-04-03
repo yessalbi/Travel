@@ -2349,7 +2349,7 @@ html, body {
 }
 /* ── 구역 하이라이트 토글 ── */
 #zone-toggle-wrap {
-  position: absolute; bottom: 80px; left: 16px; z-index: 10;
+  position: absolute; bottom: 24px; left: 16px; z-index: 10;
   display: flex; flex-direction: column; gap: 6px;
 }
 .zone-toggle-btn {
@@ -2385,54 +2385,9 @@ html, body {
 .companion-time { font-size: 10px; color: var(--ink3); }
 @media (max-width: 768px) {
   #companion-panel { top: auto; bottom: 60px; right: 8px; left: 8px; width: auto; }
-  #zone-toggle-wrap { bottom: 60px; }
+  #zone-toggle-wrap { bottom: 16px; left: 8px; }
 }
-/* ── 일정 댓글 ── */
-.item-comments-wrap {
-  margin-top: 6px; padding-top: 6px;
-  border-top: 1px solid var(--sand);
-}
-.comment-list { display: flex; flex-direction: column; gap: 4px; }
-.comment-bubble {
-  display: flex; gap: 6px; align-items: flex-start;
-  padding: 4px 0;
-}
-.comment-avatar {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--accent2); color: #fff;
-  font-size: 10px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.comment-body {
-  flex: 1; min-width: 0;
-}
-.comment-author { font-size: 10px; font-weight: 600; color: var(--ink2); }
-.comment-text { font-size: 12px; color: var(--ink); line-height: 1.4; margin-top: 1px; }
-.comment-time { font-size: 10px; color: var(--ink3); margin-top: 1px; }
-.comment-input-wrap {
-  display: flex; gap: 6px; margin-top: 6px; align-items: center;
-}
-.comment-input {
-  flex: 1; border: 1.5px solid var(--sand); border-radius: 16px;
-  padding: 6px 12px; font-family: inherit; font-size: 12px;
-  outline: none; background: var(--stone); color: var(--ink);
-}
-.comment-input:focus { border-color: var(--accent2); background: var(--white); }
-.comment-send-btn {
-  border: none; background: var(--accent2); color: #fff;
-  border-radius: 50%; width: 26px; height: 26px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 12px; flex-shrink: 0;
-  transition: opacity .13s;
-}
-.comment-send-btn:hover { opacity: .85; }
-.item-comment-toggle {
-  font-size: 11px; color: var(--ink3); border: none;
-  background: none; cursor: pointer; padding: 2px 0;
-  font-family: inherit; display: flex; align-items: center; gap: 4px;
-}
-.item-comment-toggle:hover { color: var(--accent2); }
+
 /* ── 주변 편의시설 퀵 검색 ── */
 .quick-search-pills {
   display: flex; gap: 6px; flex-wrap: wrap;
@@ -2631,12 +2586,6 @@ html, body {
           <input type="hidden" id="trip-author" />
         </div>
 
-        <!-- 날씨 위젯 -->
-        <div id="weather-section" style="display:none;">
-          <div id="weather-section-title" data-i18n="secWeather">여행 기간 예상 날씨</div>
-          <div id="weather-days"></div>
-          <div id="weather-note"></div>
-        </div>
       </div>
 
       <!-- 항공편 -->
@@ -2771,6 +2720,13 @@ html, body {
 
         <!-- 숨김 필드 (airline-logo 참조 코드 호환) -->
         <div id="airline-logo" style="display:none;">✈</div>
+      </div>
+
+      <!-- 날씨 위젯 -->
+      <div id="weather-section" style="display:none;padding:0 20px 16px;border-bottom:1px solid var(--stone);">
+        <div id="weather-section-title" data-i18n="secWeather">여행 기간 예상 날씨</div>
+        <div id="weather-days"></div>
+        <div id="weather-note"></div>
       </div>
 
       <!-- 예산 트래커 -->
@@ -3547,11 +3503,6 @@ const LANG_MAP = {
     companionEmpty:'아직 위치를 공유하는 동행자가 없어요',
     companionMe:'나',
     companionAgo:'전',
-    commentTitle:'💬 댓글',
-    commentPlaceholder:'댓글을 입력하세요...',
-    commentEmpty:'아직 댓글이 없어요',
-    commentSend:'보내기',
-    commentJustNow:'방금',
     toastOnline:'🌐 온라인 연결됨 — 최신 데이터 불러오는 중…',
     toastOnlineUpdated:'✅ 최신 데이터로 업데이트됐어요',
     offlineMsgSaved:'📴 오프라인 모드 — 마지막 저장:',
@@ -3763,11 +3714,6 @@ const LANG_MAP = {
     companionEmpty:'まだ位置を共有している同行者がいません',
     companionMe:'自分',
     companionAgo:'前',
-    commentTitle:'💬 コメント',
-    commentPlaceholder:'コメントを入力...',
-    commentEmpty:'まだコメントがありません',
-    commentSend:'送信',
-    commentJustNow:'たった今',
     toastOnline:'🌐 オンライン接続 — 最新データを取得中…',
     toastOnlineUpdated:'✅ 最新データに更新しました',
     offlineMsgSaved:'📴 オフラインモード — 最終保存:',
@@ -4347,13 +4293,16 @@ async function showTripListScreen() {
 
       // 지난 여행으로 보내기 (일반 모드)
       if (!isAdminMode) {
-        card.querySelector('.tl-archive-btn').addEventListener('click', (e) => {
+        const archiveHandler = (e) => {
           e.stopPropagation();
+          e.preventDefault();
           if (!confirm(`"${title}"${LANG_MAP[currentLang]?.confirmArchive || LANG_MAP.ko.confirmArchive}`)) return;
           archiveTrip(tripId);
           card.style.transition = 'opacity .3s'; card.style.opacity = '0';
           setTimeout(() => showTripListScreen(), 320);
-        });
+        };
+        card.querySelector('.tl-archive-btn').addEventListener('click', archiveHandler);
+        card.querySelector('.tl-archive-btn').addEventListener('touchend', archiveHandler);
       }
 
       // 삭제 버튼 — 관리자만
@@ -4375,7 +4324,7 @@ async function showTripListScreen() {
       }
 
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.tl-card-del')) return;
+        if (e.target.closest('.tl-card-del') || e.target.closest('.tl-archive-btn') || e.target.closest('.tl-color-btn')) return;
         addTripToList(tripId);
         enterTrip(tripId);
       });
@@ -4662,8 +4611,6 @@ async function realInit() {
     console.error('Firebase 로드 실패:', e);
   }
   document.getElementById('loading').style.display = 'none';
-  // 댓글 수 로드
-  if (typeof loadAllCommentCounts === 'function') loadAllCommentCounts();
 }
 
 // ── Firebase 로드 ─────────────────────────────────────────────
@@ -5677,17 +5624,9 @@ function renderScheduleList() {
       </div>
       <div class="item-actions">
         <button class="item-act-btn-memo" onclick="toggleMemoEdit(${idx})" title="${(LANG_MAP[currentLang]||LANG_MAP.ko).itemMemo}">${(LANG_MAP[currentLang]||LANG_MAP.ko).itemMemo}</button>
-        <button class="item-comment-toggle" onclick="toggleComments(${idx})">💬 <span id="comment-count-${currentDay}-${idx}">${getCommentCount(currentDay, idx)}</span></button>
         <button class="item-act-btn item-edit" onclick="openEditSchedule(${idx})">${(LANG_MAP[currentLang]||LANG_MAP.ko).itemEdit}</button>
         <button class="item-act-btn item-del"  onclick="deleteScheduleItem(${idx})">✕</button>
       </div>`;
-
-    // 댓글 영역 (접혀 있음)
-    const commentWrap = document.createElement('div');
-    commentWrap.className = 'item-comments-wrap';
-    commentWrap.id = 'comments-wrap-' + currentDay + '-' + idx;
-    commentWrap.style.display = 'none';
-    div.appendChild(commentWrap);
 
     list.appendChild(div);
 
@@ -5881,116 +5820,6 @@ function fmtTime(t) {
 }
 
 // 일정 카드 클릭 → 위치 있으면 지도 이동
-// ── 일정 댓글 시스템 ──────────────────────────────────────
-let commentsData = {}; // { "day_idx": [{author, text, ts}, ...] }
-let commentListeners = {};
-
-function getCommentCount(day, idx) {
-  const key = day + '_' + idx;
-  const comments = commentsData[key] || [];
-  return comments.length > 0 ? comments.length : '';
-}
-
-function toggleComments(idx) {
-  const wrap = document.getElementById('comments-wrap-' + currentDay + '-' + idx);
-  if (!wrap) return;
-  const isOpen = wrap.style.display !== 'none';
-  wrap.style.display = isOpen ? 'none' : 'block';
-  if (!isOpen) {
-    renderCommentSection(currentDay, idx, wrap);
-    watchComments(currentDay, idx);
-  }
-}
-
-function renderCommentSection(day, idx, wrap) {
-  const t = LANG_MAP[currentLang]||LANG_MAP.ko;
-  const key = day + '_' + idx;
-  const comments = commentsData[key] || [];
-
-  let html = '<div class="comment-list">';
-  if (comments.length === 0) {
-    html += `<div style="font-size:11px;color:var(--ink3);text-align:center;padding:6px;">${t.commentEmpty||'아직 댓글이 없어요'}</div>`;
-  } else {
-    comments.forEach(c => {
-      const initial = (c.author||'?')[0];
-      const ago = c.ts ? (() => {
-        const diff = Math.floor((Date.now() - c.ts) / 1000);
-        if (diff < 30) return t.commentJustNow||'방금';
-        if (diff < 60) return diff + 's';
-        if (diff < 3600) return Math.floor(diff/60) + (t.timeMinAgo||'분 전');
-        if (diff < 86400) return Math.floor(diff/3600) + (t.timeHourAgo||'시간 전');
-        return Math.floor(diff/86400) + (t.timeDayAgo||'일 전');
-      })() : '';
-      html += `<div class="comment-bubble">
-        <div class="comment-avatar">${initial}</div>
-        <div class="comment-body">
-          <div class="comment-author">${c.author||'?'} <span class="comment-time">${ago}</span></div>
-          <div class="comment-text">${(c.text||'').replace(/</g,'&lt;')}</div>
-        </div>
-      </div>`;
-    });
-  }
-  html += '</div>';
-  html += `<div class="comment-input-wrap">
-    <input class="comment-input" id="comment-input-${day}-${idx}" placeholder="${t.commentPlaceholder||'댓글을 입력하세요...'}"
-      onkeydown="if(event.key==='Enter')addComment(${day},${idx})" />
-    <button class="comment-send-btn" onclick="addComment(${day},${idx})">↑</button>
-  </div>`;
-  wrap.innerHTML = html;
-}
-
-function addComment(day, idx) {
-  const input = document.getElementById('comment-input-' + day + '-' + idx);
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
-
-  const key = day + '_' + idx;
-  const author = getCompanionName();
-  const comment = { author, text, ts: Date.now() };
-
-  if (!commentsData[key]) commentsData[key] = [];
-  commentsData[key].push(comment);
-
-  // Firebase에 저장
-  if (TRIP_ID) {
-    rtdb.ref(`comments/${TRIP_ID}/${key}`).set(commentsData[key]).catch(console.warn);
-  }
-
-  input.value = '';
-  const wrap = document.getElementById('comments-wrap-' + day + '-' + idx);
-  if (wrap) renderCommentSection(day, idx, wrap);
-
-  // 댓글 수 업데이트
-  const countEl = document.getElementById('comment-count-' + day + '-' + idx);
-  if (countEl) countEl.textContent = commentsData[key].length;
-}
-
-function watchComments(day, idx) {
-  const key = day + '_' + idx;
-  if (commentListeners[key]) return; // 이미 감시 중
-  if (!TRIP_ID) return;
-
-  commentListeners[key] = rtdb.ref(`comments/${TRIP_ID}/${key}`).on('value', snap => {
-    commentsData[key] = snap.val() || [];
-    const wrap = document.getElementById('comments-wrap-' + day + '-' + idx);
-    if (wrap && wrap.style.display !== 'none') renderCommentSection(day, idx, wrap);
-    const countEl = document.getElementById('comment-count-' + day + '-' + idx);
-    if (countEl) countEl.textContent = commentsData[key].length || '';
-  });
-}
-
-// 초기 로드 시 모든 Day의 댓글 수 가져오기
-function loadAllCommentCounts() {
-  if (!TRIP_ID) return;
-  rtdb.ref(`comments/${TRIP_ID}`).once('value', snap => {
-    const data = snap.val() || {};
-    Object.entries(data).forEach(([key, comments]) => {
-      commentsData[key] = comments || [];
-    });
-  }).catch(() => {});
-}
-
 function onScheduleItemClick(idx) {
   const item = (scheduleData[currentDay] || [])[idx];
   if (!item || !item.lat || !item.lng) return;
@@ -7072,6 +6901,7 @@ function showMapRecentSearches() {
 
 // 검색 실행
 function quickNearbySearch(keyword) {
+  hideSchMapCard();
   const input = document.getElementById('map-search-input');
   if (input) input.value = keyword + ' 근처';
   document.getElementById('map-search-clear')?.classList.add('show');
@@ -8300,7 +8130,7 @@ function renderCompanionList(data, myUid) {
     const color = isMe ? '#4A90E2' : COMPANION_COLORS[idx % COMPANION_COLORS.length];
     const ago = info.ts ? (() => {
       const diff = Math.floor((Date.now() - info.ts) / 1000);
-      if (diff < 10) return t.commentJustNow||'방금';
+      if (diff < 10) return t.timeJustNow||'방금';
       if (diff < 60) return diff + (t.companionAgo||'초 전');
       if (diff < 3600) return Math.floor(diff/60) + (t.timeMinAgo||'분 전');
       return Math.floor(diff/3600) + (t.timeHourAgo||'시간 전');
@@ -8351,17 +8181,20 @@ function drawZoneHighlights() {
     const items = (scheduleData[day] || []).filter(it => it.lat && it.lng);
     if (items.length === 0) return;
 
-    // 중심 계산
-    const cLat = items.reduce((s,i) => s + i.lat, 0) / items.length;
-    const cLng = items.reduce((s,i) => s + i.lng, 0) / items.length;
+    // 중심 계산 — 중앙값(median)으로 이상치 영향 감소
+    const sortedLats = items.map(i=>i.lat).sort((a,b)=>a-b);
+    const sortedLngs = items.map(i=>i.lng).sort((a,b)=>a-b);
+    const mid = Math.floor(items.length / 2);
+    const cLat = items.length % 2 ? sortedLats[mid] : (sortedLats[mid-1]+sortedLats[mid])/2;
+    const cLng = items.length % 2 ? sortedLngs[mid] : (sortedLngs[mid-1]+sortedLngs[mid])/2;
 
-    // 반경 계산 (핀들의 최대 거리, 최소 300m)
-    let maxDist = 300;
+    // 반경 — 모든 핀 포함 + 넉넉한 여유 (최소 500m, 최대 8km)
+    let maxDist = 500;
     items.forEach(it => {
       const d = Math.sqrt(Math.pow((it.lat - cLat)*111000, 2) + Math.pow((it.lng - cLng)*111000*Math.cos(cLat*Math.PI/180), 2));
       if (d > maxDist) maxDist = d;
     });
-    maxDist = Math.min(maxDist * 1.3, 5000); // 최대 5km
+    maxDist = Math.min(maxDist * 1.8 + 200, 8000);
 
     const col = DAY_COLORS[(day - 1) % DAY_COLORS.length];
     const circle = new google.maps.Circle({
@@ -8369,10 +8202,10 @@ function drawZoneHighlights() {
       center: { lat: cLat, lng: cLng },
       radius: maxDist,
       fillColor: col.stroke,
-      fillOpacity: 0.08,
+      fillOpacity: 0.12,
       strokeColor: col.stroke,
-      strokeOpacity: 0.35,
-      strokeWeight: 2,
+      strokeOpacity: 0.45,
+      strokeWeight: 2.5,
       clickable: false,
       zIndex: -1,
     });
@@ -8705,6 +8538,7 @@ function switchPanelTab(idx) {
   document.body.classList.remove('map-fullscreen');
   document.body.classList.toggle('checklist-active', idx === 2);
   document.getElementById('header').style.display = '';
+  hideSchMapCard();
   document.querySelectorAll('.panel-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
   sessionStorage.setItem('panelTab', idx);
@@ -10131,7 +9965,7 @@ function selectSchPlace(place, idx) {
   showToast(`"${place.name}" ${(LANG_MAP[currentLang]||LANG_MAP.ko).schPlaceSelected||'선택됨 — 추가 버튼을 눌러 완료하세요 ✓'}`);
 }
 
-function openOverlay(id)  { document.getElementById(id).classList.add('show'); }
+function openOverlay(id)  { document.getElementById(id).classList.add('show'); hideSchMapCard(); }
 function closeOverlay(id) { document.getElementById(id).classList.remove('show'); }
 function closeIfBg(e, id) { if (e.target === document.getElementById(id)) closeOverlay(id); }
 
