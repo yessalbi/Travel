@@ -5687,40 +5687,69 @@ function fetchDirections(from, to, mode, fromIdx) {
     provideRouteAlternatives: mode === 'transit',
   };
   if (mode === 'transit') {
-    // 일본 현지 오전 10시 기준으로 조회 (심야엔 노선 없어 ZERO_RESULTS 나오는 문제 방지)
-    const jstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-    const dep = new Date(jstNow);
-    dep.setHours(10, 0, 0, 0);
-    if (dep < jstNow) dep.setDate(dep.getDate() + 1); // 이미 오전 10시 지났으면 내일
+    // 현지 오전 10시 기준으로 조회 (심야엔 노선 없어 ZERO_RESULTS 나오는 문제 방지)
+    // from 좌표 기반으로 대략적인 타임존 오프셋 추정
+    const lngOffset = Math.round(from.lng / 15); // 경도 → UTC 오프셋 추정
+    const utcNow = new Date();
+    const localHour = (utcNow.getUTCHours() + lngOffset + 24) % 24;
+    const dep = new Date(utcNow);
+    // 현지 오전 10시에 해당하는 UTC 시각 계산
+    const targetUTCHour = (10 - lngOffset + 48) % 24;
+    dep.setUTCHours(targetUTCHour, 0, 0, 0);
+    if (dep <= utcNow) dep.setDate(dep.getDate() + 1); // 이미 지났으면 내일
     req.transitOptions = { departureTime: dep };
   }
 
   svc.route(req, (result, status) => {
     if (bodyEl) bodyEl.classList.remove('loading');
     if (status === google.maps.DirectionsStatus.OK) {
-      let distTxt, durTxt;
-      if (mode === 'transit' && result.routes.length > 1) {
-        const avgSec = Math.round(
-          result.routes.reduce((s,r) => s + r.legs[0].duration.value, 0) / result.routes.length
-        );
-        const avgMin = Math.round(avgSec / 60);
-        distTxt = result.routes[0].legs[0].distance.text;
-        const _tl = LANG_MAP[currentLang]||LANG_MAP.ko;
-        durTxt  = avgMin >= 60
-          ? `${Math.floor(avgMin/60)}${_tl.transitHour||'시간'} ${avgMin%60 > 0 ? avgMin%60+(_tl.transitMin||'분') : ''}`
-          : `${avgMin}${_tl.transitMin||'분'}`;
-        durTxt += ` (${result.routes.length}${(LANG_MAP[currentLang]||LANG_MAP.ko).transitAvgRoutes||'개 루트 평균'})`;
-      } else {
-        const leg = result.routes[0].legs[0];
-        distTxt = leg.distance.text;
-        durTxt  = leg.duration.text;
+      let distTxt, durTxt, transitDetailHtml = '';
+
+      const leg = result.routes[0].legs[0];
+      distTxt = leg.distance.text;
+      durTxt  = leg.duration.text;
+
+      if (mode === 'transit') {
+        // 대중교통: 수단별 상세 정보 추출
+        const VTYPE_ICON = {
+          BUS: '🚌', SUBWAY: '🚇', TRAM: '🚊', RAIL: '🚆',
+          HEAVY_RAIL: '🚄', HIGH_SPEED_TRAIN: '🚅', COMMUTER_TRAIN: '🚆',
+          FERRY: '⛴️', CABLE_CAR: '🚡', GONDOLA_LIFT: '🚠', OTHER: '🚌',
+        };
+        const transitSteps = leg.steps.filter(s => s.travel_mode === 'TRANSIT' && s.transit);
+        if (transitSteps.length > 0) {
+          const parts = transitSteps.map(s => {
+            const vt = s.transit.line?.vehicle?.type || 'OTHER';
+            const icon = VTYPE_ICON[vt] || '🚌';
+            const name = s.transit.line?.short_name || s.transit.line?.name || '';
+            return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:11px;">${icon}${name ? '<b>' + name + '</b>' : ''}</span>`;
+          });
+          transitDetailHtml = `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+            ${parts.map((p, i) => (i > 0 ? '<span style="color:#aaa;font-size:10px;">→</span>' : '') + p).join('')}
+          </div>`;
+        }
+
+        // 평균 계산 (복수 루트 시)
+        if (result.routes.length > 1) {
+          const avgSec = Math.round(
+            result.routes.reduce((s,r) => s + r.legs[0].duration.value, 0) / result.routes.length
+          );
+          const avgMin = Math.round(avgSec / 60);
+          const _tl = LANG_MAP[currentLang]||LANG_MAP.ko;
+          durTxt = avgMin >= 60
+            ? `${Math.floor(avgMin/60)}${_tl.transitHour||'시간'} ${avgMin%60 > 0 ? avgMin%60+(_tl.transitMin||'분') : ''}`
+            : `${avgMin}${_tl.transitMin||'분'}`;
+          durTxt += ` (${result.routes.length}${(LANG_MAP[currentLang]||LANG_MAP.ko).transitAvgRoutes||'개 루트 평균'})`;
+        }
       }
+
       infoEl.innerHTML = `
         <span class="transit-dist">${distTxt}</span>
         <span class="transit-sep">·</span>
         <span class="transit-time">약 ${durTxt}</span>
         <span class="transit-sep">·</span>
-        <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>`;
+        <span style="font-size:11px;color:var(--ink3)">${modeInfo.label}</span>
+        ${transitDetailHtml}`;
       // 출발 일정 카드에도 소요시간 배지 표시
       const badge = document.getElementById(`item-travel-${currentDay}-${fromIdx}`);
       if (badge) badge.innerHTML = `<span class="item-travel-badge">${modeInfo.icon} ${(LANG_MAP[currentLang]||LANG_MAP.ko).travelNext} ${durTxt}</span>`;
@@ -7864,42 +7893,127 @@ function drawDayRoutes() {
   });
 }
 
+// ── 대중교통 색상 매핑 (Google Transit vehicle_type)
+const TRANSIT_VEHICLE_COLORS = {
+  BUS:        '#FF6D00',  // 버스 - 주황
+  SUBWAY:     '#1565C0',  // 지하철 - 파랑
+  TRAM:       '#6A1B9A',  // 트램 - 보라
+  RAIL:       '#2E7D32',  // 기차 - 초록
+  HEAVY_RAIL: '#2E7D32',  // 고속철 - 초록
+  COMMUTER_TRAIN: '#2E7D32',
+  HIGH_SPEED_TRAIN: '#C62828',
+  FERRY:      '#00838F',  // 페리 - 청록
+  CABLE_CAR:  '#4E342E',
+  GONDOLA_LIFT: '#558B2F',
+  FUNICULAR:  '#E65100',
+  OTHER:      '#1565C0',
+};
+
 function drawSegmentRoute(from, to, mode) {
   if (!window.google || !map) return;
   const cfg = MODE_COLORS[mode] || MODE_COLORS.driving;
+  const straightPath = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
 
-  // 도보 — 진초록 점선 (직선)
-  if (mode === 'walking') {
-    const path = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
-    // 바탕 흰선
+  const svc = new google.maps.DirectionsService();
+  const dep = new Date();
+  dep.setHours(dep.getHours() < 10 ? 10 : dep.getHours(), 0, 0, 0);
+
+  // 모든 이동수단 → Directions API로 실제 경로 요청
+  // (도보/자전거도 실제 경로 사용, 실패 시 직선 폴백)
+  const travelMode = google.maps.TravelMode[mode.toUpperCase()] || google.maps.TravelMode.DRIVING;
+
+  const req = {
+    origin:      new google.maps.LatLng(from.lat, from.lng),
+    destination: new google.maps.LatLng(to.lat,   to.lng),
+    travelMode,
+    provideRouteAlternatives: false,
+  };
+
+  if (mode === 'transit') {
+    req.transitOptions = { departureTime: dep };
+  }
+
+  svc.route(req, (result, status) => {
+    if (status === google.maps.DirectionsStatus.OK) {
+      if (mode === 'transit') {
+        // 대중교통: step별로 수단에 맞는 색상/두께로 그리기
+        _drawTransitSteps(result.routes[0].legs[0].steps);
+      } else {
+        // 렌트카/도보/자전거: overview_path로 실제 도로 경로
+        _drawSolidRoute(result.routes[0].overview_path, cfg, mode, 0.9);
+      }
+    } else if (status === google.maps.DirectionsStatus.ZERO_RESULTS && mode === 'transit') {
+      // 대중교통 결과 없음 → DRIVING으로 폴백 표시 (점선 처리)
+      svc.route({
+        origin:      new google.maps.LatLng(from.lat, from.lng),
+        destination: new google.maps.LatLng(to.lat,   to.lng),
+        travelMode:  google.maps.TravelMode.DRIVING,
+      }, (r2, s2) => {
+        const fallbackPath = s2 === google.maps.DirectionsStatus.OK
+          ? r2.routes[0].overview_path
+          : straightPath;
+        _drawDashedRoute(fallbackPath, '#9E9E9E', 0.6, 3);
+      });
+    } else {
+      // 완전 실패 → 직선 폴백 (반투명)
+      _drawSolidRoute(straightPath, cfg, mode, 0.35);
+    }
+  });
+}
+
+// 실선 경로 그리기 (렌트카/도보/자전거)
+function _drawSolidRoute(path, cfg, mode, opacity) {
+  // 그림자 테두리
+  if (cfg.shadow) {
     dayPolylines.push(new google.maps.Polyline({
       path, geodesic: true,
-      strokeColor: '#fff', strokeOpacity: 0.6, strokeWeight: 4, map, zIndex: 1,
+      strokeColor: cfg.shadow, strokeOpacity: 0.65,
+      strokeWeight: cfg.weight + 4, map, zIndex: 1,
     }));
-    // 초록 점선
+  }
+  // 메인선
+  dayPolylines.push(new google.maps.Polyline({
+    path, geodesic: true,
+    strokeColor: cfg.stroke, strokeOpacity: opacity,
+    strokeWeight: cfg.weight, map, zIndex: 2,
+  }));
+
+  // 렌트카: 방향 화살표
+  if (mode === 'driving') {
+    dayPolylines.push(new google.maps.Polyline({
+      path, geodesic: true,
+      strokeColor: cfg.stroke, strokeOpacity: 0, strokeWeight: 0,
+      icons: [{
+        icon: {
+          path: google.maps.SymbolPath.FORWARD_OPEN_ARROW,
+          strokeColor: '#fff', strokeWeight: 2,
+          fillColor: cfg.stroke, fillOpacity: 0.9, scale: 3,
+        },
+        offset: '50%', repeat: '120px',
+      }],
+      map, zIndex: 3,
+    }));
+  }
+
+  // 도보: 점선 오버레이
+  if (mode === 'walking') {
     dayPolylines.push(new google.maps.Polyline({
       path, geodesic: true,
       strokeColor: cfg.stroke, strokeOpacity: 0, strokeWeight: 0,
       icons: [{
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          fillColor: cfg.stroke, fillOpacity: 1,
-          strokeColor: '#fff', strokeWeight: 1.5, scale: 4,
+          fillColor: cfg.stroke, fillOpacity: 0.9,
+          strokeColor: '#fff', strokeWeight: 1.5, scale: 3.5,
         },
-        offset: '0', repeat: '18px',
+        offset: '0', repeat: '16px',
       }],
-      map, zIndex: 2,
+      map, zIndex: 3,
     }));
-    return;
   }
 
-  // 자전거 — 주황노랑 파선 (직선)
+  // 자전거: 파선 오버레이
   if (mode === 'bicycling') {
-    const path = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
-    dayPolylines.push(new google.maps.Polyline({
-      path, geodesic: true,
-      strokeColor: '#fff', strokeOpacity: 0.6, strokeWeight: 5, map, zIndex: 1,
-    }));
     dayPolylines.push(new google.maps.Polyline({
       path, geodesic: true,
       strokeColor: cfg.stroke, strokeOpacity: 0, strokeWeight: 0,
@@ -7908,86 +8022,108 @@ function drawSegmentRoute(from, to, mode) {
           path: 'M -2,0 2,0',
           strokeColor: cfg.stroke, strokeOpacity: 1, strokeWeight: 3, scale: 4,
         },
-        offset: '0', repeat: '20px',
+        offset: '0', repeat: '18px',
       }],
-      map, zIndex: 2,
+      map, zIndex: 3,
     }));
-    return;
   }
+}
 
-  // 렌트카 / 대중교통 — Directions API 실제 도로 경로
-  const svc = new google.maps.DirectionsService();
-  const req = {
-    origin:      new google.maps.LatLng(from.lat, from.lng),
-    destination: new google.maps.LatLng(to.lat,   to.lng),
-    travelMode:  google.maps.TravelMode[mode.toUpperCase()] || google.maps.TravelMode.DRIVING,
-  };
-  if (mode === 'transit') {
-    const dep = new Date();
-    dep.setHours(dep.getHours() < 10 ? 10 : dep.getHours(), 0, 0, 0);
-    req.transitOptions = { departureTime: dep };
-  }
+// 대중교통: step별 세밀한 경로 그리기
+function _drawTransitSteps(steps) {
+  if (!steps || !steps.length) return;
 
-  svc.route(req, (result, status) => {
-    const path = status === google.maps.DirectionsStatus.OK
-      ? result.routes[0].overview_path
-      : [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
-    const opacity = status === google.maps.DirectionsStatus.OK ? 0.9 : 0.45;
+  steps.forEach(step => {
+    if (!step.path || step.path.length < 2) return;
+    const path = step.path;
 
-    // 그림자 (흰 테두리선)
-    if (cfg.shadow) {
+    if (step.travel_mode === 'TRANSIT' && step.transit) {
+      const vt = step.transit.line?.vehicle?.type || 'OTHER';
+      const color = TRANSIT_VEHICLE_COLORS[vt] || TRANSIT_VEHICLE_COLORS.OTHER;
+      const lineName = step.transit.line?.short_name || step.transit.line?.name || '';
+      const numStops = step.transit.num_stops || 0;
+      const weight = (vt === 'SUBWAY' || vt === 'RAIL' || vt === 'HEAVY_RAIL' || vt === 'HIGH_SPEED_TRAIN') ? 5 : 4;
+
+      // 흰 테두리
       dayPolylines.push(new google.maps.Polyline({
         path, geodesic: true,
-        strokeColor: cfg.shadow,
-        strokeOpacity: 0.7,
-        strokeWeight: cfg.weight + 4,
-        map, zIndex: 1,
+        strokeColor: '#fff', strokeOpacity: 0.9,
+        strokeWeight: weight + 4, map, zIndex: 10,
       }));
-    }
+      // 메인 색상선
+      const poly = new google.maps.Polyline({
+        path, geodesic: true,
+        strokeColor: color, strokeOpacity: 0.95,
+        strokeWeight: weight, map, zIndex: 11,
+      });
+      dayPolylines.push(poly);
 
-    // 메인 경로선
-    dayPolylines.push(new google.maps.Polyline({
-      path, geodesic: true,
-      strokeColor: cfg.stroke,
-      strokeOpacity: opacity,
-      strokeWeight: cfg.weight,
-      map, zIndex: 2,
-    }));
+      // 노선명 툴팁
+      if (lineName) {
+        poly.addListener('click', () => {
+          const midIdx = Math.floor(path.length / 2);
+          const infoWin = new google.maps.InfoWindow({
+            content: `<div style="font-size:12px;font-weight:700;padding:4px 8px;">${lineName}${numStops ? ' · ' + numStops + '정류장' : ''}</div>`,
+            position: path[midIdx],
+          });
+          infoWin.open(map);
+          setTimeout(() => infoWin.close(), 3000);
+        });
+      }
 
-    // 렌트카는 방향 화살표 추가
-    if (mode === 'driving') {
+      // 출발/도착 정류장 마커
+      const stopSvg = (label, color) => `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+        <circle cx="10" cy="10" r="8" fill="${color}" stroke="#fff" stroke-width="2.5"/>
+        <circle cx="10" cy="10" r="3.5" fill="#fff"/>
+      </svg>`;
+
+      [path[0], path[path.length - 1]].forEach((pos, i) => {
+        const m = new google.maps.Marker({
+          position: pos, map,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(stopSvg(i === 0 ? '승차' : '하차', color)),
+            scaledSize: new google.maps.Size(20, 20),
+            anchor: new google.maps.Point(10, 10),
+          },
+          zIndex: 20,
+          clickable: false,
+        });
+        dayPolylines.push(m);
+      });
+
+    } else if (step.travel_mode === 'WALKING') {
+      // 환승 도보 구간: 회색 점선
       dayPolylines.push(new google.maps.Polyline({
         path, geodesic: true,
-        strokeColor: cfg.stroke, strokeOpacity: 0, strokeWeight: 0,
+        strokeColor: '#aaa', strokeOpacity: 0, strokeWeight: 0,
         icons: [{
           icon: {
-            path: google.maps.SymbolPath.FORWARD_OPEN_ARROW,
-            strokeColor: '#fff', strokeWeight: 2,
-            fillColor: cfg.stroke, fillOpacity: 0.9, scale: 3,
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: '#888', fillOpacity: 0.7,
+            strokeColor: '#fff', strokeWeight: 1, scale: 2.5,
           },
-          offset: '50%', repeat: '120px',
+          offset: '0', repeat: '12px',
         }],
-        map, zIndex: 3,
-      }));
-    }
-
-    // 대중교통은 작은 사각 패턴
-    if (mode === 'transit') {
-      dayPolylines.push(new google.maps.Polyline({
-        path, geodesic: true,
-        strokeColor: '#fff', strokeOpacity: 0, strokeWeight: 0,
-        icons: [{
-          icon: {
-            path: 'M -1,-1 1,-1 1,1 -1,1 z',
-            strokeColor: '#fff', strokeWeight: 1.5, strokeOpacity: 0.8,
-            fillColor: cfg.stroke, fillOpacity: 0, scale: 3,
-          },
-          offset: '0', repeat: '30px',
-        }],
-        map, zIndex: 3,
+        map, zIndex: 9,
       }));
     }
   });
+}
+
+// 점선 경로 (폴백용)
+function _drawDashedRoute(path, color, opacity, weight) {
+  dayPolylines.push(new google.maps.Polyline({
+    path, geodesic: true,
+    strokeColor: color, strokeOpacity: 0, strokeWeight: 0,
+    icons: [{
+      icon: {
+        path: 'M 0,-1 0,1',
+        strokeColor: color, strokeOpacity: opacity, strokeWeight: weight, scale: weight + 1,
+      },
+      offset: '0', repeat: '14px',
+    }],
+    map, zIndex: 2,
+  }));
 }
 
 // Day 전환 시 해당 날 장소들이 보이도록 fitBounds
@@ -8609,44 +8745,59 @@ function drawAllDayRoutes() {
 
 function drawAllDaySegment(from, to, mode, col) {
   if (!window.google || !map) return;
-  const path = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
+  const straightPath = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
 
-  if (mode === 'walking' || mode === 'bicycling') {
-    // 직선으로 표시
-    allDayPolylines.push(new google.maps.Polyline({
-      path, geodesic: true,
-      strokeColor: '#fff', strokeOpacity: 0.5, strokeWeight: 3, map, zIndex: 1,
-    }));
-    allDayPolylines.push(new google.maps.Polyline({
-      path, geodesic: true,
-      strokeColor: col.stroke, strokeOpacity: 0.8, strokeWeight: 2, map, zIndex: 2,
-    }));
-    return;
-  }
-
-  // 렌트카/대중교통 — Directions API
   const svc = new google.maps.DirectionsService();
-  svc.route({
+  const dep = new Date();
+  dep.setHours(dep.getHours() < 10 ? 10 : dep.getHours(), 0, 0, 0);
+
+  const travelMode = google.maps.TravelMode[mode.toUpperCase()] || google.maps.TravelMode.DRIVING;
+  const req = {
     origin:      new google.maps.LatLng(from.lat, from.lng),
     destination: new google.maps.LatLng(to.lat,   to.lng),
-    travelMode:  google.maps.TravelMode[mode.toUpperCase()] || google.maps.TravelMode.DRIVING,
-  }, (result, status) => {
-    const routePath = status === google.maps.DirectionsStatus.OK
-      ? result.routes[0].overview_path
-      : path;
-    // 흰 테두리
-    if (col.shadow) {
-      allDayPolylines.push(new google.maps.Polyline({
-        path: routePath, geodesic: true,
-        strokeColor: '#fff', strokeOpacity: 0.8, strokeWeight: 6, map, zIndex: 1,
-      }));
+    travelMode,
+  };
+  if (mode === 'transit') req.transitOptions = { departureTime: dep };
+
+  svc.route(req, (result, status) => {
+    let routePath;
+    let opacity = 0.85;
+
+    if (status === google.maps.DirectionsStatus.OK) {
+      routePath = result.routes[0].overview_path;
+    } else if (status === google.maps.DirectionsStatus.ZERO_RESULTS && mode === 'transit') {
+      // 대중교통 결과 없음 → DRIVING으로 재시도
+      svc.route({
+        origin:      new google.maps.LatLng(from.lat, from.lng),
+        destination: new google.maps.LatLng(to.lat,   to.lng),
+        travelMode:  google.maps.TravelMode.DRIVING,
+      }, (r2, s2) => {
+        const fp = s2 === google.maps.DirectionsStatus.OK ? r2.routes[0].overview_path : straightPath;
+        _pushAllDayLine(fp, col, 0.5);
+      });
+      return;
+    } else {
+      routePath = straightPath;
+      opacity = 0.35;
     }
-    // 메인선
+
+    _pushAllDayLine(routePath, col, opacity);
+  });
+}
+
+function _pushAllDayLine(routePath, col, opacity) {
+  // 흰 테두리
+  if (col.shadow) {
     allDayPolylines.push(new google.maps.Polyline({
       path: routePath, geodesic: true,
-      strokeColor: col.stroke, strokeOpacity: 0.95, strokeWeight: 4, map, zIndex: 2,
+      strokeColor: '#fff', strokeOpacity: 0.8, strokeWeight: 6, map, zIndex: 1,
     }));
-  });
+  }
+  // 메인선
+  allDayPolylines.push(new google.maps.Polyline({
+    path: routePath, geodesic: true,
+    strokeColor: col.stroke, strokeOpacity: opacity, strokeWeight: 4, map, zIndex: 2,
+  }));
 }
 
 // 맛집&장소 + 전체 일정 핀을 한눈에 보이게 fitBounds
