@@ -1794,6 +1794,8 @@ html, body {
 #btn-new-trip:hover { border-color: var(--accent2); color: var(--accent2); background: #EBF3FE; }
 /* 날씨 위젯 */
 #weather-section {
+  margin: 0 20px 0;
+  padding-bottom: 4px;
   margin-top: 12px; border-radius: 14px;
   border: 1px solid var(--sand); overflow: hidden;
   background: var(--white);
@@ -2723,7 +2725,7 @@ html, body {
       </div>
 
       <!-- 날씨 위젯 -->
-      <div id="weather-section" style="display:none;padding:0 20px 16px;border-bottom:1px solid var(--stone);">
+      <div id="weather-section" style="display:none;">
         <div id="weather-section-title" data-i18n="secWeather">여행 기간 예상 날씨</div>
         <div id="weather-days"></div>
         <div id="weather-note"></div>
@@ -5532,6 +5534,8 @@ function getModeList() {
 }
 const MODE_LIST = getModeList();
 
+let _memoClosing = false; // blur→reopen 경합 방지 플래그
+
 function toggleMemoEdit(idx) {
   const day  = currentDay;
   const wrap = document.getElementById(`memo-wrap-${day}-${idx}`);
@@ -5540,15 +5544,14 @@ function toggleMemoEdit(idx) {
   const item = (scheduleData[day] || [])[idx];
   if (!item) return;
 
+  // blur 직후 재오픈 방지 (50ms 이내 재클릭이면 무시)
+  if (_memoClosing) return;
+
   const existing = wrap.querySelector('.item-memo-input');
 
   // 이미 열려있으면 → 저장 후 닫기
   if (existing) {
-    item.memo = existing.value.trim();
-    autoSave();
-    wrap.innerHTML = item.memo
-      ? `<div class="item-memo-text">${item.memo}</div>` : '';
-    if (btn) btn.classList.remove('active');
+    _closeMemo(existing, item, wrap, btn);
     return;
   }
 
@@ -5563,26 +5566,22 @@ function toggleMemoEdit(idx) {
   ta.focus();
   if (btn) btn.classList.add('active');
 
-  const saveMemo = () => {
-    item.memo = ta.value.trim();
-    autoSave();
-    wrap.innerHTML = item.memo
-      ? `<div class="item-memo-text">${item.memo}</div>` : '';
-    if (btn) btn.classList.remove('active');
-  };
-
-  ta.addEventListener('blur', saveMemo);
-
+  ta.addEventListener('blur', () => _closeMemo(ta, item, wrap, btn));
   ta.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      saveMemo();
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      saveMemo();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _closeMemo(ta, item, wrap, btn); }
+    if (e.key === 'Escape') { e.preventDefault(); _closeMemo(ta, item, wrap, btn); }
   });
+}
+
+function _closeMemo(ta, item, wrap, btn) {
+  if (_memoClosing) return;
+  _memoClosing = true;
+  item.memo = ta.value.trim();
+  autoSave();
+  wrap.innerHTML = item.memo
+    ? `<div class="item-memo-text">${item.memo}</div>` : '';
+  if (btn) btn.classList.remove('active');
+  setTimeout(() => { _memoClosing = false; }, 80);
 }
 
 function renderScheduleList() {
