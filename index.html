@@ -1794,10 +1794,10 @@ html, body {
 #btn-new-trip:hover { border-color: var(--accent2); color: var(--accent2); background: #EBF3FE; }
 /* 날씨 위젯 */
 #weather-section {
-  margin: 0 20px 0;
+  margin: 12px 20px 0;
   padding-bottom: 4px;
-  margin-top: 12px; border-radius: 14px;
-  border: 1px solid var(--sand); overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--sand);
   background: var(--white);
 }
 #weather-section-title {
@@ -9116,6 +9116,42 @@ async function loadWeather() {
     if (dist > EXCLUDE_RADIUS) {
       lat = cLat.toFixed(4);
       lng = cLng.toFixed(4);
+    }
+  }
+
+  // 맛집&장소 핀에서도 좌표 추출 시도
+  if (!lat && placesData && placesData.length) {
+    for (const p of placesData) {
+      if (p.lat && p.lng) {
+        const dist = Math.sqrt((p.lat - ICN_LAT)**2 + (p.lng - ICN_LNG)**2);
+        if (dist > EXCLUDE_RADIUS) {
+          lat = p.lat.toFixed(4);
+          lng = p.lng.toFixed(4);
+          break;
+        }
+      }
+    }
+  }
+
+  // 여행 제목에서 주요 도시 좌표 추출 (최후 폴백)
+  if (!lat) {
+    const title = (document.getElementById('trip-title')?.value || '').toLowerCase();
+    const cityCoords = {
+      '도쿄':[35.6762,139.6503],'tokyo':[35.6762,139.6503],'오사카':[34.6937,135.5023],'osaka':[34.6937,135.5023],
+      '교토':[35.0116,135.7681],'kyoto':[35.0116,135.7681],'후쿠오카':[33.5904,130.4017],'fukuoka':[33.5904,130.4017],
+      '삿포로':[43.0618,141.3545],'sapporo':[43.0618,141.3545],'나고야':[35.1815,136.9066],
+      '오키나와':[26.3344,127.8056],'시즈오카':[34.9756,138.3827],'나라':[34.6851,135.8050],
+      '제주':[33.4996,126.5312],'부산':[35.1796,129.0756],'강릉':[37.7519,128.8761],
+      '속초':[38.2070,128.5918],'여수':[34.7604,127.6622],'경주':[35.8562,129.2247],
+      '방콕':[13.7563,100.5018],'bangkok':[13.7563,100.5018],'다낭':[16.0544,108.2022],
+      '파리':[48.8566,2.3522],'paris':[48.8566,2.3522],'런던':[51.5074,-0.1278],
+    };
+    for (const [key, coords] of Object.entries(cityCoords)) {
+      if (title.includes(key)) {
+        lat = coords[0].toFixed(4);
+        lng = coords[1].toFixed(4);
+        break;
+      }
     }
   }
 
