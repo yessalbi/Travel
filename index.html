@@ -8169,10 +8169,10 @@ function drawSegmentRoute(from, to, mode) {
     tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
       (result) => _polylineTransitSteps(result.routes[0].legs[0].steps),
       () => {
-        // 대중교통 없음 → DRIVING 경로를 회색 점선으로
+        // 대중교통 없음 → DRIVING 경로를 대중교통 색상 점선으로
         tryRoute(google.maps.TravelMode.DRIVING, {},
-          (r2) => _polylineDashed(r2.routes[0].overview_path, '#9E9E9E', 0.6),
-          () => _polylineDashed(straight, '#9E9E9E', 0.4)
+          (r2) => _polylineDashed(r2.routes[0].overview_path, '#1565C0', 0.55),
+          () => _polylineDashed(straight, '#1565C0', 0.35)
         );
       }
     );
