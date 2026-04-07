@@ -7897,7 +7897,7 @@ function drawDayRoutes() {
   if (!map) return;
   clearDayRoutes();
   const items = scheduleData[currentDay] || [];
-  const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
+  const locItems = items.filter(it => it.lat && it.lng);
   if (locItems.length === 0) return;
 
   // 일정 마커 (번호 원형)
@@ -8166,13 +8166,32 @@ function drawSegmentRoute(from, to, mode) {
   }
 
   if (mode === 'transit') {
-    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
+    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep }, provideRouteAlternatives: true },
       (result) => _polylineTransitSteps(result.routes[0].legs[0].steps),
       () => {
-        // 대중교통 없음 → DRIVING 경로를 대중교통 색상 점선으로
+        // 대중교통 없음 → DRIVING 경로를 대중교통 색상으로 (실선에 가까운 굵은 점선)
         tryRoute(google.maps.TravelMode.DRIVING, {},
-          (r2) => _polylineDashed(r2.routes[0].overview_path, '#1565C0', 0.55),
-          () => _polylineDashed(straight, '#1565C0', 0.35)
+          (r2) => {
+            const p = r2.routes[0].overview_path;
+            // 흰 배경선
+            dayPolylines.push(new google.maps.Polyline({
+              path: p, geodesic: true, strokeColor: '#fff', strokeOpacity: 0.7,
+              strokeWeight: 6, map, zIndex: 1
+            }));
+            // 파란 실선 (대중교통 스타일)
+            dayPolylines.push(new google.maps.Polyline({
+              path: p, geodesic: true, strokeColor: '#1565C0', strokeOpacity: 0.7,
+              strokeWeight: 3.5, map, zIndex: 2
+            }));
+            // 네모 마커로 대중교통임을 표시
+            dayPolylines.push(new google.maps.Polyline({
+              path: p, geodesic: true, strokeColor: '#1565C0', strokeOpacity: 0, strokeWeight: 0,
+              icons: [{ icon: { path: 'M -1,-1 1,-1 1,1 -1,1 z', strokeColor: '#fff', strokeWeight: 1.5,
+                strokeOpacity: 0.8, fillColor: '#1565C0', fillOpacity: 0, scale: 3 },
+                offset: '0', repeat: '30px' }], map, zIndex: 3
+            }));
+          },
+          () => _polylineDashed(straight, '#1565C0', 0.5)
         );
       }
     );
@@ -8805,7 +8824,7 @@ function drawAllDayRoutes() {
   const days = Object.keys(scheduleData).map(Number).sort((a,b) => a-b);
   days.forEach(day => {
     const items = scheduleData[day] || [];
-    const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
+    const locItems = items.filter(it => it.lat && it.lng);
     if (locItems.length < 2) return;
 
     const col = DAY_COLORS[(day - 1) % DAY_COLORS.length];
@@ -8859,11 +8878,11 @@ function drawAllDaySegment(from, to, mode, col) {
   }
 
   if (mode === 'transit') {
-    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
+    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep }, provideRouteAlternatives: true },
       (r) => push(r.routes[0].overview_path, 0.85),
       () => tryRoute(google.maps.TravelMode.DRIVING, {},
-        (r2) => push(r2.routes[0].overview_path, 0.5),
-        () => push(straight, 0.25)
+        (r2) => push(r2.routes[0].overview_path, 0.65),
+        () => push(straight, 0.35)
       )
     );
   } else if (mode === 'bicycling') {
