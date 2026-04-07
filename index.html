@@ -622,7 +622,6 @@ html, body {
 .schedule-item.type-move   { border-left-color: #888780; }
 .schedule-item.type-cafe   { border-left-color: #AD6B2F; }
 .schedule-item.type-shop   { border-left-color: #7B1FA2; }
-.schedule-item.type-flight { border-left-color: #1565C0; }
 .item-icon {
   width: 34px; height: 34px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
@@ -3474,7 +3473,6 @@ const LANG_MAP = {
     modePickTransit:'대중교통',
     modePickWalking:'도보',
     modePickBicycling:'자전거',
-    modePickFlight:'비행기',
     weatherForecast:'실시간 예보 · Open-Meteo',
     weatherClimate:'⚠️ 출발까지 7일 이상 남아 실제 예보가 아닌 과거 기후 평균값이에요',
     expenseNamePh:'예: 라멘',
@@ -3686,7 +3684,6 @@ const LANG_MAP = {
     modePickTransit:'公共交通機関',
     modePickWalking:'徒歩',
     modePickBicycling:'自転車',
-    modePickFlight:'飛行機',
     weatherForecast:'リアルタイム予報 · Open-Meteo',
     weatherClimate:'⚠️ 出発まで7日以上あるため、実際の予報ではなく過去の気候平均値です',
     expenseNamePh:'例: ラーメン',
@@ -5533,7 +5530,6 @@ function getModeList() {
     { id: 'transit',   icon: '🚆', label: _t.modePickTransit||'대중교통' },
     { id: 'walking',   icon: '🚶', label: _t.modePickWalking||'도보' },
     { id: 'bicycling', icon: '🚲', label: _t.modePickBicycling||'자전거' },
-    { id: 'flight',    icon: '✈️', label: _t.modePickFlight||'비행기' },
   ];
 }
 const MODE_LIST = getModeList();
@@ -5707,7 +5703,10 @@ function fetchDirections(from, to, mode, fromIdx) {
     };
     svc.route(req, (result, status) => {
       if (status === google.maps.DirectionsStatus.OK) onOK(result);
-      else onFail(status);
+      else {
+        console.warn('[이동카드] Directions 실패:', travelMode, status, from.name||'?', '→', to.name||'?');
+        onFail(status);
+      }
     });
   }
 
@@ -5756,16 +5755,17 @@ function fetchDirections(from, to, mode, fromIdx) {
   }
 
   // ── 거리 계산 (직선 km)
-  // 비행기 모드 → 직선거리만 표시
-  if (mode === 'flight') {
-    if (bodyEl) bodyEl.classList.remove('loading');
-    const distKm2 = Math.round(Math.sqrt(Math.pow(to.lat-from.lat,2)+Math.pow(to.lng-from.lng,2)) * 111);
-    infoEl.innerHTML = `
-      <span class="transit-dist">${distKm2}km</span>
-      <span class="transit-sep">·</span>
-      <span style="font-size:11px;color:var(--ink3)">✈️ ${_t.modePickFlight||'비행기'}</span>`;
-    const badge = document.getElementById('item-travel-' + currentDay + '-' + fromIdx);
-    if (badge) badge.innerHTML = '<span class="item-travel-badge">✈️ ' + distKm2 + 'km</span>';
+  const distKm = Math.sqrt(
+    Math.pow(to.lat - from.lat, 2) + Math.pow(to.lng - from.lng, 2)
+  ) * 111;
+
+  // 300km 초과 → 비행기 구간
+  if (distKm > 300 && mode !== 'transit') {
+    showError(_t.transitFlight || '✈️ 비행기 이동 구간');
+    if (bodyEl) {
+      const btn = bodyEl.querySelector('.transit-mode-btn');
+      if (btn) { btn.textContent = '✈️'; btn.style.pointerEvents = 'none'; }
+    }
     return;
   }
 
@@ -7876,7 +7876,6 @@ const MODE_COLORS = {
   transit:   { stroke: '#1565C0', shadow: '#90CAF9', weight: 3  },  // 진파랑   - 실선
   walking:   { stroke: '#2E7D32', shadow: null,      weight: 2  },  // 진초록   - 점선
   bicycling: { stroke: '#F57F17', shadow: '#FFF176', weight: 3  },  // 진노랑   - 파선
-  flight:    { stroke: '#1565C0', shadow: '#90CAF9', weight: 3  },  // 파랑     - 포물선
 };
 
 // 인천공항 좌표 (반경 3km 이내면 필터)
@@ -8114,13 +8113,10 @@ function _polylineTransitSteps(steps) {
 function _polylineFlightArc(from, to) {
   const N = 60;
   const arc = [];
-  // 거리에 비례한 완만한 호 (최대 2도, 가까우면 더 작게)
-  const distDeg = Math.sqrt(Math.pow(to.lat-from.lat,2) + Math.pow(to.lng-from.lng,2));
-  const bulge = Math.min(distDeg * 0.15, 2.0);
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     arc.push({
-      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * bulge,
+      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * 5,
       lng: from.lng + (to.lng - from.lng) * t,
     });
   }
@@ -8145,8 +8141,13 @@ function drawSegmentRoute(from, to, mode) {
   const cfg  = MODE_COLORS[mode] || MODE_COLORS.driving;
   const straight = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
 
-  // 비행기 모드 — 사용자가 직접 선택한 경우만 포물선
-  if (mode === 'flight') {
+  // 직선 거리 km
+  const distKm = Math.sqrt(
+    Math.pow(to.lat - from.lat, 2) + Math.pow(to.lng - from.lng, 2)
+  ) * 111;
+
+  // 비행기 구간 (300km+ & 대중교통 아님)
+  if (distKm > 300 && mode !== 'transit') {
     _polylineFlightArc(from, to);
     return;
   }
@@ -8168,30 +8169,16 @@ function drawSegmentRoute(from, to, mode) {
   if (mode === 'transit') {
     tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep }, provideRouteAlternatives: true },
       (result) => _polylineTransitSteps(result.routes[0].legs[0].steps),
-      () => {
-        // 대중교통 없음 → DRIVING 경로를 대중교통 색상으로 (실선에 가까운 굵은 점선)
+      (transitErr) => {
+        console.warn('[경로] TRANSIT 실패:', from.name||'?', '→', to.name||'?', transitErr);
+        // 대중교통 없음 → DRIVING 경로를 파란 실선으로 (대중교통 스타일 대체)
         tryRoute(google.maps.TravelMode.DRIVING, {},
           (r2) => {
             const p = r2.routes[0].overview_path;
-            // 흰 배경선
-            dayPolylines.push(new google.maps.Polyline({
-              path: p, geodesic: true, strokeColor: '#fff', strokeOpacity: 0.7,
-              strokeWeight: 6, map, zIndex: 1
-            }));
-            // 파란 실선 (대중교통 스타일)
-            dayPolylines.push(new google.maps.Polyline({
-              path: p, geodesic: true, strokeColor: '#1565C0', strokeOpacity: 0.7,
-              strokeWeight: 3.5, map, zIndex: 2
-            }));
-            // 네모 마커로 대중교통임을 표시
-            dayPolylines.push(new google.maps.Polyline({
-              path: p, geodesic: true, strokeColor: '#1565C0', strokeOpacity: 0, strokeWeight: 0,
-              icons: [{ icon: { path: 'M -1,-1 1,-1 1,1 -1,1 z', strokeColor: '#fff', strokeWeight: 1.5,
-                strokeOpacity: 0.8, fillColor: '#1565C0', fillOpacity: 0, scale: 3 },
-                offset: '0', repeat: '30px' }], map, zIndex: 3
-            }));
+            dayPolylines.push(new google.maps.Polyline({ path:p, geodesic:true, strokeColor:'#90CAF9', strokeOpacity:0.9, strokeWeight:6, map, zIndex:1 }));
+            dayPolylines.push(new google.maps.Polyline({ path:p, geodesic:true, strokeColor:'#1565C0', strokeOpacity:0.85, strokeWeight:4, map, zIndex:2 }));
           },
-          () => _polylineDashed(straight, '#1565C0', 0.5)
+          (drvErr) => { console.warn('[경로] DRIVING도 실패:', drvErr); _polylineDashed(straight, '#1565C0', 0.6); }
         );
       }
     );
@@ -8199,13 +8186,13 @@ function drawSegmentRoute(from, to, mode) {
   } else if (mode === 'driving') {
     tryRoute(google.maps.TravelMode.DRIVING, {},
       (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.9),
-      () => _polylineSolid(straight, cfg, mode, 0.3)
+      (err) => { console.warn('[경로] DRIVING 실패:', from.name||'?', '→', to.name||'?', err); _polylineSolid(straight, cfg, mode, 0.3); }
     );
 
   } else if (mode === 'walking') {
     tryRoute(google.maps.TravelMode.WALKING, {},
       (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.85),
-      () => _polylineSolid(straight, cfg, mode, 0.3)
+      (err) => { console.warn('[경로] WALKING 실패:', from.name||'?', '→', to.name||'?', err); _polylineSolid(straight, cfg, mode, 0.3); }
     );
 
   } else if (mode === 'bicycling') {
@@ -8842,9 +8829,12 @@ function drawAllDayRoutes() {
 function drawAllDaySegment(from, to, mode, col) {
   if (!window.google || !map) return;
   const straight = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
+  const distKm = Math.sqrt(
+    Math.pow(to.lat - from.lat, 2) + Math.pow(to.lng - from.lng, 2)
+  ) * 111;
 
-  // 비행기 모드 — 사용자 지정만
-  if (mode === 'flight') {
+  // 비행기 구간
+  if (distKm > 300 && mode !== 'transit') {
     _allDayFlightArc(from, to, col);
     return;
   }
@@ -8880,10 +8870,13 @@ function drawAllDaySegment(from, to, mode, col) {
   if (mode === 'transit') {
     tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep }, provideRouteAlternatives: true },
       (r) => push(r.routes[0].overview_path, 0.85),
-      () => tryRoute(google.maps.TravelMode.DRIVING, {},
-        (r2) => push(r2.routes[0].overview_path, 0.65),
-        () => push(straight, 0.35)
-      )
+      (err) => {
+        console.warn('[전체경로] TRANSIT 실패:', err);
+        tryRoute(google.maps.TravelMode.DRIVING, {},
+          (r2) => push(r2.routes[0].overview_path, 0.75),
+          () => push(straight, 0.4)
+        );
+      }
     );
   } else if (mode === 'bicycling') {
     tryRoute(google.maps.TravelMode.BICYCLING, {},
