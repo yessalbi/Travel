@@ -5686,19 +5686,11 @@ function fetchDirections(from, to, mode, fromIdx) {
     const offset = Math.round(lng / 15);
     const now = new Date();
     const dep = new Date(now);
-    const targetUTC = ((10 - offset) % 24 + 24) % 24;
+    const targetUTC = (10 - offset + 48) % 24;
     dep.setUTCHours(targetUTC, 0, 0, 0);
-    if (dep.getTime() <= now.getTime()) dep.setUTCDate(dep.getUTCDate() + 1);
+    if (dep <= now) dep.setDate(dep.getDate() + 1);
     return dep;
   }
-
-  // 좌표 기반 region 추정 (한국/일본/기타)
-  function _regionHint(lat, lng) {
-    if (lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132) return 'kr'; // 한국
-    if (lat >= 24 && lat <= 46 && lng >= 129 && lng <= 146) return 'jp'; // 일본
-    return undefined;
-  }
-  const region = _regionHint(from.lat, from.lng);
 
   // ── 실제 Directions 요청
   function doRequest(travelMode, opts, onOK, onFail) {
@@ -5707,15 +5699,11 @@ function fetchDirections(from, to, mode, fromIdx) {
       destination: new google.maps.LatLng(to.lat,   to.lng),
       travelMode,
       provideRouteAlternatives: travelMode === google.maps.TravelMode.TRANSIT,
-      ...(region ? { region } : {}),
       ...opts,
     };
     svc.route(req, (result, status) => {
       if (status === google.maps.DirectionsStatus.OK) onOK(result);
-      else {
-        console.warn('[이동카드] Directions 실패:', travelMode, status, from.lat, from.lng, '→', to.lat, to.lng);
-        onFail(status);
-      }
+      else onFail(status);
     });
   }
 
@@ -6037,10 +6025,18 @@ function saveScheduleItem() {
 }
 
 function deleteScheduleItem(idx) {
+  const item = (scheduleData[currentDay] || [])[idx];
+  if (!item) return;
+  const _t = LANG_MAP[currentLang] || LANG_MAP.ko;
+  const msg = currentLang === 'ja'
+    ? '"' + item.name + '" を削除しますか？'
+    : '"' + item.name + '" 을(를) 삭제하시겠어요?';
+  if (!confirm(msg)) return;
   scheduleData[currentDay].splice(idx, 1);
   renderScheduleList();
   calcBudget();
   autoSave();
+  showToast((_t.toastItemDeleted || '항목을 삭제했어요'));
 }
 
 // ── 예산 트래커 ───────────────────────────────────────────────
@@ -7905,7 +7901,7 @@ function drawDayRoutes() {
   if (!map) return;
   clearDayRoutes();
   const items = scheduleData[currentDay] || [];
-  const locItems = items.filter(it => it.lat && it.lng);
+  const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
   if (locItems.length === 0) return;
 
   // 일정 마커 (번호 원형)
@@ -7963,21 +7959,14 @@ const TRANSIT_LINE_COLORS = {
   OTHER:           '#1565C0',
 };
 
-// 경도 기반 현지 오전 10시 계산 (transit 전용)
+// 경도 기반 현지 오전 10시 계산
 function _routeDepTime(lngDeg) {
-  // 경도로 UTC 오프셋 추정 (ex: 한국 127° → UTC+9, 일본 139° → UTC+9)
-  const offset = Math.round(lngDeg / 15);
-  const now    = new Date();
-  // 오늘 현지 날짜 기준으로 오전 10시 UTC 계산
-  const localNowHour = (now.getUTCHours() + offset + 24) % 24;
-  const dep = new Date(now);
-  // 현지 오전 10시에 해당하는 UTC 시각
-  const targetUTC = ((10 - offset) % 24 + 24) % 24;
+  const offset    = Math.round(lngDeg / 15);
+  const now       = new Date();
+  const dep       = new Date(now);
+  const targetUTC = (10 - offset + 48) % 24;
   dep.setUTCHours(targetUTC, 0, 0, 0);
-  // 이미 지난 시각이면 내일 같은 시각
-  if (dep.getTime() <= now.getTime()) {
-    dep.setUTCDate(dep.getUTCDate() + 1);
-  }
+  if (dep <= now) dep.setDate(dep.getDate() + 1);
   return dep;
 }
 
@@ -8132,7 +8121,7 @@ function _polylineFlightArc(from, to) {
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     arc.push({
-      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * 5,
+      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * Math.min(Math.sqrt(Math.pow(to.lat-from.lat,2)+Math.pow(to.lng-from.lng,2))*0.08, 1.0),
       lng: from.lng + (to.lng - from.lng) * t,
     });
   }
@@ -8171,43 +8160,25 @@ function drawSegmentRoute(from, to, mode) {
   const svc = new google.maps.DirectionsService();
   const dep = _routeDepTime(from.lng);
 
-  // 좌표 기반 region 추정
-  function _rgn(lat, lng) {
-    if (lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132) return 'kr';
-    if (lat >= 24 && lat <= 46 && lng >= 129 && lng <= 146) return 'jp';
-    return undefined;
-  }
-  const rgn = _rgn(from.lat, from.lng);
-
   function tryRoute(travelMode, opts, onSuccess, onFail) {
     svc.route({
       origin:      new google.maps.LatLng(from.lat, from.lng),
       destination: new google.maps.LatLng(to.lat,   to.lng),
-      travelMode,
-      ...(rgn ? { region: rgn } : {}),
-      ...opts,
+      travelMode, ...opts,
     }, (result, status) => {
       if (status === google.maps.DirectionsStatus.OK) onSuccess(result);
-      else {
-        console.warn('[경로] Directions 실패:', travelMode, status, from.lat, from.lng, '→', to.lat, to.lng);
-        onFail(status);
-      }
+      else onFail(status);
     });
   }
 
   if (mode === 'transit') {
-    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep }, provideRouteAlternatives: true },
+    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
       (result) => _polylineTransitSteps(result.routes[0].legs[0].steps),
-      (transitErr) => {
-        console.warn('[경로] TRANSIT 실패:', from.name||'?', '→', to.name||'?', transitErr);
-        // 대중교통 없음 → DRIVING 경로를 파란 실선으로 (대중교통 스타일 대체)
+      () => {
+        // 대중교통 없음 → DRIVING 경로를 회색 점선으로
         tryRoute(google.maps.TravelMode.DRIVING, {},
-          (r2) => {
-            const p = r2.routes[0].overview_path;
-            dayPolylines.push(new google.maps.Polyline({ path:p, geodesic:true, strokeColor:'#90CAF9', strokeOpacity:0.9, strokeWeight:6, map, zIndex:1 }));
-            dayPolylines.push(new google.maps.Polyline({ path:p, geodesic:true, strokeColor:'#1565C0', strokeOpacity:0.85, strokeWeight:4, map, zIndex:2 }));
-          },
-          (drvErr) => { console.warn('[경로] DRIVING도 실패:', drvErr); _polylineDashed(straight, '#1565C0', 0.6); }
+          (r2) => _polylineDashed(r2.routes[0].overview_path, '#9E9E9E', 0.6),
+          () => _polylineDashed(straight, '#9E9E9E', 0.4)
         );
       }
     );
@@ -8215,13 +8186,13 @@ function drawSegmentRoute(from, to, mode) {
   } else if (mode === 'driving') {
     tryRoute(google.maps.TravelMode.DRIVING, {},
       (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.9),
-      (err) => { console.warn('[경로] DRIVING 실패:', from.name||'?', '→', to.name||'?', err); _polylineSolid(straight, cfg, mode, 0.3); }
+      () => _polylineSolid(straight, cfg, mode, 0.3)
     );
 
   } else if (mode === 'walking') {
     tryRoute(google.maps.TravelMode.WALKING, {},
       (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.85),
-      (err) => { console.warn('[경로] WALKING 실패:', from.name||'?', '→', to.name||'?', err); _polylineSolid(straight, cfg, mode, 0.3); }
+      () => _polylineSolid(straight, cfg, mode, 0.3)
     );
 
   } else if (mode === 'bicycling') {
@@ -8840,7 +8811,7 @@ function drawAllDayRoutes() {
   const days = Object.keys(scheduleData).map(Number).sort((a,b) => a-b);
   days.forEach(day => {
     const items = scheduleData[day] || [];
-    const locItems = items.filter(it => it.lat && it.lng);
+    const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
     if (locItems.length < 2) return;
 
     const col = DAY_COLORS[(day - 1) % DAY_COLORS.length];
@@ -8871,14 +8842,6 @@ function drawAllDaySegment(from, to, mode, col) {
   const svc = new google.maps.DirectionsService();
   const dep = _routeDepTime(from.lng);
 
-  // region 추정
-  function _r(lat, lng) {
-    if (lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132) return 'kr';
-    if (lat >= 24 && lat <= 46 && lng >= 129 && lng <= 146) return 'jp';
-    return undefined;
-  }
-  const rgn2 = _r(from.lat, from.lng);
-
   function push(routePath, opacity) {
     if (!routePath || routePath.length < 2) return;
     if (col.shadow) {
@@ -8897,9 +8860,7 @@ function drawAllDaySegment(from, to, mode, col) {
     svc.route({
       origin:      new google.maps.LatLng(from.lat, from.lng),
       destination: new google.maps.LatLng(to.lat,   to.lng),
-      travelMode,
-      ...(rgn2 ? { region: rgn2 } : {}),
-      ...opts,
+      travelMode, ...opts,
     }, (result, status) => {
       if (status === google.maps.DirectionsStatus.OK) onOK(result);
       else onFail(status);
@@ -8907,15 +8868,12 @@ function drawAllDaySegment(from, to, mode, col) {
   }
 
   if (mode === 'transit') {
-    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep }, provideRouteAlternatives: true },
+    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
       (r) => push(r.routes[0].overview_path, 0.85),
-      (err) => {
-        console.warn('[전체경로] TRANSIT 실패:', err);
-        tryRoute(google.maps.TravelMode.DRIVING, {},
-          (r2) => push(r2.routes[0].overview_path, 0.75),
-          () => push(straight, 0.4)
-        );
-      }
+      () => tryRoute(google.maps.TravelMode.DRIVING, {},
+        (r2) => push(r2.routes[0].overview_path, 0.5),
+        () => push(straight, 0.25)
+      )
     );
   } else if (mode === 'bicycling') {
     tryRoute(google.maps.TravelMode.BICYCLING, {},
@@ -8944,7 +8902,7 @@ function _allDayFlightArc(from, to, col) {
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     arc.push({
-      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * 4,
+      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * Math.min(Math.sqrt(Math.pow(to.lat-from.lat,2)+Math.pow(to.lng-from.lng,2))*0.08, 1.0),
       lng: from.lng + (to.lng - from.lng) * t,
     });
   }
