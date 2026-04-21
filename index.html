@@ -2404,6 +2404,87 @@ html, body {
 }
 .quick-pill:hover { border-color: var(--accent2); color: var(--accent2); background: #EBF3FE; }
 .quick-pill:active { transform: scale(0.96); }
+/* ── 구역 묶음 (일정 카드 그룹핑) ── */
+.zone-group {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all .25s;
+}
+.zone-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--white);
+  border: 1.5px solid var(--sand);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+}
+.zone-group-header:hover { background: var(--stone); border-color: var(--accent2); }
+.zone-group-header .zgh-icon { font-size: 14px; flex-shrink: 0; }
+.zone-group-header .zgh-name {
+  font-size: 12px; font-weight: 700; color: var(--ink);
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.zone-group-header .zgh-count {
+  font-size: 11px; font-weight: 600; color: var(--ink3);
+  background: var(--stone); border-radius: 10px;
+  padding: 2px 8px; flex-shrink: 0;
+}
+.zone-group-header .zgh-arrow {
+  font-size: 10px; color: var(--ink3);
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+.zone-group.collapsed .zgh-arrow { transform: rotate(-90deg); }
+
+/* 접힌 상태: 카드들이 짜부러져서 겹쳐 보임 */
+.zone-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  transition: all .25s;
+}
+.zone-group.collapsed .zone-group-body {
+  gap: 0;
+  padding-top: 4px;
+  max-height: 72px;
+  overflow: hidden;
+  position: relative;
+}
+.zone-group.collapsed .zone-group-body::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 28px;
+  background: linear-gradient(transparent, var(--cream));
+  pointer-events: none;
+}
+.zone-group.collapsed .schedule-item {
+  transform: scaleY(0.45);
+  transform-origin: top center;
+  margin-bottom: -20px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.zone-group.collapsed .schedule-item:nth-child(n+4) {
+  display: none;
+}
+.zone-group.collapsed .transit-card {
+  display: none;
+}
+/* 펼친 상태: 정상 */
+.zone-group:not(.collapsed) .schedule-item {
+  transform: none;
+  margin-bottom: 0;
+  opacity: 1;
+  pointer-events: all;
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -5584,14 +5665,186 @@ function _closeMemo(ta, item, wrap, btn) {
   setTimeout(() => { _memoClosing = false; }, 80);
 }
 
+// ── 구역 묶음 상태 저장 (Day별)
+let zoneCollapseState = {}; // { "day_zoneIdx": true/false }
+
+function getZoneKey(day, zIdx) { return day + '_z' + zIdx; }
+
+function toggleZoneCollapse(day, zIdx) {
+  const key = getZoneKey(day, zIdx);
+  zoneCollapseState[key] = !zoneCollapseState[key];
+  const el = document.getElementById('zone-group-' + day + '-' + zIdx);
+  if (el) el.classList.toggle('collapsed', zoneCollapseState[key]);
+}
+
+// 위치 기반 구역 그룹핑 (반경 800m 이내 → 같은 구역)
+function groupItemsByZone(items) {
+  if (!items.length) return [];
+  const RADIUS = 800; // 미터
+  const groups = []; // [{center:{lat,lng}, items:[{item,origIdx}]}]
+
+  items.forEach((item, idx) => {
+    if (!item.lat || !item.lng) {
+      // 위치 없는 항목 → 마지막 그룹에 추가하거나 새 그룹
+      if (groups.length > 0) {
+        groups[groups.length - 1].items.push({ item, origIdx: idx });
+      } else {
+        groups.push({ center: null, items: [{ item, origIdx: idx }] });
+      }
+      return;
+    }
+
+    // 기존 그룹 중 가까운 곳 찾기
+    let found = false;
+    for (const g of groups) {
+      if (!g.center) continue;
+      const d = Math.sqrt(
+        Math.pow((item.lat - g.center.lat) * 111000, 2) +
+        Math.pow((item.lng - g.center.lng) * 111000 * Math.cos(g.center.lat * Math.PI / 180), 2)
+      );
+      if (d <= RADIUS) {
+        g.items.push({ item, origIdx: idx });
+        // 중심 업데이트 (이동 평균)
+        const n = g.items.filter(i => i.item.lat).length;
+        g.center.lat = g.items.filter(i=>i.item.lat).reduce((s,i)=>s+i.item.lat,0) / n;
+        g.center.lng = g.items.filter(i=>i.item.lng).reduce((s,i)=>s+i.item.lng,0) / n;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      groups.push({
+        center: { lat: item.lat, lng: item.lng },
+        items: [{ item, origIdx: idx }],
+      });
+    }
+  });
+
+  return groups;
+}
+
+// 구역 이름 추출 (첫 번째 항목 이름 기반)
+function getZoneName(group) {
+  const names = group.items.map(i => i.item.name).filter(Boolean);
+  if (names.length <= 2) return names.join(' · ');
+  return names[0] + ' 외';
+}
+
 function renderScheduleList() {
   const list = document.getElementById('schedule-list');
   const items = scheduleData[currentDay] || [];
   list.innerHTML = '';
   const typeIcon = { food:'🍜', cafe:'☕', sight:'🏛️', hotel:'🏨', shop:'🛍️', move:'🚆' };
 
-  items.forEach((item, idx) => {
-    // ── 일정 카드
+  // 그룹핑 (3개 이상일 때만)
+  const groups = items.length >= 5 ? groupItemsByZone(items) : null;
+  const useGroups = groups && groups.length > 1 && groups.some(g => g.items.length >= 2);
+
+  if (useGroups) {
+    groups.forEach((group, gIdx) => {
+      const isCollapsed = !!zoneCollapseState[getZoneKey(currentDay, gIdx)];
+
+      if (group.items.length >= 2) {
+        // 구역 그룹 래퍼
+        const zoneDiv = document.createElement('div');
+        zoneDiv.className = 'zone-group' + (isCollapsed ? ' collapsed' : '');
+        zoneDiv.id = 'zone-group-' + currentDay + '-' + gIdx;
+
+        // 구역 헤더
+        const header = document.createElement('div');
+        header.className = 'zone-group-header';
+        header.onclick = () => toggleZoneCollapse(currentDay, gIdx);
+        const zoneName = getZoneName(group);
+        const _t = LANG_MAP[currentLang] || LANG_MAP.ko;
+        const countLabel = currentLang === 'ja'
+          ? group.items.length + '件の予定'
+          : group.items.length + '개 일정';
+        header.innerHTML = `
+          <span class="zgh-icon">📍</span>
+          <span class="zgh-name">${zoneName}</span>
+          <span class="zgh-count">${countLabel}</span>
+          <span class="zgh-arrow">▼</span>`;
+        zoneDiv.appendChild(header);
+
+        // 카드 바디
+        const body = document.createElement('div');
+        body.className = 'zone-group-body';
+
+        group.items.forEach(({ item, origIdx }, i) => {
+          const card = buildScheduleCard(item, origIdx, typeIcon);
+          body.appendChild(card);
+
+          // 이동 카드
+          if (i < group.items.length - 1) {
+            const next = group.items[i + 1];
+            const tc = buildTransitCard(item, next.item, origIdx);
+            body.appendChild(tc);
+            if (item.lat && item.lng && next.item.lat && next.item.lng) {
+              const mode = transitModes[transitKey(currentDay, origIdx)] || 'driving';
+              fetchDirections(item, next.item, mode, origIdx);
+            }
+          }
+        });
+
+        zoneDiv.appendChild(body);
+        list.appendChild(zoneDiv);
+
+        // 구역 간 이동 카드 (마지막 구역 아님 + 다음 구역 있으면)
+        if (gIdx < groups.length - 1) {
+          const lastItem = group.items[group.items.length - 1];
+          const nextGroup = groups[gIdx + 1];
+          const nextItem = nextGroup.items[0];
+          const tc = buildTransitCard(lastItem.item, nextItem.item, lastItem.origIdx);
+          list.appendChild(tc);
+          if (lastItem.item.lat && lastItem.item.lng && nextItem.item.lat && nextItem.item.lng) {
+            const mode = transitModes[transitKey(currentDay, lastItem.origIdx)] || 'driving';
+            fetchDirections(lastItem.item, nextItem.item, mode, lastItem.origIdx);
+          }
+        }
+
+      } else {
+        // 1개짜리 구역은 그룹 없이 그냥 표시
+        group.items.forEach(({ item, origIdx }) => {
+          const card = buildScheduleCard(item, origIdx, typeIcon);
+          list.appendChild(card);
+        });
+        // 다음 구역과의 이동 카드
+        if (gIdx < groups.length - 1) {
+          const lastItem = group.items[group.items.length - 1];
+          const nextGroup = groups[gIdx + 1];
+          const nextItem = nextGroup.items[0];
+          const tc = buildTransitCard(lastItem.item, nextItem.item, lastItem.origIdx);
+          list.appendChild(tc);
+          if (lastItem.item.lat && lastItem.item.lng && nextItem.item.lat && nextItem.item.lng) {
+            const mode = transitModes[transitKey(currentDay, lastItem.origIdx)] || 'driving';
+            fetchDirections(lastItem.item, nextItem.item, mode, lastItem.origIdx);
+          }
+        }
+      }
+    });
+  } else {
+    // 그룹핑 안 할 때 (기존 방식)
+    items.forEach((item, idx) => {
+      const card = buildScheduleCard(item, idx, typeIcon);
+      list.appendChild(card);
+      if (idx < items.length - 1) {
+        const next = items[idx + 1];
+        const tc = buildTransitCard(item, next, idx);
+        list.appendChild(tc);
+        if (item.lat && item.lng && next.lat && next.lng) {
+          const mode = transitModes[transitKey(currentDay, idx)] || 'driving';
+          fetchDirections(item, next, mode, idx);
+        }
+      }
+    });
+  }
+
+  drawDayRoutes();
+}
+
+// 개별 일정 카드 빌드 (분리)
+function buildScheduleCard(item, idx, typeIcon) {
     const div = document.createElement('div');
     div.className = 'schedule-item type-' + item.type;
     const hasLoc = item.lat && item.lng;
@@ -5627,21 +5880,7 @@ function renderScheduleList() {
         <button class="item-act-btn item-del"  onclick="deleteScheduleItem(${idx})">✕</button>
       </div>`;
 
-    list.appendChild(div);
-
-    // ── 이동 카드 (마지막 카드 뒤엔 없음)
-    if (idx < items.length - 1) {
-      const next = items[idx + 1];
-      const tc = buildTransitCard(item, next, idx);
-      list.appendChild(tc);
-      // DOM에 붙은 후에 Directions 호출
-      if (item.lat && item.lng && next.lat && next.lng) {
-        const mode = transitModes[transitKey(currentDay, idx)] || 'driving';
-        fetchDirections(item, next, mode, idx);
-      }
-    }
-  });
-  drawDayRoutes();
+    return div;
 }
 
 function buildTransitCard(from, to, fromIdx) {
@@ -6024,32 +6263,11 @@ function saveScheduleItem() {
   autoSave();
 }
 
-let _pendingDeleteIdx = null;
-
 function deleteScheduleItem(idx) {
-  const item = (scheduleData[currentDay] || [])[idx];
-  if (!item) return;
-  _pendingDeleteIdx = idx;
-  const _t = LANG_MAP[currentLang] || LANG_MAP.ko;
-  document.getElementById('delete-confirm-name').textContent = '"' + item.name + '"';
-  document.getElementById('delete-confirm-msg').textContent = currentLang === 'ja'
-    ? 'この予定を削除しますか？' : '이 일정을 삭제하시겠어요?';
-  document.getElementById('delete-confirm-cancel').textContent = _t.btnCancel || '취소';
-  document.getElementById('delete-confirm-btn').textContent = currentLang === 'ja' ? '削除' : '삭제';
-  openOverlay('delete-confirm-overlay');
-}
-
-function confirmDeleteSchedule() {
-  if (_pendingDeleteIdx === null) return;
-  const _t = LANG_MAP[currentLang] || LANG_MAP.ko;
-  const item = (scheduleData[currentDay] || [])[_pendingDeleteIdx];
-  scheduleData[currentDay].splice(_pendingDeleteIdx, 1);
-  _pendingDeleteIdx = null;
-  closeOverlay('delete-confirm-overlay');
+  scheduleData[currentDay].splice(idx, 1);
   renderScheduleList();
   calcBudget();
   autoSave();
-  showToast('"' + (item?.name||'') + '" ' + (_t.toastItemDeleted || '삭제했어요'));
 }
 
 // ── 예산 트래커 ───────────────────────────────────────────────
@@ -8134,7 +8352,7 @@ function _polylineFlightArc(from, to) {
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     arc.push({
-      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * Math.min(Math.sqrt(Math.pow(to.lat-from.lat,2)+Math.pow(to.lng-from.lng,2))*0.18, 2.5),
+      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * 5,
       lng: from.lng + (to.lng - from.lng) * t,
     });
   }
@@ -8915,7 +9133,7 @@ function _allDayFlightArc(from, to, col) {
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     arc.push({
-      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * Math.min(Math.sqrt(Math.pow(to.lat-from.lat,2)+Math.pow(to.lng-from.lng,2))*0.18, 2.5),
+      lat: from.lat + (to.lat - from.lat) * t + Math.sin(Math.PI * t) * 4,
       lng: from.lng + (to.lng - from.lng) * t,
     });
   }
@@ -10496,28 +10714,5 @@ document.addEventListener('keydown', (e) => {
   </div>
 </div>
 
-
-<!-- 삭제 확인 팝업 -->
-<div class="overlay" id="delete-confirm-overlay" onclick="closeIfBg(event,'delete-confirm-overlay')">
-  <div class="popup" style="width:320px;text-align:center;padding:28px 24px;">
-    <div style="font-size:32px;margin-bottom:12px;">🗑️</div>
-    <div id="delete-confirm-name" style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;"></div>
-    <div id="delete-confirm-msg" style="font-size:13px;color:var(--ink3);margin-bottom:20px;"></div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="closeOverlay('delete-confirm-overlay')"
-        style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--sand);
-               background:var(--white);font-family:inherit;font-size:13px;font-weight:500;
-               color:var(--ink2);cursor:pointer;transition:all .14s;"
-        onmouseover="this.style.background='var(--stone)'" onmouseout="this.style.background='var(--white)'"
-        id="delete-confirm-cancel">취소</button>
-      <button onclick="confirmDeleteSchedule()"
-        style="flex:1;padding:11px;border-radius:10px;border:none;
-               background:#E53935;color:#fff;font-family:inherit;font-size:13px;font-weight:600;
-               cursor:pointer;transition:opacity .14s;"
-        onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'"
-        id="delete-confirm-btn">삭제</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
