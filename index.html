@@ -2441,7 +2441,7 @@ html, body {
 }
 .zone-group.collapsed .zgh-arrow { transform: rotate(-90deg); }
 
-/* 접힌 상태: 카드들이 짜부러져서 겹쳐 보임 */
+/* 접힌 상태: 카드들이 자연스럽게 작아짐 */
 .zone-group-body {
   display: flex;
   flex-direction: column;
@@ -2450,30 +2450,31 @@ html, body {
   transition: all .25s;
 }
 .zone-group.collapsed .zone-group-body {
-  gap: 0;
-  padding-top: 4px;
-  max-height: 72px;
+  gap: 3px;
+  padding-top: 3px;
   overflow: hidden;
-  position: relative;
 }
 .zone-group.collapsed .zone-group-body::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 28px;
-  background: linear-gradient(transparent, var(--cream));
-  pointer-events: none;
-}
-.zone-group.collapsed .schedule-item {
-  transform: scaleY(0.45);
-  transform-origin: top center;
-  margin-bottom: -20px;
-  opacity: 0.7;
-  pointer-events: none;
-}
-.zone-group.collapsed .schedule-item:nth-child(n+4) {
   display: none;
 }
+
+/* 접힌 상태: 카드 높이를 자연스럽게 줄이기 — scaleY 대신 padding/overflow 조절 */
+.zone-group.collapsed .schedule-item {
+  padding-top: 5px;
+  padding-bottom: 5px;
+  opacity: 0.85;
+  pointer-events: none;
+  overflow: hidden;
+}
+/* 접힌 상태에서 숨길 요소들 */
+.zone-group.collapsed .schedule-item .item-desc,
+.zone-group.collapsed .schedule-item .item-memo-wrap,
+.zone-group.collapsed .schedule-item .item-has-loc,
+.zone-group.collapsed .schedule-item .item-actions,
+.zone-group.collapsed .schedule-item .item-act-btn-memo {
+  display: none;
+}
+/* 접힌 상태에서 4번째 이후 카드 숨기기 제거 — 전부 표시 */
 .zone-group.collapsed .transit-card {
   display: none;
 }
