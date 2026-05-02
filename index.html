@@ -2414,28 +2414,29 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: var(--white);
-  border: 1.5px solid var(--sand);
-  border-radius: 12px;
+  padding: 8px 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
   cursor: pointer;
   transition: all .15s;
   user-select: none;
+  box-shadow: 0 2px 8px rgba(224,122,58,0.25);
 }
-.zone-group-header:hover { background: var(--stone); border-color: var(--accent2); }
-.zone-group-header .zgh-icon { font-size: 14px; flex-shrink: 0; }
+.zone-group-header:hover { background: #c96a2e; box-shadow: 0 3px 12px rgba(224,122,58,0.35); }
+.zone-group-header .zgh-icon { font-size: 13px; flex-shrink: 0; }
 .zone-group-header .zgh-name {
-  font-size: 12px; font-weight: 700; color: var(--ink);
+  font-size: 12px; font-weight: 700; color: #fff;
   flex: 1; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .zone-group-header .zgh-count {
-  font-size: 11px; font-weight: 600; color: var(--ink3);
-  background: var(--stone); border-radius: 10px;
+  font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.2); border-radius: 10px;
   padding: 2px 8px; flex-shrink: 0;
 }
 .zone-group-header .zgh-arrow {
-  font-size: 10px; color: var(--ink3);
+  font-size: 10px; color: rgba(255,255,255,0.8);
   transition: transform .2s;
   flex-shrink: 0;
 }
@@ -5725,11 +5726,46 @@ function groupItemsByZone(items) {
   return groups;
 }
 
-// 구역 이름 추출 (첫 번째 항목 이름 기반)
+// 구역 이름 캐시 (lat+lng → 동네이름)
+const zoneNameCache = {};
+
+async function fetchZoneName(lat, lng) {
+  const key = lat.toFixed(3) + ',' + lng.toFixed(3);
+  if (zoneNameCache[key]) return zoneNameCache[key];
+  try {
+    const geocoder = new google.maps.Geocoder();
+    return await new Promise((resolve) => {
+      geocoder.geocode({ location: { lat, lng }, language: 'ko' }, (results, status) => {
+        if (status !== 'OK' || !results.length) { resolve(null); return; }
+        // 동/구/시 순서로 적절한 지명 추출
+        const priorities = ['sublocality_level_2','sublocality_level_1','locality','administrative_area_level_2'];
+        for (const type of priorities) {
+          const comp = results[0].address_components.find(c => c.types.includes(type));
+          if (comp) {
+            zoneNameCache[key] = comp.long_name;
+            resolve(comp.long_name);
+            return;
+          }
+        }
+        // fallback: 첫 번째 결과 formatted_address에서 짧게 추출
+        const short = results[0].formatted_address.split(' ').slice(-2).join(' ');
+        zoneNameCache[key] = short;
+        resolve(short);
+      });
+    });
+  } catch(e) { return null; }
+}
+
 function getZoneName(group) {
+  // 동기 fallback (캐시 없을 때) — 첫 번째 아이템 이름 사용
   const names = group.items.map(i => i.item.name).filter(Boolean);
   if (names.length <= 2) return names.join(' · ');
-  return names[0] + ' 외';
+  // 캐시된 지역명 있으면 사용
+  if (group.center) {
+    const key = group.center.lat.toFixed(3) + ',' + group.center.lng.toFixed(3);
+    if (zoneNameCache[key]) return zoneNameCache[key];
+  }
+  return names[0]; // 외 없이 첫 번째 이름만
 }
 
 function renderScheduleList() {
@@ -5766,6 +5802,16 @@ function renderScheduleList() {
           <span class="zgh-name">${zoneName}</span>
           <span class="zgh-count">${countLabel}</span>
           <span class="zgh-arrow">▼</span>`;
+
+        // 비동기로 실제 동네이름 가져와서 업데이트
+        if (group.center && window.google) {
+          fetchZoneName(group.center.lat, group.center.lng).then(name => {
+            if (name) {
+              const nameEl = header.querySelector('.zgh-name');
+              if (nameEl) nameEl.textContent = name;
+            }
+          });
+        }
         zoneDiv.appendChild(header);
 
         // 카드 바디
