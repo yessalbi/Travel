@@ -1019,7 +1019,11 @@ html, body {
 }
 #map-search-results.show { display: flex; }
 
-/* 검색결과 닫기 버튼 */
+/* 경로 hover 툴팁 — InfoWindow 기본 스타일 제거 */
+.route-tooltip-iw .gm-style-iw-c { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+.route-tooltip-iw .gm-style-iw-d { overflow: visible !important; }
+.route-tooltip-iw .gm-style-iw-tc { display: none !important; }
+.route-tooltip-iw button.gm-ui-hover-effect { display: none !important; }
 .map-search-close-inner {
   display: flex; align-items: center; justify-content: center;
   padding: 8px 0;
@@ -4551,8 +4555,6 @@ function enterTrip(tripId) {
 function createNewTrip() {
   const newId = generateId();
   addTripToList(newId);
-  // 새 여행 플래그 저장 — 페이지 로드 후 위자드 자동 오픈
-  sessionStorage.setItem('newTripWizard', '1');
   enterTrip(newId);
 }
 
@@ -4699,9 +4701,8 @@ async function realInit() {
   }
   document.getElementById('loading').style.display = 'none';
 
-  // 새 여행 만들기 직후 → 위자드 자동 오픈
-  if (sessionStorage.getItem('newTripWizard') === '1') {
-    sessionStorage.removeItem('newTripWizard');
+  // 여행 기본정보가 없으면 위자드 자동 오픈
+  if (!document.getElementById('trip-title')?.value?.trim()) {
     setTimeout(() => openTripSetup(), 400);
   }
 }
@@ -9087,6 +9088,7 @@ let allDayPolylines = [];
 function clearAllDayRoutes() {
   allDayPolylines.forEach(p => p.setMap(null));
   allDayPolylines = [];
+  Object.keys(allDayPolylineGroups).forEach(k => delete allDayPolylineGroups[k]);
   if (allDayHoverWindow) allDayHoverWindow.close();
 }
 
@@ -9113,26 +9115,47 @@ function drawAllDayRoutes() {
   });
 }
 
-let allDayHoverWindow = null; // 경로 hover 툴팁
+// Day별 폴리라인 그룹 (hover 시 해당 Day 전체 하이라이트용)
+const allDayPolylineGroups = {}; // { day: [polyline, ...] }
+let allDayHoverWindow = null;
 
 function _attachRouteHover(polyline, day, col) {
-  if (!allDayHoverWindow) {
-    allDayHoverWindow = new google.maps.InfoWindow({ disableAutoPan: true });
-  }
+  if (!allDayPolylineGroups[day]) allDayPolylineGroups[day] = [];
+  allDayPolylineGroups[day].push(polyline);
+
   polyline.addListener('mouseover', (e) => {
-    // 하이라이트
-    polyline.setOptions({ strokeWeight: 7, strokeOpacity: 1, zIndex: 100 });
-    // 툴팁
-    const label = currentLang === 'ja' ? `Day${day}のルート` : `Day${day} 경로`;
+    // 해당 Day의 모든 폴리라인 하이라이트
+    (allDayPolylineGroups[day] || []).forEach(pl => {
+      pl.setOptions({ strokeWeight: 7, strokeOpacity: 1, zIndex: 100 });
+    });
+    // 툴팁 — 작은 말풍선
+    if (!allDayHoverWindow) {
+      allDayHoverWindow = new google.maps.InfoWindow({
+        disableAutoPan: true,
+        pixelOffset: new google.maps.Size(0, -4),
+      });
+      // 열린 후 DOM에 클래스 추가
+      google.maps.event.addListener(allDayHoverWindow, 'domready', () => {
+        const iw = document.querySelector('.gm-style-iw-c');
+        if (iw) iw.closest('.gm-style-iw-t')?.classList.add('route-tooltip-iw');
+      });
+    }
+    const label = currentLang === 'ja' ? `Day${day}` : `Day${day}`;
     allDayHoverWindow.setContent(
-      `<div style="font-size:12px;font-weight:700;color:${col.stroke};padding:2px 4px;">📍 ${label}</div>`
+      `<div style="background:rgba(0,0,0,0.5);color:${col.stroke};font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;line-height:1.4;box-shadow:none;">Day${day}</div>`
     );
     allDayHoverWindow.setPosition(e.latLng);
     allDayHoverWindow.open(map);
   });
+
   polyline.addListener('mouseout', () => {
-    polyline.setOptions({ strokeWeight: 4, strokeOpacity: col._opacity || 0.9, zIndex: 2 });
-    allDayHoverWindow.close();
+    // 해당 Day 전체 원복
+    (allDayPolylineGroups[day] || []).forEach(pl => {
+      const origWeight = pl.get('_origWeight') || 4;
+      const origOpacity = pl.get('_origOpacity') || 0.9;
+      pl.setOptions({ strokeWeight: origWeight, strokeOpacity: origOpacity, zIndex: 2 });
+    });
+    if (allDayHoverWindow) allDayHoverWindow.close();
   });
 }
 
@@ -9164,6 +9187,8 @@ function drawAllDaySegment(from, to, mode, col) {
       path: routePath, geodesic: true,
       strokeColor: col.stroke, strokeOpacity: opacity, strokeWeight: 4, map, zIndex: 2,
     });
+    pl.set('_origWeight', 4);
+    pl.set('_origOpacity', opacity);
     col._opacity = opacity;
     _attachRouteHover(pl, col._day, col);
     allDayPolylines.push(pl);
