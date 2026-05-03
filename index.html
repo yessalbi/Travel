@@ -4552,6 +4552,8 @@ function createNewTrip() {
   const newId = generateId();
   addTripToList(newId);
   enterTrip(newId);
+  // 새 여행 진입 즉시 위자드 자동 오픈
+  setTimeout(() => openTripSetup(), 300);
 }
 
 function goToTripList() {
