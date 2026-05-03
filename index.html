@@ -9087,6 +9087,7 @@ let allDayPolylines = [];
 function clearAllDayRoutes() {
   allDayPolylines.forEach(p => p.setMap(null));
   allDayPolylines = [];
+  if (allDayHoverWindow) allDayHoverWindow.close();
 }
 
 function drawAllDayRoutes() {
@@ -9100,7 +9101,7 @@ function drawAllDayRoutes() {
     const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
     if (locItems.length < 2) return;
 
-    const col = DAY_COLORS[(day - 1) % DAY_COLORS.length];
+    const col = { ...DAY_COLORS[(day - 1) % DAY_COLORS.length], _day: day };
 
     locItems.forEach((item, i) => {
       if (i >= locItems.length - 1) return;
@@ -9109,6 +9110,29 @@ function drawAllDayRoutes() {
       const mode = transitModes[transitKey(day, origIdx)] || 'driving';
       drawAllDaySegment(item, next, mode, col);
     });
+  });
+}
+
+let allDayHoverWindow = null; // 경로 hover 툴팁
+
+function _attachRouteHover(polyline, day, col) {
+  if (!allDayHoverWindow) {
+    allDayHoverWindow = new google.maps.InfoWindow({ disableAutoPan: true });
+  }
+  polyline.addListener('mouseover', (e) => {
+    // 하이라이트
+    polyline.setOptions({ strokeWeight: 7, strokeOpacity: 1, zIndex: 100 });
+    // 툴팁
+    const label = currentLang === 'ja' ? `Day${day}のルート` : `Day${day} 경로`;
+    allDayHoverWindow.setContent(
+      `<div style="font-size:12px;font-weight:700;color:${col.stroke};padding:2px 4px;">📍 ${label}</div>`
+    );
+    allDayHoverWindow.setPosition(e.latLng);
+    allDayHoverWindow.open(map);
+  });
+  polyline.addListener('mouseout', () => {
+    polyline.setOptions({ strokeWeight: 4, strokeOpacity: col._opacity || 0.9, zIndex: 2 });
+    allDayHoverWindow.close();
   });
 }
 
@@ -9136,10 +9160,13 @@ function drawAllDaySegment(from, to, mode, col) {
         strokeColor: '#fff', strokeOpacity: 0.75, strokeWeight: 6, map, zIndex: 1,
       }));
     }
-    allDayPolylines.push(new google.maps.Polyline({
+    const pl = new google.maps.Polyline({
       path: routePath, geodesic: true,
       strokeColor: col.stroke, strokeOpacity: opacity, strokeWeight: 4, map, zIndex: 2,
-    }));
+    });
+    col._opacity = opacity;
+    _attachRouteHover(pl, col._day, col);
+    allDayPolylines.push(pl);
   }
 
   function tryRoute(travelMode, opts, onOK, onFail) {
