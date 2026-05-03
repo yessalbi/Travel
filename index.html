@@ -4551,9 +4551,9 @@ function enterTrip(tripId) {
 function createNewTrip() {
   const newId = generateId();
   addTripToList(newId);
+  // 새 여행 플래그 저장 — 페이지 로드 후 위자드 자동 오픈
+  sessionStorage.setItem('newTripWizard', '1');
   enterTrip(newId);
-  // 새 여행 진입 즉시 위자드 자동 오픈
-  setTimeout(() => openTripSetup(), 300);
 }
 
 function goToTripList() {
@@ -4698,6 +4698,12 @@ async function realInit() {
     console.error('Firebase 로드 실패:', e);
   }
   document.getElementById('loading').style.display = 'none';
+
+  // 새 여행 만들기 직후 → 위자드 자동 오픈
+  if (sessionStorage.getItem('newTripWizard') === '1') {
+    sessionStorage.removeItem('newTripWizard');
+    setTimeout(() => openTripSetup(), 400);
+  }
 }
 
 // ── Firebase 로드 ─────────────────────────────────────────────
