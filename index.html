@@ -1019,11 +1019,19 @@ html, body {
 }
 #map-search-results.show { display: flex; }
 
-/* 경로 hover 툴팁 — InfoWindow 기본 스타일 제거 */
-.route-tooltip-iw .gm-style-iw-c { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
-.route-tooltip-iw .gm-style-iw-d { overflow: visible !important; }
-.route-tooltip-iw .gm-style-iw-tc { display: none !important; }
+/* 경로 hover 툴팁 — InfoWindow 기본 스타일 완전 제거 */
+.route-tooltip-iw .gm-style-iw-c,
+.route-tooltip-iw .gm-style-iw {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border: none !important;
+}
+.route-tooltip-iw .gm-style-iw-d { overflow: visible !important; padding: 0 !important; }
+.route-tooltip-iw .gm-style-iw-tc,
+.route-tooltip-iw .gm-style-iw-t::after { display: none !important; }
 .route-tooltip-iw button.gm-ui-hover-effect { display: none !important; }
+.route-tooltip-iw .gm-style-iw-chr { display: none !important; }
 .map-search-close-inner {
   display: flex; align-items: center; justify-content: center;
   padding: 8px 0;
@@ -5683,9 +5691,11 @@ function getZoneKey(day, zIdx) { return day + '_z' + zIdx; }
 
 function toggleZoneCollapse(day, zIdx) {
   const key = getZoneKey(day, zIdx);
-  zoneCollapseState[key] = !zoneCollapseState[key];
+  // 기본값이 true(묶임)이므로 undefined → false(펼침)
+  const current = zoneCollapseState[key] !== false;
+  zoneCollapseState[key] = !current;
   const el = document.getElementById('zone-group-' + day + '-' + zIdx);
-  if (el) el.classList.toggle('collapsed', zoneCollapseState[key]);
+  if (el) el.classList.toggle('collapsed', !current);
 }
 
 // 위치 기반 구역 그룹핑 (반경 800m 이내 → 같은 구역)
@@ -5789,7 +5799,7 @@ function renderScheduleList() {
 
   if (useGroups) {
     groups.forEach((group, gIdx) => {
-      const isCollapsed = !!zoneCollapseState[getZoneKey(currentDay, gIdx)];
+      const isCollapsed = zoneCollapseState[getZoneKey(currentDay, gIdx)] !== false; // 기본값 묶임
 
       if (group.items.length >= 2) {
         // 구역 그룹 래퍼
@@ -9142,7 +9152,7 @@ function _attachRouteHover(polyline, day, col) {
     }
     const label = currentLang === 'ja' ? `Day${day}` : `Day${day}`;
     allDayHoverWindow.setContent(
-      `<div style="background:rgba(0,0,0,0.5);color:${col.stroke};font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;line-height:1.4;box-shadow:none;">Day${day}</div>`
+      `<div style="background:rgba(20,20,20,0.82);color:${col.stroke};font-size:13px;font-weight:800;padding:5px 12px;border-radius:8px;white-space:nowrap;letter-spacing:0.5px;text-shadow:0 0 8px rgba(0,0,0,0.6);border:2px solid ${col.stroke};">Day${day}</div>`
     );
     allDayHoverWindow.setPosition(e.latLng);
     allDayHoverWindow.open(map);
