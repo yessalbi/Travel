@@ -5366,6 +5366,8 @@ async function saveAll() {
   window.offlineSave(TRIP_ID, payload).catch(() => {});
   showToast((LANG_MAP[currentLang]?.toastSaved || LANG_MAP.ko.toastSaved));
   updateTripSummary();
+  // 일정 변경 시 지역 하이라이트 갱신
+  if (map) drawRegionHighlights();
 }
 
 let saveTimer = null;
@@ -7982,7 +7984,116 @@ function mapFitRoute() {
   map.fitBounds(bounds, 60);
 }
 
-// ── 현재 위치 + 나침반 ────────────────────────────────────────
+// ── 지역 하이라이트 (한국/일본 전용) ────────────────────────
+let regionPolygons = [];
+let regionFetching = false;
+
+// 좌표가 한국/일본인지 판별
+function detectCountry(pins) {
+  let kr = 0, jp = 0;
+  pins.forEach(({ lat, lng }) => {
+    if (lat >= 33 && lat <= 38.9 && lng >= 124.6 && lng <= 131.9) kr++;
+    else if (lat >= 24 && lat <= 45.7 && lng >= 122.9 && lng <= 153.9) jp++;
+  });
+  if (kr === 0 && jp === 0) return null;
+  return kr >= jp ? 'KR' : 'JP';
+}
+
+// Nominatim으로 행정구역 폴리곤 가져오기
+async function fetchRegionPolygon(lat, lng, country) {
+  // zoom: KR=10(시/군), JP=10(시)
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=geojson&zoom=10&accept-language=${country === 'KR' ? 'ko' : 'ja'}`;
+  try {
+    const res = await fetch(url, { headers: { 'Accept-Language': country === 'KR' ? 'ko' : 'ja' } });
+    const data = await res.json();
+    const feature = data?.features?.[0];
+    if (!feature) return null;
+    const name = feature.properties?.display_name?.split(',')[0]?.trim();
+    const geom = feature.geometry;
+    if (!geom) return null;
+    return { name, geom };
+  } catch(e) { return null; }
+}
+
+// GeoJSON geometry → Google Maps Polygon paths
+function geomToPaths(geom) {
+  const toLatLng = coords => coords.map(([lng, lat]) => ({ lat, lng }));
+  if (geom.type === 'Polygon') {
+    return geom.coordinates.map(toLatLng);
+  } else if (geom.type === 'MultiPolygon') {
+    return geom.coordinates.flatMap(poly => poly.map(toLatLng));
+  }
+  return null;
+}
+
+async function drawRegionHighlights() {
+  if (!map || regionFetching) return;
+  clearRegionHighlights();
+
+  // 모든 Day 핀 수집 (공항 제외)
+  const allPins = [];
+  Object.values(scheduleData).forEach(items => {
+    items.forEach(it => {
+      if (it.lat && it.lng && !isIncheonAirport(it.lat, it.lng)) {
+        allPins.push({ lat: it.lat, lng: it.lng });
+      }
+    });
+  });
+  if (allPins.length < 2) return;
+
+  const country = detectCountry(allPins);
+  if (!country) return; // 한국/일본 아님 → 기능 비활성
+
+  regionFetching = true;
+
+  // 중복 제거: 같은 행정구역 중심 좌표 묶기 (0.1° 격자)
+  const grid = {};
+  allPins.forEach(p => {
+    const key = `${(p.lat * 10 | 0)}_${(p.lng * 10 | 0)}`;
+    if (!grid[key]) grid[key] = p;
+  });
+  const uniquePins = Object.values(grid);
+
+  // 각 격자 대표 좌표로 행정구역 폴리곤 요청 (병렬, 최대 8개)
+  const results = await Promise.allSettled(
+    uniquePins.slice(0, 8).map(p => fetchRegionPolygon(p.lat, p.lng, country))
+  );
+
+  // 같은 이름 중복 제거
+  const seen = new Set();
+  results.forEach(r => {
+    if (r.status !== 'fulfilled' || !r.value) return;
+    const { name, geom } = r.value;
+    if (seen.has(name)) return;
+    seen.add(name);
+
+    const paths = geomToPaths(geom);
+    if (!paths) return;
+
+    // 경로와 구분: 점선 테두리 + 연한 fill
+    const poly = new google.maps.Polygon({
+      paths,
+      strokeColor: '#4A90D9',
+      strokeOpacity: 0.7,
+      strokeWeight: 2,
+      // 점선 효과는 SymbolPath로
+      icons: [],
+      fillColor: '#4A90D9',
+      fillOpacity: 0.07,
+      map,
+      zIndex: 0, // 경로(zIndex 2) 아래
+      clickable: false,
+    });
+    regionPolygons.push(poly);
+  });
+
+  regionFetching = false;
+}
+
+function clearRegionHighlights() {
+  regionPolygons.forEach(p => p.setMap(null));
+  regionPolygons = [];
+}
 // 모드: 0=off, 1=위치만, 2=위치+방향(나침반)
 let locMode       = 0;
 let locWatchId    = null;
@@ -9061,6 +9172,7 @@ function switchPanelTab(idx) {
     clearDayRoutes();
     fitAllPins();
     drawAllDayRoutes();
+    drawRegionHighlights();
     // 맛집&장소 마커 표시
     markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(map); });
   }
@@ -9570,6 +9682,7 @@ function restoreUIState() {
     if (tab === '0' || tab === null) {
       fitAllPins();
       drawAllDayRoutes(); // 초기 로드 시 전체 경로 표시
+      drawRegionHighlights(); // 한국/일본 지역 하이라이트
     } else if (tab !== 'map' && tab !== null) {
       clearAllDayRoutes();
       drawDayRoutes();
