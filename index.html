@@ -2501,6 +2501,7 @@ html, body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 </head>
 <body>
 
@@ -8122,19 +8123,47 @@ async function drawRegionHighlights() {
   );
 
   const seen = new Set();
-  let count = 0;
+  const geojsonFeatures = [];
+
   results.forEach(r => {
     if (r.status !== 'fulfilled' || !r.value) return;
     const { name, geojson } = r.value;
     if (seen.has(name)) return;
     seen.add(name);
+    // Turf 용 Feature로 변환
+    try {
+      const feature = { type: 'Feature', properties: { name }, geometry: geojson };
+      geojsonFeatures.push(feature);
+    } catch(e) {}
+  });
+
+  console.log('[Region] areas:', [...seen]);
+
+  if (geojsonFeatures.length === 0) { regionFetching = false; return; }
+
+  // Turf.js로 인접 폴리곤 union (하나의 덩어리로)
+  let unified = null;
+  if (typeof turf !== 'undefined' && geojsonFeatures.length > 0) {
+    try {
+      unified = geojsonFeatures[0];
+      for (let i = 1; i < geojsonFeatures.length; i++) {
+        unified = turf.union(unified, geojsonFeatures[i]);
+      }
+    } catch(e) {
+      console.warn('[Region] turf union error:', e);
+      unified = null;
+    }
+  }
+
+  // union된 폴리곤 또는 개별 폴리곤을 지도에 그리기
+  const drawGeoJSON = (geojson) => {
     const pathSets = geojsonToPaths(geojson);
     if (!pathSets) return;
     pathSets.forEach(paths => {
       const poly = new google.maps.Polygon({
         paths,
         strokeColor: '#1A73E8',
-        strokeOpacity: 0.8,
+        strokeOpacity: 0.85,
         strokeWeight: 2.5,
         fillColor: '#4A90D9',
         fillOpacity: 0.1,
@@ -8144,9 +8173,16 @@ async function drawRegionHighlights() {
       });
       regionPolygons.push(poly);
     });
-    count++;
-  });
-  console.log('[Region] drawn:', count, 'areas:', [...seen]);
+  };
+
+  if (unified) {
+    drawGeoJSON(unified.geometry);
+    console.log('[Region] union drawn, areas:', seen.size);
+  } else {
+    geojsonFeatures.forEach(f => drawGeoJSON(f.geometry));
+    console.log('[Region] individual drawn:', geojsonFeatures.length);
+  }
+
   regionFetching = false;
 }
 
