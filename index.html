@@ -8037,37 +8037,8 @@ function mapFitRoute() {
 // ── 지역 하이라이트 (한국/일본 전용) ────────────────────────
 let regionPolygons = [];
 let regionFetching = false;
+const regionNameCache = {}; // lat,lng → {name, geojson}
 
-// 2D Convex Hull (Gift Wrapping)
-function convexHull(points) {
-  if (points.length < 3) return points;
-  const pts = [...points].sort((a,b) => a.lng - b.lng || a.lat - b.lat);
-  const cross = (O,A,B) => (A.lng-O.lng)*(B.lat-O.lat)-(A.lat-O.lat)*(B.lng-O.lng);
-  const lower = [], upper = [];
-  for (const p of pts) {
-    while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
-    lower.push(p);
-  }
-  for (let i = pts.length-1; i >= 0; i--) {
-    const p = pts[i];
-    while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
-    upper.push(p);
-  }
-  upper.pop(); lower.pop();
-  return lower.concat(upper);
-}
-
-// Hull에 버퍼 추가 (팽창)
-function expandHull(hull, deg = 0.04) {
-  const cx = hull.reduce((s,p) => s+p.lat, 0) / hull.length;
-  const cy = hull.reduce((s,p) => s+p.lng, 0) / hull.length;
-  return hull.map(p => ({
-    lat: cx + (p.lat - cx) * (1 + deg / (Math.abs(p.lat-cx) || 0.01)),
-    lng: cy + (p.lng - cy) * (1 + deg / (Math.abs(p.lng-cy) || 0.01)),
-  }));
-}
-
-// 좌표가 한국/일본인지 판별
 function detectCountry(pins) {
   let kr = 0, jp = 0;
   pins.forEach(({ lat, lng }) => {
@@ -8078,11 +8049,48 @@ function detectCountry(pins) {
   return kr >= jp ? 'KR' : 'JP';
 }
 
+// Nominatim reverse geocoding + polygon_geojson
+async function fetchAdminBoundary(lat, lng, country) {
+  const cacheKey = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+  if (regionNameCache[cacheKey]) return regionNameCache[cacheKey];
+  try {
+    const lang = country === 'KR' ? 'ko' : 'ja';
+    const zoom = 10; // 시/구 단위
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=${zoom}&polygon_geojson=1&accept-language=${lang}`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'TravelPlanApp/1.0 (yessalbi.github.io)' }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const geojson = data.geojson;
+    const name = data.name || data.display_name?.split(',')[0] || '';
+    if (!geojson) return null;
+    const result = { name, geojson };
+    regionNameCache[cacheKey] = result;
+    return result;
+  } catch(e) {
+    console.warn('[Region] fetch error:', e);
+    return null;
+  }
+}
+
+// GeoJSON → Google Maps Polygon paths
+function geojsonToPaths(geojson) {
+  const toLatLng = ring => ring.map(([lng, lat]) => ({ lat, lng }));
+  if (geojson.type === 'Polygon') {
+    return [geojson.coordinates.map(toLatLng)];
+  } else if (geojson.type === 'MultiPolygon') {
+    return geojson.coordinates.map(poly => poly.map(toLatLng));
+  }
+  return null;
+}
+
 async function drawRegionHighlights() {
   console.log('[Region] called, map:', !!map, 'fetching:', regionFetching);
   if (!map || regionFetching) return;
   clearRegionHighlights();
 
+  // 모든 핀 수집
   const allPins = [];
   Object.values(scheduleData).forEach(items => {
     items.forEach(it => {
@@ -8091,7 +8099,7 @@ async function drawRegionHighlights() {
     });
   });
   console.log('[Region] pins:', allPins.length);
-  if (allPins.length < 2) return;
+  if (allPins.length < 1) return;
 
   const country = detectCountry(allPins);
   console.log('[Region] country:', country);
@@ -8099,32 +8107,46 @@ async function drawRegionHighlights() {
 
   regionFetching = true;
 
-  // Day별 Hull 그리기
-  const days = Object.keys(scheduleData).map(Number).sort((a,b)=>a-b);
-  days.forEach(day => {
-    const pins = (scheduleData[day] || [])
-      .filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng))
-      .map(it => ({ lat: it.lat, lng: it.lng }));
-    if (pins.length < 2) return;
-
-    const hull = convexHull(pins.length >= 3 ? pins : [...pins, { lat: pins[0].lat+0.001, lng: pins[0].lng+0.001 }]);
-    const expanded = expandHull(hull, 0.06);
-
-    const poly = new google.maps.Polygon({
-      paths: expanded,
-      strokeColor: '#1A73E8',
-      strokeOpacity: 0.75,
-      strokeWeight: 2.5,
-      fillColor: '#1A73E8',
-      fillOpacity: 0.1,
-      map,
-      zIndex: 0,
-      clickable: false,
-    });
-    regionPolygons.push(poly);
-    console.log('[Region] drew hull day', day, 'pins:', pins.length);
+  // 핀 좌표 중복 제거 (0.05° 격자)
+  const grid = {};
+  allPins.forEach(p => {
+    const key = `${(p.lat / 0.05 | 0)}_${(p.lng / 0.05 | 0)}`;
+    if (!grid[key]) grid[key] = p;
   });
+  const uniquePins = Object.values(grid).slice(0, 10);
+  console.log('[Region] unique pins:', uniquePins.length);
 
+  // 병렬로 행정구역 폴리곤 요청
+  const results = await Promise.allSettled(
+    uniquePins.map(p => fetchAdminBoundary(p.lat, p.lng, country))
+  );
+
+  const seen = new Set();
+  let count = 0;
+  results.forEach(r => {
+    if (r.status !== 'fulfilled' || !r.value) return;
+    const { name, geojson } = r.value;
+    if (seen.has(name)) return;
+    seen.add(name);
+    const pathSets = geojsonToPaths(geojson);
+    if (!pathSets) return;
+    pathSets.forEach(paths => {
+      const poly = new google.maps.Polygon({
+        paths,
+        strokeColor: '#1A73E8',
+        strokeOpacity: 0.8,
+        strokeWeight: 2.5,
+        fillColor: '#4A90D9',
+        fillOpacity: 0.1,
+        map,
+        zIndex: 0,
+        clickable: false,
+      });
+      regionPolygons.push(poly);
+    });
+    count++;
+  });
+  console.log('[Region] drawn:', count, 'areas:', [...seen]);
   regionFetching = false;
 }
 
