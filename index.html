@@ -8091,7 +8091,6 @@ async function drawRegionHighlights() {
   if (!map || regionFetching) return;
   clearRegionHighlights();
 
-  // 모든 핀 수집 (Day 순서 유지)
   const allPins = [];
   const days = Object.keys(scheduleData).map(Number).sort((a,b)=>a-b);
   days.forEach(day => {
@@ -8109,104 +8108,99 @@ async function drawRegionHighlights() {
 
   regionFetching = true;
 
-  // 연속 핀 사이에 중간점 4개 추가
-  const MIDPOINTS = 4;
-  const expandedPins = [];
-  allPins.forEach((p, i) => {
-    expandedPins.push(p);
-    if (i < allPins.length - 1) {
-      const next = allPins[i + 1];
-      for (let m = 1; m <= MIDPOINTS; m++) {
-        const t = m / (MIDPOINTS + 1);
-        expandedPins.push({
-          lat: p.lat + (next.lat - p.lat) * t,
-          lng: p.lng + (next.lng - p.lng) * t,
-        });
+  try {
+    const MIDPOINTS = 2;
+    const expandedPins = [];
+    allPins.forEach((p, i) => {
+      expandedPins.push(p);
+      if (i < allPins.length - 1) {
+        const next = allPins[i + 1];
+        for (let m = 1; m <= MIDPOINTS; m++) {
+          const t = m / (MIDPOINTS + 1);
+          expandedPins.push({
+            lat: p.lat + (next.lat - p.lat) * t,
+            lng: p.lng + (next.lng - p.lng) * t,
+          });
+        }
       }
-    }
-  });
-
-  // 0.05° 격자로 중복 제거
-  const grid = {};
-  expandedPins.forEach(p => {
-    const key = `${(p.lat / 0.05 | 0)}_${(p.lng / 0.05 | 0)}`;
-    if (!grid[key]) grid[key] = p;
-  });
-  const uniquePins = Object.values(grid).slice(0, 20);
-  console.log('[Region] unique pins (with midpoints):', uniquePins.length);
-
-  // Nominatim 요청 — rate limit 때문에 순차 처리 (100ms 간격)
-  const results = [];
-  for (const p of uniquePins) {
-    const res = await fetchAdminBoundary(p.lat, p.lng, country);
-    results.push({ status: 'fulfilled', value: res });
-    await new Promise(r => setTimeout(r, 120)); // Nominatim rate limit 준수
-  }
-
-  const seen = new Set();
-  const geojsonFeatures = [];
-
-  results.forEach(r => {
-    if (r.status !== 'fulfilled' || !r.value) return;
-    const { name, geojson } = r.value;
-    if (seen.has(name)) return;
-    seen.add(name);
-    // Turf 용 Feature로 변환
-    try {
-      const feature = { type: 'Feature', properties: { name }, geometry: geojson };
-      geojsonFeatures.push(feature);
-    } catch(e) {}
-  });
-
-  console.log('[Region] areas:', [...seen]);
-
-  if (geojsonFeatures.length === 0) { regionFetching = false; return; }
-
-  // Turf.js로 인접 폴리곤 union (하나의 덩어리로)
-  let unified = null;
-  if (typeof turf !== 'undefined' && geojsonFeatures.length > 0) {
-    try {
-      unified = geojsonFeatures[0];
-      for (let i = 1; i < geojsonFeatures.length; i++) {
-        unified = turf.union(unified, geojsonFeatures[i]);
-      }
-    } catch(e) {
-      console.warn('[Region] turf union error:', e);
-      unified = null;
-    }
-  }
-
-  // union된 폴리곤 또는 개별 폴리곤을 지도에 그리기
-  const drawGeoJSON = (geojson) => {
-    const pathSets = geojsonToPaths(geojson);
-    if (!pathSets) return;
-    pathSets.forEach(paths => {
-      const poly = new google.maps.Polygon({
-        paths,
-        strokeColor: '#1A73E8',
-        strokeOpacity: 0.85,
-        strokeWeight: 2.5,
-        fillColor: '#4A90D9',
-        fillOpacity: 0.1,
-        map,
-        zIndex: 0,
-        clickable: false,
-      });
-      regionPolygons.push(poly);
     });
-  };
 
-  if (unified) {
-    drawGeoJSON(unified.geometry);
-    console.log('[Region] union drawn, areas:', seen.size);
-  } else {
-    geojsonFeatures.forEach(f => drawGeoJSON(f.geometry));
-    console.log('[Region] individual drawn:', geojsonFeatures.length);
+    const grid = {};
+    expandedPins.forEach(p => {
+      const key = `${(p.lat / 0.05 | 0)}_${(p.lng / 0.05 | 0)}`;
+      if (!grid[key]) grid[key] = p;
+    });
+    const uniquePins = Object.values(grid).slice(0, 15);
+    console.log('[Region] unique pins:', uniquePins.length);
+
+    const results = [];
+    for (const p of uniquePins) {
+      const res = await fetchAdminBoundary(p.lat, p.lng, country);
+      results.push(res);
+      await new Promise(r => setTimeout(r, 120));
+    }
+
+    const seen = new Set();
+    const geojsonFeatures = [];
+    results.forEach(r => {
+      if (!r) return;
+      const { name, geojson } = r;
+      if (seen.has(name)) return;
+      seen.add(name);
+      try {
+        geojsonFeatures.push({ type: 'Feature', properties: { name }, geometry: geojson });
+      } catch(e) {}
+    });
+    console.log('[Region] areas:', [...seen]);
+
+    if (geojsonFeatures.length === 0) return;
+
+    let unified = null;
+    if (typeof turf !== 'undefined') {
+      try {
+        unified = geojsonFeatures[0];
+        for (let i = 1; i < geojsonFeatures.length; i++) {
+          const result = turf.union(unified, geojsonFeatures[i]);
+          if (result) unified = result;
+        }
+      } catch(e) {
+        console.warn('[Region] turf union error:', e);
+        unified = null;
+      }
+    }
+
+    const drawGeoJSON = (geojson) => {
+      const pathSets = geojsonToPaths(geojson);
+      if (!pathSets) return;
+      pathSets.forEach(paths => {
+        const poly = new google.maps.Polygon({
+          paths,
+          strokeColor: '#1A73E8',
+          strokeOpacity: 0.85,
+          strokeWeight: 2.5,
+          fillColor: '#4A90D9',
+          fillOpacity: 0.1,
+          map,
+          zIndex: 0,
+          clickable: false,
+        });
+        regionPolygons.push(poly);
+      });
+    };
+
+    if (unified) {
+      drawGeoJSON(unified.geometry);
+      console.log('[Region] union drawn:', seen.size, 'areas');
+    } else {
+      geojsonFeatures.forEach(f => drawGeoJSON(f.geometry));
+    }
+
+  } catch(e) {
+    console.warn('[Region] error:', e);
+  } finally {
+    regionFetching = false;
   }
-
-  regionFetching = false;
 }
-
 function clearRegionHighlights() {
   regionPolygons.forEach(p => p.setMap(null));
   regionPolygons = [];
