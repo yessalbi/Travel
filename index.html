@@ -8050,33 +8050,67 @@ function detectCountry(pins) {
   return kr >= jp ? 'KR' : 'JP';
 }
 
-// Nominatim reverse geocoding + polygon_geojson
+// Google Geocoder(이름) + Overpass API(경계 폴리곤) 조합
 async function fetchAdminBoundary(lat, lng, country) {
   const cacheKey = `${lat.toFixed(2)},${lng.toFixed(2)}`;
-  if (regionNameCache[cacheKey] !== undefined) return regionNameCache[cacheKey]; // null도 캐시 (실패 포함)
+  if (regionNameCache[cacheKey] !== undefined) return regionNameCache[cacheKey];
+
   try {
-    const lang = country === 'KR' ? 'ko' : 'ja';
-    // 일본: zoom=10 (시 단위), 한국: zoom=10 (시/군 단위)
-    const zoom = 10;
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=${zoom}&polygon_geojson=1&accept-language=${lang}&namedetails=1`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'TravelPlanApp/1.0 (yessalbi.github.io)' }
+    // 1단계: Google Geocoder로 행정구역 이름 + OSM relation ID 획득
+    const geocoder = new google.maps.Geocoder();
+    const geocodeResult = await new Promise((resolve) => {
+      geocoder.geocode({ location: { lat, lng }, language: country === 'KR' ? 'ko' : 'ja' }, (results, status) => {
+        resolve(status === 'OK' ? results : null);
+      });
     });
-    if (!res.ok) {
-      console.warn('[Region] HTTP', res.status, lat.toFixed(2), lng.toFixed(2));
-      regionNameCache[cacheKey] = null; // 실패도 캐싱해서 무한 재시도 방지
-      return null;
+
+    if (!geocodeResult) { regionNameCache[cacheKey] = null; return null; }
+
+    // 시/구 단위 행정구역 이름 추출
+    const types = country === 'KR'
+      ? ['administrative_area_level_2', 'locality']
+      : ['locality', 'administrative_area_level_2'];
+
+    let adminName = null;
+    for (const type of types) {
+      const comp = geocodeResult[0]?.address_components?.find(c => c.types.includes(type));
+      if (comp) { adminName = comp.long_name; break; }
     }
+    if (!adminName) { regionNameCache[cacheKey] = null; return null; }
+    console.log('[Region] admin name:', adminName, 'for', lat.toFixed(2), lng.toFixed(2));
+
+    // 2단계: Overpass API로 해당 행정구역 경계 폴리곤 가져오기
+    const query = `[out:json][timeout:10];
+relation["name"="${adminName}"]["boundary"="administrative"]["admin_level"~"^(7|8|9)$"];
+out geom;`;
+    const overpassUrl = 'https://overpass-api.de/api/interpreter';
+    const res = await fetch(overpassUrl, {
+      method: 'POST',
+      body: query,
+      headers: { 'Content-Type': 'text/plain' }
+    });
+    if (!res.ok) { regionNameCache[cacheKey] = null; return null; }
     const data = await res.json();
-    const geojson = data.geojson;
-    const name = data.namedetails?.name || data.name || data.display_name?.split(',')[0] || '';
-    console.log('[Region] fetched:', name, 'for', lat.toFixed(2), lng.toFixed(2));
-    if (!geojson) { regionNameCache[cacheKey] = null; return null; }
-    const result = { name, geojson };
+    const el = data?.elements?.[0];
+    if (!el?.members) { regionNameCache[cacheKey] = null; return null; }
+
+    // Overpass relation → GeoJSON Polygon 변환
+    const outerRings = el.members
+      .filter(m => m.type === 'way' && m.role === 'outer' && m.geometry?.length)
+      .map(m => m.geometry.map(pt => [pt.lon, pt.lat]));
+
+    if (!outerRings.length) { regionNameCache[cacheKey] = null; return null; }
+
+    const geojson = outerRings.length === 1
+      ? { type: 'Polygon', coordinates: outerRings }
+      : { type: 'MultiPolygon', coordinates: outerRings.map(r => [r]) };
+
+    const result = { name: adminName, geojson };
     regionNameCache[cacheKey] = result;
     return result;
+
   } catch(e) {
-    console.warn('[Region] fetch error:', e);
+    console.warn('[Region] fetch error:', e.message);
     regionNameCache[cacheKey] = null;
     return null;
   }
@@ -8142,7 +8176,7 @@ async function drawRegionHighlights() {
     const uniquePins = Object.values(grid).slice(0, 15);
     console.log('[Region] unique pins:', uniquePins.length);
 
-    // Nominatim 순차 요청 — 200ms 간격으로 여유있게
+    // 순차 요청 (Overpass rate limit 준수)
     const fetchWithRetry = async (p) => {
       const cacheKey = `${p.lat.toFixed(2)},${p.lng.toFixed(2)}`;
       // 이미 캐시된 결과 있으면 바로 반환 (null 포함)
