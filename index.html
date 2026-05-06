@@ -2501,7 +2501,6 @@ html, body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 </head>
 <body>
 
@@ -5393,7 +5392,6 @@ async function saveAll() {
   showToast((LANG_MAP[currentLang]?.toastSaved || LANG_MAP.ko.toastSaved));
   updateTripSummary();
   // 일정 변경 시 지역 하이라이트 갱신
-  if (map) drawRegionHighlights();
 }
 
 let saveTimer = null;
@@ -8035,233 +8033,6 @@ function mapFitRoute() {
   map.fitBounds(bounds, 60);
 }
 
-// ── 지역 하이라이트 (한국/일본 전용) ────────────────────────
-let regionPolygons = [];
-let regionFetching = false;
-const regionNameCache = {}; // lat,lng → {name, geojson}
-
-function detectCountry(pins) {
-  let kr = 0, jp = 0;
-  pins.forEach(({ lat, lng }) => {
-    if (lat >= 33 && lat <= 38.9 && lng >= 124.6 && lng <= 131.9) kr++;
-    else if (lat >= 24 && lat <= 45.7 && lng >= 122.9 && lng <= 153.9) jp++;
-  });
-  if (kr === 0 && jp === 0) return null;
-  return kr >= jp ? 'KR' : 'JP';
-}
-
-// Google Geocoder(이름) + Overpass API(경계 폴리곤) 조합
-async function fetchAdminBoundary(lat, lng, country) {
-  const cacheKey = `${lat.toFixed(2)},${lng.toFixed(2)}`;
-  if (regionNameCache[cacheKey] !== undefined) return regionNameCache[cacheKey];
-
-  try {
-    // 1단계: Google Geocoder로 행정구역 이름 + OSM relation ID 획득
-    const geocoder = new google.maps.Geocoder();
-    const geocodeResult = await new Promise((resolve) => {
-      geocoder.geocode({ location: { lat, lng }, language: country === 'KR' ? 'ko' : 'ja' }, (results, status) => {
-        resolve(status === 'OK' ? results : null);
-      });
-    });
-
-    if (!geocodeResult) { regionNameCache[cacheKey] = null; return null; }
-
-    // 시/구 단위 행정구역 이름 추출
-    const types = country === 'KR'
-      ? ['administrative_area_level_2', 'locality']
-      : ['locality', 'administrative_area_level_2'];
-
-    let adminName = null;
-    for (const type of types) {
-      const comp = geocodeResult[0]?.address_components?.find(c => c.types.includes(type));
-      if (comp) { adminName = comp.long_name; break; }
-    }
-    if (!adminName) { regionNameCache[cacheKey] = null; return null; }
-    console.log('[Region] admin name:', adminName, 'for', lat.toFixed(2), lng.toFixed(2));
-
-    // 2단계: Overpass API로 해당 행정구역 경계 폴리곤 가져오기
-    const query = `[out:json][timeout:10];
-relation["name"="${adminName}"]["boundary"="administrative"]["admin_level"~"^(7|8|9)$"];
-out geom;`;
-    const overpassUrl = 'https://overpass-api.de/api/interpreter';
-    const res = await fetch(overpassUrl, {
-      method: 'POST',
-      body: query,
-      headers: { 'Content-Type': 'text/plain' }
-    });
-    if (!res.ok) { regionNameCache[cacheKey] = null; return null; }
-    const data = await res.json();
-    const el = data?.elements?.[0];
-    if (!el?.members) { regionNameCache[cacheKey] = null; return null; }
-
-    // Overpass relation → GeoJSON Polygon 변환
-    const outerRings = el.members
-      .filter(m => m.type === 'way' && m.role === 'outer' && m.geometry?.length)
-      .map(m => m.geometry.map(pt => [pt.lon, pt.lat]));
-
-    if (!outerRings.length) { regionNameCache[cacheKey] = null; return null; }
-
-    const geojson = outerRings.length === 1
-      ? { type: 'Polygon', coordinates: outerRings }
-      : { type: 'MultiPolygon', coordinates: outerRings.map(r => [r]) };
-
-    const result = { name: adminName, geojson };
-    regionNameCache[cacheKey] = result;
-    return result;
-
-  } catch(e) {
-    console.warn('[Region] fetch error:', e.message);
-    regionNameCache[cacheKey] = null;
-    return null;
-  }
-}
-
-// GeoJSON → Google Maps Polygon paths
-function geojsonToPaths(geojson) {
-  const toLatLng = ring => ring.map(([lng, lat]) => ({ lat, lng }));
-  if (geojson.type === 'Polygon') {
-    return [geojson.coordinates.map(toLatLng)];
-  } else if (geojson.type === 'MultiPolygon') {
-    return geojson.coordinates.map(poly => poly.map(toLatLng));
-  }
-  return null;
-}
-
-async function drawRegionHighlights() {
-  console.log('[Region] called, map:', !!map, 'fetching:', regionFetching);
-  if (!map || regionFetching) return;
-  clearRegionHighlights();
-
-  const allPins = [];
-  const days = Object.keys(scheduleData).map(Number).sort((a,b)=>a-b);
-  days.forEach(day => {
-    (scheduleData[day] || []).forEach(it => {
-      if (it.lat && it.lng && !isIncheonAirport(it.lat, it.lng))
-        allPins.push({ lat: it.lat, lng: it.lng });
-    });
-  });
-  console.log('[Region] pins:', allPins.length);
-  if (allPins.length < 1) return;
-
-  const country = detectCountry(allPins);
-  console.log('[Region] country:', country);
-  if (!country) return;
-
-  regionFetching = true;
-
-  try {
-    // 중간점 2개 추가
-    const MIDPOINTS = 2;
-    const expandedPins = [];
-    allPins.forEach((p, i) => {
-      expandedPins.push(p);
-      if (i < allPins.length - 1) {
-        const next = allPins[i + 1];
-        for (let m = 1; m <= MIDPOINTS; m++) {
-          const t = m / (MIDPOINTS + 1);
-          expandedPins.push({
-            lat: p.lat + (next.lat - p.lat) * t,
-            lng: p.lng + (next.lng - p.lng) * t,
-          });
-        }
-      }
-    });
-
-    // 0.05° 격자 (약 5km) — 인접 시/구 구분
-    const grid = {};
-    expandedPins.forEach(p => {
-      const key = `${(p.lat / 0.05 | 0)}_${(p.lng / 0.05 | 0)}`;
-      if (!grid[key]) grid[key] = p;
-    });
-    const uniquePins = Object.values(grid).slice(0, 15);
-    console.log('[Region] unique pins:', uniquePins.length);
-
-    // 순차 요청 (Overpass rate limit 준수)
-    const fetchWithRetry = async (p) => {
-      const cacheKey = `${p.lat.toFixed(2)},${p.lng.toFixed(2)}`;
-      // 이미 캐시된 결과 있으면 바로 반환 (null 포함)
-      if (regionNameCache[cacheKey] !== undefined) return regionNameCache[cacheKey];
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const res = await fetchAdminBoundary(p.lat, p.lng, country);
-        if (res) return res;
-        if (attempt === 0) await new Promise(r => setTimeout(r, 500));
-      }
-      return null;
-    };
-
-    const results = [];
-    for (const p of uniquePins) {
-      const res = await fetchWithRetry(p);
-      results.push(res);
-      await new Promise(r => setTimeout(r, 200)); // 200ms 간격
-    }
-
-    const seen = new Set();
-    const geojsonFeatures = [];
-    results.forEach(r => {
-      if (!r) return;
-      const { name, geojson } = r;
-      if (seen.has(name)) return;
-      seen.add(name);
-      try {
-        geojsonFeatures.push({ type: 'Feature', properties: { name }, geometry: geojson });
-      } catch(e) {}
-    });
-    console.log('[Region] areas:', [...seen]);
-
-    if (geojsonFeatures.length === 0) return;
-
-    // Turf.js union
-    let unified = null;
-    if (typeof turf !== 'undefined') {
-      try {
-        unified = geojsonFeatures[0];
-        for (let i = 1; i < geojsonFeatures.length; i++) {
-          const result = turf.union(unified, geojsonFeatures[i]);
-          if (result) unified = result;
-        }
-      } catch(e) {
-        console.warn('[Region] turf union error:', e);
-        unified = null;
-      }
-    }
-
-    const drawGeoJSON = (geojson) => {
-      const pathSets = geojsonToPaths(geojson);
-      if (!pathSets) return;
-      pathSets.forEach(paths => {
-        const poly = new google.maps.Polygon({
-          paths,
-          strokeColor: '#1A73E8',
-          strokeOpacity: 0.85,
-          strokeWeight: 2.5,
-          fillColor: '#4A90D9',
-          fillOpacity: 0.1,
-          map,
-          zIndex: 0,
-          clickable: false,
-        });
-        regionPolygons.push(poly);
-      });
-    };
-
-    if (unified) {
-      drawGeoJSON(unified.geometry);
-      console.log('[Region] union drawn:', seen.size, 'areas');
-    } else {
-      geojsonFeatures.forEach(f => drawGeoJSON(f.geometry));
-    }
-
-  } catch(e) {
-    console.warn('[Region] error:', e);
-  } finally {
-    regionFetching = false;
-  }
-}
-function clearRegionHighlights() {
-  regionPolygons.forEach(p => p.setMap(null));
-  regionPolygons = [];
-}
 // 모드: 0=off, 1=위치만, 2=위치+방향(나침반)
 let locMode       = 0;
 let locWatchId    = null;
@@ -9340,7 +9111,6 @@ function switchPanelTab(idx) {
     clearDayRoutes();
     fitAllPins();
     drawAllDayRoutes();
-    drawRegionHighlights();
     // 맛집&장소 마커 표시
     markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(map); });
   }
@@ -9850,8 +9620,7 @@ function restoreUIState() {
     if (tab === '0' || tab === null) {
       fitAllPins();
       drawAllDayRoutes(); // 초기 로드 시 전체 경로 표시
-      drawRegionHighlights(); // 한국/일본 지역 하이라이트
-    } else if (tab !== 'map' && tab !== null) {
+      } else if (tab !== 'map' && tab !== null) {
       clearAllDayRoutes();
       drawDayRoutes();
       fitDayBounds(currentDay);
