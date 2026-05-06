@@ -8053,24 +8053,31 @@ function detectCountry(pins) {
 // Nominatim reverse geocoding + polygon_geojson
 async function fetchAdminBoundary(lat, lng, country) {
   const cacheKey = `${lat.toFixed(2)},${lng.toFixed(2)}`;
-  if (regionNameCache[cacheKey]) return regionNameCache[cacheKey];
+  if (regionNameCache[cacheKey] !== undefined) return regionNameCache[cacheKey]; // null도 캐시 (실패 포함)
   try {
     const lang = country === 'KR' ? 'ko' : 'ja';
-    const zoom = 10; // 시/구 단위
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=${zoom}&polygon_geojson=1&accept-language=${lang}`;
+    // 일본: zoom=10 (시 단위), 한국: zoom=10 (시/군 단위)
+    const zoom = 10;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=${zoom}&polygon_geojson=1&accept-language=${lang}&namedetails=1`;
     const res = await fetch(url, {
       headers: { 'User-Agent': 'TravelPlanApp/1.0 (yessalbi.github.io)' }
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn('[Region] HTTP', res.status, lat.toFixed(2), lng.toFixed(2));
+      regionNameCache[cacheKey] = null; // 실패도 캐싱해서 무한 재시도 방지
+      return null;
+    }
     const data = await res.json();
     const geojson = data.geojson;
-    const name = data.name || data.display_name?.split(',')[0] || '';
-    if (!geojson) return null;
+    const name = data.namedetails?.name || data.name || data.display_name?.split(',')[0] || '';
+    console.log('[Region] fetched:', name, 'for', lat.toFixed(2), lng.toFixed(2));
+    if (!geojson) { regionNameCache[cacheKey] = null; return null; }
     const result = { name, geojson };
     regionNameCache[cacheKey] = result;
     return result;
   } catch(e) {
     console.warn('[Region] fetch error:', e);
+    regionNameCache[cacheKey] = null;
     return null;
   }
 }
@@ -8126,21 +8133,24 @@ async function drawRegionHighlights() {
       }
     });
 
-    // 0.08° 격자로 중복 제거 (더 넓게) — 최대 12개
+    // 0.05° 격자 (약 5km) — 인접 시/구 구분
     const grid = {};
     expandedPins.forEach(p => {
-      const key = `${(p.lat / 0.08 | 0)}_${(p.lng / 0.08 | 0)}`;
+      const key = `${(p.lat / 0.05 | 0)}_${(p.lng / 0.05 | 0)}`;
       if (!grid[key]) grid[key] = p;
     });
-    const uniquePins = Object.values(grid).slice(0, 12);
+    const uniquePins = Object.values(grid).slice(0, 15);
     console.log('[Region] unique pins:', uniquePins.length);
 
     // Nominatim 순차 요청 — 200ms 간격으로 여유있게
     const fetchWithRetry = async (p) => {
+      const cacheKey = `${p.lat.toFixed(2)},${p.lng.toFixed(2)}`;
+      // 이미 캐시된 결과 있으면 바로 반환 (null 포함)
+      if (regionNameCache[cacheKey] !== undefined) return regionNameCache[cacheKey];
       for (let attempt = 0; attempt < 2; attempt++) {
         const res = await fetchAdminBoundary(p.lat, p.lng, country);
         if (res) return res;
-        await new Promise(r => setTimeout(r, 500)); // 실패 시 500ms 후 재시도
+        if (attempt === 0) await new Promise(r => setTimeout(r, 500));
       }
       return null;
     };
