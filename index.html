@@ -8109,6 +8109,7 @@ async function drawRegionHighlights() {
   regionFetching = true;
 
   try {
+    // 중간점 2개 추가
     const MIDPOINTS = 2;
     const expandedPins = [];
     allPins.forEach((p, i) => {
@@ -8125,19 +8126,30 @@ async function drawRegionHighlights() {
       }
     });
 
+    // 0.08° 격자로 중복 제거 (더 넓게) — 최대 12개
     const grid = {};
     expandedPins.forEach(p => {
-      const key = `${(p.lat / 0.05 | 0)}_${(p.lng / 0.05 | 0)}`;
+      const key = `${(p.lat / 0.08 | 0)}_${(p.lng / 0.08 | 0)}`;
       if (!grid[key]) grid[key] = p;
     });
-    const uniquePins = Object.values(grid).slice(0, 15);
+    const uniquePins = Object.values(grid).slice(0, 12);
     console.log('[Region] unique pins:', uniquePins.length);
+
+    // Nominatim 순차 요청 — 200ms 간격으로 여유있게
+    const fetchWithRetry = async (p) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const res = await fetchAdminBoundary(p.lat, p.lng, country);
+        if (res) return res;
+        await new Promise(r => setTimeout(r, 500)); // 실패 시 500ms 후 재시도
+      }
+      return null;
+    };
 
     const results = [];
     for (const p of uniquePins) {
-      const res = await fetchAdminBoundary(p.lat, p.lng, country);
+      const res = await fetchWithRetry(p);
       results.push(res);
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 200)); // 200ms 간격
     }
 
     const seen = new Set();
@@ -8155,6 +8167,7 @@ async function drawRegionHighlights() {
 
     if (geojsonFeatures.length === 0) return;
 
+    // Turf.js union
     let unified = null;
     if (typeof turf !== 'undefined') {
       try {
