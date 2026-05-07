@@ -5941,6 +5941,7 @@ async function routesAPIRequest(from, to, travelMode, depTime) {
       return null;
     }
     const data = await res.json();
+    console.log('[Routes API] full response:', JSON.stringify(data).slice(0, 500));
     console.log('[Routes API] response routes:', data.routes?.length, 'polyline:', data.routes?.[0]?.polyline?.encodedPolyline?.slice(0,30));
     if (!data.routes?.length) return null;
     return data.routes[0];
