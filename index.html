@@ -6099,77 +6099,7 @@ function buildTransitCard(from, to, fromIdx) {
   return wrap;
 }
 
-// ── Google Routes API (REST) ──────────────────────────────────
-// DirectionsService deprecated → Routes API로 대체
-const MAPS_API_KEY = 'AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ';
-
-async function routesAPIRequest(from, to, travelMode, depTime) {
-  // travelMode: 'DRIVE' | 'WALK' | 'BICYCLE' | 'TRANSIT'
-  const body = {
-    origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
-    destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
-    travelMode,
-    routingPreference: travelMode === 'DRIVE' ? 'TRAFFIC_AWARE' : undefined,
-    computeAlternativeRoutes: false,
-    languageCode: 'ko',
-  };
-  if (travelMode === 'TRANSIT' && depTime) {
-    body.departureTime = depTime.toISOString();
-  }
-  // undefined 필드 제거
-  Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
-
-  try {
-    const res = await fetch(
-      `https://routes.googleapis.com/directions/v2:computeRoutes?key=${MAPS_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-FieldMask': 'routes.polyline.encodedPolyline,routes.legs.polyline.encodedPolyline,routes.legs.steps.polyline.encodedPolyline,routes.legs.steps.transitDetails,routes.legs.steps.travelMode,routes.distanceMeters,routes.legs.distanceMeters,routes.duration,routes.legs.duration,routes.staticDuration',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.warn('[Routes API] error:', res.status, err?.error?.message);
-      return null;
-    }
-    const data = await res.json();
-    console.log('[Routes API] response:', JSON.stringify(data).slice(0, 300));
-    if (!data.routes?.length) {
-      console.warn('[Routes API] empty routes, data:', data);
-      return null;
-    }
-    return data.routes[0];
-  } catch(e) {
-    console.warn('[Routes API] fetch error:', e);
-    return null;
-  }
-}
-
-// Routes API polyline 디코딩 (Google Encoded Polyline)
-function decodePolyline(encoded) {
-  if (!encoded) return [];
-  // google.maps.geometry.encoding 사용
-  if (window.google?.maps?.geometry?.encoding) {
-    return window.google.maps.geometry.encoding.decodePath(encoded)
-      .map(p => ({ lat: p.lat(), lng: p.lng() }));
-  }
-  // 수동 디코딩 fallback
-  const pts = []; let idx = 0, lat = 0, lng = 0;
-  while (idx < encoded.length) {
-    let b, shift = 0, result = 0;
-    do { b = encoded.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
-    shift = 0; result = 0;
-    do { b = encoded.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
-    pts.push({ lat: lat / 1e5, lng: lng / 1e5 });
-  }
-  return pts;
-}
+const MAPS_API_KEY = 'AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ'; // 기존 호환용
 
 // Directions API 호출
 function fetchDirections(from, to, mode, fromIdx) {
@@ -6182,61 +6112,122 @@ function fetchDirections(from, to, mode, fromIdx) {
   if (bodyEl) bodyEl.classList.add('loading');
 
   const modeInfo = MODE_LIST.find(m => m.id === mode) || MODE_LIST[0];
+  const svc = new google.maps.DirectionsService();
 
-  // Routes API 모드 매핑
-  const routesModeMap = { driving:'DRIVE', transit:'TRANSIT', walking:'WALK', bicycling:'BICYCLE' };
-
-  async function doRequest(travelMode, opts, onOK, onFail) {
-    const rmMode = routesModeMap[travelMode.toLowerCase?.()] ||
-      (travelMode === google.maps.TravelMode.DRIVING ? 'DRIVE' :
-       travelMode === google.maps.TravelMode.TRANSIT ? 'TRANSIT' :
-       travelMode === google.maps.TravelMode.WALKING ? 'WALK' : 'BICYCLE');
-    const route = await routesAPIRequest(from, to, rmMode, opts?.transitOptions?.departureTime);
-    if (route) onOK(route);
-    else {
-      console.warn('[Routes API] no result for', rmMode,
-        `(${from.lat.toFixed(3)},${from.lng.toFixed(3)}) → (${to.lat.toFixed(3)},${to.lng.toFixed(3)})`);
-      onFail('ZERO_RESULTS');
-    }
+  function getDepTime(lng) {
+    const offset = Math.round(lng / 15);
+    const now = new Date();
+    const dep = new Date(now);
+    const targetUTC = (10 - offset + 48) % 24;
+    dep.setUTCHours(targetUTC, 0, 0, 0);
+    if (dep <= now) dep.setDate(dep.getDate() + 1);
+    return dep;
   }
 
-  // Routes API 응답 → 공통 형식 변환
-  function normalizeRoute(route) {
-    const leg = route.legs?.[0];
-    if (!leg) return null;
-    const durSec = parseInt(leg.duration) || parseInt(leg.staticDuration) || 0;
-    const durMin = Math.round(durSec / 60);
-    const durTxt = durMin >= 60
-      ? `${Math.floor(durMin/60)}${_t.transitHour||'시간'} ${durMin%60>0?durMin%60+(_t.transitMin||'분'):''}`
-      : `${durMin}${_t.transitMin||'분'}`;
-    const distM = route.distanceMeters || leg.distanceMeters || 0;
-    const distTxt = distM >= 1000 ? `${(distM/1000).toFixed(1)}km` : `${distM}m`;
-    const steps = leg.steps || [];
-    return { durTxt, distTxt, durSec, distM, steps };
-  }
-
-  function handleRoute(route, label, color) {
-    const n = normalizeRoute(route);
-    if (!n) { showError(_t.transitNoRoute||'경로를 찾을 수 없어요'); return; }
-    showResult(n.distTxt, n.durTxt, label, color, transitBadgesNew(n.steps));
-  }
-
-  function transitBadgesNew(steps) {
-    const ICON = {BUS:'🚌',SUBWAY:'🚇',TRAM:'🚊',RAIL:'🚆',HEAVY_RAIL:'🚄',HIGH_SPEED_TRAIN:'🚅',COMMUTER_TRAIN:'🚆',FERRY:'⛴️',CABLE_CAR:'🚡',OTHER:'🚌'};
-    const COL  = {BUS:'#FF6D00',SUBWAY:'#1565C0',TRAM:'#6A1B9A',RAIL:'#2E7D32',HEAVY_RAIL:'#1B5E20',HIGH_SPEED_TRAIN:'#C62828',COMMUTER_TRAIN:'#1B5E20',FERRY:'#00838F',OTHER:'#1565C0'};
-    const ts = steps.filter(s => s.transitDetails || s.travelMode === 'TRANSIT');
-    if (!ts.length) return '';
-    const parts = ts.map(s => {
-      const td = s.transitDetails;
-      const vt = td?.transitLine?.vehicle?.type || 'OTHER';
-      const col = COL[vt]||'#1565C0', ico = ICON[vt]||'🚌';
-      const nm = td?.transitLine?.nameShort || td?.transitLine?.name || '';
-      return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:10px;background:${col}20;border-radius:6px;padding:1px 5px;color:${col};font-weight:700;">${ico}${nm?' '+nm:''}</span>`;
+  function doRequest(travelMode, opts, onOK, onFail) {
+    svc.route({
+      origin:      new google.maps.LatLng(from.lat, from.lng),
+      destination: new google.maps.LatLng(to.lat,   to.lng),
+      travelMode,
+      provideRouteAlternatives: travelMode === google.maps.TravelMode.TRANSIT,
+      ...opts,
+    }, (result, status) => {
+      if (status === google.maps.DirectionsStatus.OK) onOK(result);
+      else {
+        console.warn('[Directions] status:', status, travelMode,
+          `(${from.lat.toFixed(3)},${from.lng.toFixed(3)}) → (${to.lat.toFixed(3)},${to.lng.toFixed(3)})`);
+        onFail(status);
+      }
     });
-    return `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px;">${parts.map((p,i)=>(i>0?'<span style="color:#ccc;font-size:9px;">→</span>':'')+p).join('')}</div>`;
   }
 
-  // ── 노선 배지 HTML (대중교통) — 하위호환
+  // ── 노선 배지 HTML (대중교통)
+  function transitBadges(legs) {
+    const ICON = { BUS:'🚌', SUBWAY:'🚇', TRAM:'🚊', RAIL:'🚆',
+      HEAVY_RAIL:'🚄', HIGH_SPEED_TRAIN:'🚅', COMMUTER_TRAIN:'🚆',
+      FERRY:'⛴️', CABLE_CAR:'🚡', OTHER:'🚌' };
+    const COL  = { BUS:'#FF6D00', SUBWAY:'#1565C0', TRAM:'#6A1B9A',
+      RAIL:'#2E7D32', HEAVY_RAIL:'#1B5E20', HIGH_SPEED_TRAIN:'#C62828',
+      COMMUTER_TRAIN:'#1B5E20', FERRY:'#00838F', OTHER:'#1565C0' };
+    const steps = legs.steps.filter(s => s.travel_mode === 'TRANSIT' && s.transit);
+    if (!steps.length) return '';
+    const parts = steps.map(s => {
+      const vt  = s.transit.line?.vehicle?.type || 'OTHER';
+      const col = COL[vt]  || '#1565C0';
+      const ico = ICON[vt] || '🚌';
+      const nm  = s.transit.line?.short_name || s.transit.line?.name || '';
+      return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:10px;
+        background:${col}20;border-radius:6px;padding:1px 5px;color:${col};font-weight:700;">
+        ${ico}${nm ? ' ' + nm : ''}</span>`;
+    });
+    return `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px;align-items:center;">
+      ${parts.map((p, i) => (i > 0 ? '<span style="color:#ccc;font-size:9px;">→</span>' : '') + p).join('')}
+    </div>`;
+  }
+
+  // ── 모드별 요청
+  if (mode === 'transit') {
+    const dep = getDepTime(from.lng);
+    doRequest(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
+      (result) => {
+        const leg = result.routes[0].legs[0];
+        let durTxt = leg.duration.text;
+        if (result.routes.length > 1) {
+          const avgSec = Math.round(result.routes.reduce((s, r) => s + r.legs[0].duration.value, 0) / result.routes.length);
+          const m = Math.round(avgSec / 60);
+          durTxt = m >= 60
+            ? `${Math.floor(m/60)}${_t.transitHour||'시간'} ${m%60>0?m%60+(_t.transitMin||'분'):''} (${result.routes.length}루트 평균)`
+            : `${m}${_t.transitMin||'분'} (${result.routes.length}루트 평균)`;
+        }
+        showResult(leg.distance.text, durTxt, modeInfo.label, null, transitBadges(leg));
+      },
+      () => {
+        doRequest(google.maps.TravelMode.DRIVING, {},
+          (r2) => {
+            const leg = r2.routes[0].legs[0];
+            showResult(leg.distance.text, leg.duration.text,
+              _t.transitNoPublicFallback||'🚌 대중교통 없음 (자동차 기준)', 'var(--red)', '');
+          },
+          () => showError(_t.transitNoPublic||'🚌 이 구간 대중교통 정보가 없어요')
+        );
+      }
+    );
+  } else if (mode === 'driving') {
+    doRequest(google.maps.TravelMode.DRIVING, {},
+      (result) => {
+        const leg = result.routes[0].legs[0];
+        showResult(leg.distance.text, leg.duration.text, modeInfo.label, null, '');
+      },
+      () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
+    );
+  } else if (mode === 'walking') {
+    doRequest(google.maps.TravelMode.WALKING, {},
+      (result) => {
+        const leg = result.routes[0].legs[0];
+        showResult(leg.distance.text, leg.duration.text, modeInfo.label, null, '');
+      },
+      () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
+    );
+  } else if (mode === 'bicycling') {
+    doRequest(google.maps.TravelMode.BICYCLING, {},
+      (result) => {
+        const leg = result.routes[0].legs[0];
+        showResult(leg.distance.text, leg.duration.text, modeInfo.label, null, '');
+      },
+      () => {
+        doRequest(google.maps.TravelMode.WALKING, {},
+          (r2) => {
+            const leg = r2.routes[0].legs[0];
+            showResult(leg.distance.text, leg.duration.text,
+              modeInfo.label+' (도보 기준)', 'var(--ink3)', '');
+          },
+          () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
+        );
+      }
+    );
+  }
+}
+  // ── 노선 배지 HTML (대중교통)
   function transitBadges(legs) {
     const ICON = { BUS:'🚌', SUBWAY:'🚇', TRAM:'🚊', RAIL:'🚆',
       HEAVY_RAIL:'🚄', HIGH_SPEED_TRAIN:'🚅', COMMUTER_TRAIN:'🚆',
@@ -6295,40 +6286,7 @@ function fetchDirections(from, to, mode, fromIdx) {
     return;
   }
 
-  // ── 모드별 요청
-  if (mode === 'transit') {
-    const dep = _routeDepTime(from.lng);
-    doRequest('TRANSIT', { transitOptions: { departureTime: dep } },
-      (route) => handleRoute(route, modeInfo.label, null),
-      () => {
-        doRequest('DRIVE', {},
-          (r2) => handleRoute(r2, _t.transitNoPublicFallback||'🚌 대중교통 없음 (자동차 기준)', 'var(--red)'),
-          () => showError(_t.transitNoPublic||'🚌 이 구간 대중교통 정보가 없어요')
-        );
-      }
-    );
-  } else if (mode === 'driving') {
-    doRequest('DRIVE', {},
-      (route) => handleRoute(route, modeInfo.label, null),
-      () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
-    );
-  } else if (mode === 'walking') {
-    doRequest('WALK', {},
-      (route) => handleRoute(route, modeInfo.label, null),
-      () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
-    );
-  } else if (mode === 'bicycling') {
-    doRequest('BICYCLE', {},
-      (route) => handleRoute(route, modeInfo.label, null),
-      () => {
-        doRequest('WALK', {},
-          (r2) => handleRoute(r2, modeInfo.label + ' (도보 기준)', 'var(--ink3)'),
-          () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
-        );
-      }
-    );
-  }
-}
+
 
 // 이동수단 선택 팝업
 let openModePickerEl = null;
@@ -8707,63 +8665,50 @@ function drawSegmentRoute(from, to, mode) {
     return;
   }
 
-  const svc = null; // Routes API 사용 — DirectionsService 불필요
+  const svc = new google.maps.DirectionsService();
   const dep = _routeDepTime(from.lng);
 
-  async function tryRoute(rmMode, onSuccess, onFail) {
-    const route = await routesAPIRequest(from, to, rmMode, rmMode === 'TRANSIT' ? dep : null);
-    if (route) onSuccess(route);
-    else {
-      console.warn('[Routes API] no result for', rmMode);
-      onFail();
-    }
+  function tryRoute(travelMode, opts, onSuccess, onFail) {
+    svc.route({
+      origin:      new google.maps.LatLng(from.lat, from.lng),
+      destination: new google.maps.LatLng(to.lat,   to.lng),
+      travelMode, ...opts,
+    }, (result, status) => {
+      if (status === google.maps.DirectionsStatus.OK) onSuccess(result);
+      else {
+        console.warn('[Directions] status:', status, travelMode,
+          `(${from.lat.toFixed(3)},${from.lng.toFixed(3)}) → (${to.lat.toFixed(3)},${to.lng.toFixed(3)})`);
+        onFail(status);
+      }
+    });
   }
 
   if (mode === 'transit') {
-    tryRoute('TRANSIT',
-      (route) => {
-        const path = decodePolyline(route.polyline?.encodedPolyline);
-        if (path.length) _polylineTransitStepsFromRoute(route, path);
-        else _polylineDashed(straight, '#9E9E9E', 0.4);
-      },
+    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
+      (result) => _polylineTransitSteps(result.routes[0].legs[0].steps),
       () => {
-        tryRoute('DRIVE',
-          (r2) => _polylineDashed(decodePolyline(r2.polyline?.encodedPolyline) || straight, '#9E9E9E', 0.6),
+        tryRoute(google.maps.TravelMode.DRIVING, {},
+          (r2) => _polylineDashed(r2.routes[0].overview_path, '#9E9E9E', 0.6),
           () => _polylineDashed(straight, '#9E9E9E', 0.4)
         );
       }
     );
-
   } else if (mode === 'driving') {
-    tryRoute('DRIVE',
-      (route) => {
-        const path = decodePolyline(route.polyline?.encodedPolyline);
-        _polylineSolid(path.length ? path : straight, cfg, mode, 0.9);
-      },
+    tryRoute(google.maps.TravelMode.DRIVING, {},
+      (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.9),
       () => _polylineSolid(straight, cfg, mode, 0.3)
     );
-
   } else if (mode === 'walking') {
-    tryRoute('WALK',
-      (route) => {
-        const path = decodePolyline(route.polyline?.encodedPolyline);
-        _polylineSolid(path.length ? path : straight, cfg, mode, 0.85);
-      },
+    tryRoute(google.maps.TravelMode.WALKING, {},
+      (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.85),
       () => _polylineSolid(straight, cfg, mode, 0.3)
     );
-
   } else if (mode === 'bicycling') {
-    tryRoute('BICYCLE',
-      (route) => {
-        const path = decodePolyline(route.polyline?.encodedPolyline);
-        _polylineSolid(path.length ? path : straight, cfg, mode, 0.85);
-      },
+    tryRoute(google.maps.TravelMode.BICYCLING, {},
+      (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.85),
       () => {
-        tryRoute('WALK',
-          (r2) => {
-            const path = decodePolyline(r2.polyline?.encodedPolyline);
-            _polylineSolid(path.length ? path : straight, cfg, mode, 0.7);
-          },
+        tryRoute(google.maps.TravelMode.WALKING, {},
+          (r2) => _polylineSolid(r2.routes[0].overview_path, cfg, mode, 0.7),
           () => _polylineSolid(straight, cfg, mode, 0.3)
         );
       }
@@ -9467,32 +9412,44 @@ function drawAllDaySegment(from, to, mode, col) {
     allDayPolylines.push(pl);
   }
 
-  async function tryRoute(rmMode, onOK, onFail) {
-    const route = await routesAPIRequest(from, to, rmMode, rmMode === 'TRANSIT' ? dep : null);
-    if (route) onOK(route);
-    else onFail();
+  const svc2 = new google.maps.DirectionsService();
+  const dep2 = _routeDepTime(from.lng);
+
+  function tryRoute2(travelMode, opts, onOK, onFail) {
+    svc2.route({
+      origin:      new google.maps.LatLng(from.lat, from.lng),
+      destination: new google.maps.LatLng(to.lat,   to.lng),
+      travelMode, ...opts,
+    }, (result, status) => {
+      if (status === google.maps.DirectionsStatus.OK) onOK(result);
+      else onFail(status);
+    });
   }
 
-  const getPath = (route) => decodePolyline(route.polyline?.encodedPolyline) || straight;
-
   if (mode === 'transit') {
-    tryRoute('TRANSIT',
-      (r) => push(getPath(r), 0.85),
-      () => tryRoute('DRIVE', (r2) => push(getPath(r2), 0.5), () => push(straight, 0.25))
+    tryRoute2(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep2 } },
+      (r) => push(r.routes[0].overview_path, 0.85),
+      () => tryRoute2(google.maps.TravelMode.DRIVING, {},
+        (r2) => push(r2.routes[0].overview_path, 0.5),
+        () => push(straight, 0.25)
+      )
     );
   } else if (mode === 'bicycling') {
-    tryRoute('BICYCLE',
-      (r) => push(getPath(r), 0.8),
-      () => tryRoute('WALK', (r2) => push(getPath(r2), 0.7), () => push(straight, 0.25))
+    tryRoute2(google.maps.TravelMode.BICYCLING, {},
+      (r) => push(r.routes[0].overview_path, 0.8),
+      () => tryRoute2(google.maps.TravelMode.WALKING, {},
+        (r2) => push(r2.routes[0].overview_path, 0.7),
+        () => push(straight, 0.25)
+      )
     );
   } else if (mode === 'walking') {
-    tryRoute('WALK',
-      (r) => push(getPath(r), 0.8),
+    tryRoute2(google.maps.TravelMode.WALKING, {},
+      (r) => push(r.routes[0].overview_path, 0.8),
       () => push(straight, 0.25)
     );
   } else {
-    tryRoute('DRIVE',
-      (r) => push(getPath(r), 0.9),
+    tryRoute2(google.maps.TravelMode.DRIVING, {},
+      (r) => push(r.routes[0].overview_path, 0.9),
       () => push(straight, 0.25)
     );
   }
