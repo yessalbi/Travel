@@ -5920,8 +5920,8 @@ async function routesAPIRequest(from, to, travelMode, depTime) {
     computeAlternativeRoutes: false,
     languageCode: 'ko',
   };
-  if (travelMode === 'DRIVE') body.routingPreference = 'TRAFFIC_AWARE';
   if (travelMode === 'TRANSIT' && depTime) body.departureTime = depTime.toISOString();
+  console.log('[Routes API] body:', JSON.stringify(body));
 
   try {
     const res = await fetch(
