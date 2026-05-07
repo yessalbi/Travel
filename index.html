@@ -6137,7 +6137,11 @@ async function routesAPIRequest(from, to, travelMode, depTime) {
       return null;
     }
     const data = await res.json();
-    if (!data.routes?.length) return null;
+    console.log('[Routes API] response:', JSON.stringify(data).slice(0, 300));
+    if (!data.routes?.length) {
+      console.warn('[Routes API] empty routes, data:', data);
+      return null;
+    }
     return data.routes[0];
   } catch(e) {
     console.warn('[Routes API] fetch error:', e);
