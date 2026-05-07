@@ -5912,6 +5912,7 @@ function buildTransitCard(from, to, fromIdx) {
 const MAPS_API_KEY = 'AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ';
 
 async function routesAPIRequest(from, to, travelMode, depTime) {
+  console.log('[Routes API] requesting:', travelMode, from.lat.toFixed(3), from.lng.toFixed(3), '→', to.lat.toFixed(3), to.lng.toFixed(3));
   const body = {
     origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
     destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
@@ -8396,6 +8397,7 @@ function _polylineFlightArc(from, to) {
 
 function drawSegmentRoute(from, to, mode) {
   if (!window.google || !map) return;
+  console.log('[drawSegmentRoute] mode:', mode, from.lat.toFixed(3), '→', to.lat.toFixed(3));
   const cfg  = MODE_COLORS[mode] || MODE_COLORS.driving;
   const straight = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
 
