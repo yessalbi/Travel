@@ -189,14 +189,14 @@
 </script>
 
 <script>
-  window.MAPS_API_KEY = "AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ";
+  window.MAPS_API_KEY = "AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo";
   window.initMap = function() {
     window.mapsReady = true;
     document.dispatchEvent(new Event("maps-ready"));
   };
 </script>
 <script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ&libraries=places,geometry&callback=initMap&language=ko">
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo&libraries=places,geometry&callback=initMap&language=ko">
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1019,19 +1019,7 @@ html, body {
 }
 #map-search-results.show { display: flex; }
 
-/* 경로 hover 툴팁 — InfoWindow 기본 스타일 완전 제거 */
-.route-tooltip-iw .gm-style-iw-c,
-.route-tooltip-iw .gm-style-iw {
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  border: none !important;
-}
-.route-tooltip-iw .gm-style-iw-d { overflow: visible !important; padding: 0 !important; }
-.route-tooltip-iw .gm-style-iw-tc,
-.route-tooltip-iw .gm-style-iw-t::after { display: none !important; }
-.route-tooltip-iw button.gm-ui-hover-effect { display: none !important; }
-.route-tooltip-iw .gm-style-iw-chr { display: none !important; }
+/* 검색결과 닫기 버튼 */
 .map-search-close-inner {
   display: flex; align-items: center; justify-content: center;
   padding: 8px 0;
@@ -2426,35 +2414,34 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  background: var(--accent);
-  border: none;
-  border-radius: 10px;
+  padding: 8px 12px;
+  background: var(--white);
+  border: 1.5px solid var(--sand);
+  border-radius: 12px;
   cursor: pointer;
   transition: all .15s;
   user-select: none;
-  box-shadow: 0 2px 8px rgba(224,122,58,0.25);
 }
-.zone-group-header:hover { background: #c96a2e; box-shadow: 0 3px 12px rgba(224,122,58,0.35); }
-.zone-group-header .zgh-icon { font-size: 13px; flex-shrink: 0; }
+.zone-group-header:hover { background: var(--stone); border-color: var(--accent2); }
+.zone-group-header .zgh-icon { font-size: 14px; flex-shrink: 0; }
 .zone-group-header .zgh-name {
-  font-size: 12px; font-weight: 700; color: #fff;
+  font-size: 12px; font-weight: 700; color: var(--ink);
   flex: 1; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .zone-group-header .zgh-count {
-  font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85);
-  background: rgba(255,255,255,0.2); border-radius: 10px;
+  font-size: 11px; font-weight: 600; color: var(--ink3);
+  background: var(--stone); border-radius: 10px;
   padding: 2px 8px; flex-shrink: 0;
 }
 .zone-group-header .zgh-arrow {
-  font-size: 10px; color: rgba(255,255,255,0.8);
+  font-size: 10px; color: var(--ink3);
   transition: transform .2s;
   flex-shrink: 0;
 }
 .zone-group.collapsed .zgh-arrow { transform: rotate(-90deg); }
 
-/* 접힌 상태: 카드들이 자연스럽게 작아짐 */
+/* 접힌 상태: 카드들이 짜부러져서 겹쳐 보임 */
 .zone-group-body {
   display: flex;
   flex-direction: column;
@@ -2463,31 +2450,30 @@ html, body {
   transition: all .25s;
 }
 .zone-group.collapsed .zone-group-body {
-  gap: 3px;
-  padding-top: 3px;
+  gap: 0;
+  padding-top: 4px;
+  max-height: 72px;
   overflow: hidden;
+  position: relative;
 }
 .zone-group.collapsed .zone-group-body::after {
-  display: none;
-}
-
-/* 접힌 상태: 카드 높이를 자연스럽게 줄이기 — scaleY 대신 padding/overflow 조절 */
-.zone-group.collapsed .schedule-item {
-  padding-top: 5px;
-  padding-bottom: 5px;
-  opacity: 0.85;
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 28px;
+  background: linear-gradient(transparent, var(--cream));
   pointer-events: none;
-  overflow: hidden;
 }
-/* 접힌 상태에서 숨길 요소들 */
-.zone-group.collapsed .schedule-item .item-desc,
-.zone-group.collapsed .schedule-item .item-memo-wrap,
-.zone-group.collapsed .schedule-item .item-has-loc,
-.zone-group.collapsed .schedule-item .item-actions,
-.zone-group.collapsed .schedule-item .item-act-btn-memo {
+.zone-group.collapsed .schedule-item {
+  transform: scaleY(0.45);
+  transform-origin: top center;
+  margin-bottom: -20px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.zone-group.collapsed .schedule-item:nth-child(n+4) {
   display: none;
 }
-/* 접힌 상태에서 4번째 이후 카드 숨기기 제거 — 전부 표시 */
 .zone-group.collapsed .transit-card {
   display: none;
 }
@@ -3145,31 +3131,6 @@ html, body {
       <div id="place-popup-desc"></div>
       <button class="btn-save" style="width:100%;padding:10px;border-radius:10px;" onclick="openGoogleMapsPlace()">
         🗺️ Google Maps에서 보기
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- 일정 삭제 확인 팝업 -->
-<div class="overlay" id="delete-confirm-overlay">
-  <div class="popup" style="max-width:340px;padding:24px 24px 20px;">
-    <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px;" id="del-confirm-title">일정을 삭제할까요?</div>
-    <div style="font-size:12px;color:var(--ink3);margin-bottom:16px;">아래 일정이 삭제되며 복구할 수 없어요.</div>
-    <div id="del-confirm-card" style="background:var(--stone);border-radius:10px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;gap:10px;">
-      <div id="del-confirm-icon" style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:#FEE8DF;"></div>
-      <div style="min-width:0;">
-        <div id="del-confirm-name" style="font-size:13px;font-weight:600;color:var(--ink);"></div>
-        <div id="del-confirm-time" style="font-size:11px;color:var(--ink3);margin-top:2px;"></div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="closeOverlay('delete-confirm-overlay')"
-        style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--sand);background:var(--white);font-size:13px;font-weight:600;color:var(--ink2);cursor:pointer;">
-        아니오
-      </button>
-      <button id="del-confirm-yes"
-        style="flex:1;padding:10px;border-radius:10px;border:none;background:#E53935;font-size:13px;font-weight:700;color:#fff;cursor:pointer;">
-        삭제
       </button>
     </div>
   </div>
@@ -4733,11 +4694,6 @@ async function realInit() {
     console.error('Firebase 로드 실패:', e);
   }
   document.getElementById('loading').style.display = 'none';
-
-  // 여행 기본정보가 없으면 위자드 자동 오픈
-  if (!document.getElementById('trip-title')?.value?.trim()) {
-    setTimeout(() => openTripSetup(), 400);
-  }
 }
 
 // ── Firebase 로드 ─────────────────────────────────────────────
@@ -5137,110 +5093,20 @@ function openPdfPopup(itemId, label) {
   document.getElementById('pdf-overlay').classList.add('show');
 }
 
-let pdfCurrentScale = 2;
-
 async function openPdfFullscreen() {
   const b64   = pdfData[currentPdfItemId];
   const label = document.getElementById('pdf-popup-title').textContent;
   if (!b64) return;
-  pdfCurrentScale = 2;
   document.getElementById('pdf-fullscreen-title').textContent = label;
-  document.getElementById('pdf-zoom-label').textContent = '100%';
   document.getElementById('pdf-fullscreen').classList.add('show');
-  initPdfZoomEvents(); // 핀치줌 + ctrl+휠 이벤트 등록
   const wrap = document.getElementById('pdf-canvas-wrap');
   wrap.innerHTML = '<div style="color:#ccc;font-size:13px;padding:40px;text-align:center;">PDF 불러오는 중…</div>';
   try {
-    await renderPdfToWrap(b64, wrap, pdfCurrentScale);
+    await renderPdfToWrap(b64, wrap, 2);
   } catch(e) {
     wrap.innerHTML = '<div style="color:#f88;padding:40px;text-align:center;">PDF를 불러올 수 없어요</div>';
+    console.warn('PDF.js 렌더링 실패:', e);
   }
-}
-
-async function pdfZoom(delta) {
-  const b64 = pdfData[currentPdfItemId];
-  if (!b64) return;
-  pdfCurrentScale = Math.max(0.5, Math.min(5, pdfCurrentScale + delta));
-  const pct = Math.round((pdfCurrentScale / 2) * 100);
-  document.getElementById('pdf-zoom-label').textContent = pct + '%';
-  const wrap = document.getElementById('pdf-canvas-wrap');
-  const scrollRatio = wrap.scrollTop / (wrap.scrollHeight || 1);
-  wrap.innerHTML = '<div style="color:#ccc;font-size:13px;padding:40px;text-align:center;">렌더링 중…</div>';
-  await renderPdfToWrap(b64, wrap, pdfCurrentScale);
-  wrap.scrollTop = scrollRatio * wrap.scrollHeight;
-}
-
-let pdfZoomAbort = null;
-
-function initPdfZoomEvents() {
-  if (pdfZoomAbort) pdfZoomAbort.abort(); // 이전 이벤트 제거
-  pdfZoomAbort = new AbortController();
-  const sig = pdfZoomAbort.signal;
-  const wrap = document.getElementById('pdf-canvas-wrap');
-  if (!wrap) return;
-
-  wrap.addEventListener('wheel', (e) => {
-    if (!e.ctrlKey) return;
-    e.preventDefault();
-    const delta = e.deltaY < 0 ? 0.25 : -0.25;
-    pdfZoom(delta);
-  }, { passive: false, signal: sig });
-
-  let lastDist = null;
-  let pinchScale = null;
-
-  wrap.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      lastDist = Math.hypot(dx, dy);
-      pinchScale = pdfCurrentScale;
-    }
-  }, { passive: true, signal: sig });
-
-  wrap.addEventListener('touchmove', (e) => {
-    if (e.touches.length !== 2 || lastDist === null) return;
-    e.preventDefault();
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const dist = Math.hypot(dx, dy);
-    const ratio = dist / lastDist;
-    const newScale = Math.max(0.5, Math.min(5, pinchScale * ratio));
-    const canvases = wrap.querySelectorAll('canvas');
-    canvases.forEach(cv => { cv.style.transform = `scale(${newScale / pdfCurrentScale})`; cv.style.transformOrigin = 'top center'; });
-    const pct = Math.round((newScale / 2) * 100);
-    const label = document.getElementById('pdf-zoom-label');
-    if (label) label.textContent = pct + '%';
-  }, { passive: false, signal: sig });
-
-  wrap.addEventListener('touchend', async (e) => {
-    if (e.touches.length < 2 && lastDist !== null) {
-      const canvases = wrap.querySelectorAll('canvas');
-      if (canvases.length) {
-        const transform = canvases[0].style.transform;
-        const match = transform.match(/scale\(([^)]+)\)/);
-        if (match) {
-          const ratio = parseFloat(match[1]);
-          canvases.forEach(cv => { cv.style.transform = ''; });
-          const newScale = Math.max(0.5, Math.min(5, pdfCurrentScale * ratio));
-          if (Math.abs(newScale - pdfCurrentScale) > 0.1) {
-            pdfCurrentScale = newScale;
-            const pct = Math.round((pdfCurrentScale / 2) * 100);
-            const label = document.getElementById('pdf-zoom-label');
-            if (label) label.textContent = pct + '%';
-            const b64 = pdfData[currentPdfItemId];
-            if (b64) {
-              const scrollRatio = wrap.scrollTop / (wrap.scrollHeight || 1);
-              await renderPdfToWrap(b64, wrap, pdfCurrentScale);
-              wrap.scrollTop = scrollRatio * wrap.scrollHeight;
-            }
-          }
-        }
-      }
-      lastDist = null;
-      pinchScale = null;
-    }
-  }, { passive: true, signal: sig });
 }
 
 function closePdfFullscreen() {
@@ -5481,7 +5347,6 @@ async function saveAll() {
   window.offlineSave(TRIP_ID, payload).catch(() => {});
   showToast((LANG_MAP[currentLang]?.toastSaved || LANG_MAP.ko.toastSaved));
   updateTripSummary();
-  // 일정 변경 시 지역 하이라이트 갱신
 }
 
 let saveTimer = null;
@@ -5807,11 +5672,9 @@ function getZoneKey(day, zIdx) { return day + '_z' + zIdx; }
 
 function toggleZoneCollapse(day, zIdx) {
   const key = getZoneKey(day, zIdx);
-  // 기본값이 true(묶임)이므로 undefined → false(펼침)
-  const current = zoneCollapseState[key] !== false;
-  zoneCollapseState[key] = !current;
+  zoneCollapseState[key] = !zoneCollapseState[key];
   const el = document.getElementById('zone-group-' + day + '-' + zIdx);
-  if (el) el.classList.toggle('collapsed', !current);
+  if (el) el.classList.toggle('collapsed', zoneCollapseState[key]);
 }
 
 // 위치 기반 구역 그룹핑 (반경 800m 이내 → 같은 구역)
@@ -5861,46 +5724,11 @@ function groupItemsByZone(items) {
   return groups;
 }
 
-// 구역 이름 캐시 (lat+lng → 동네이름)
-const zoneNameCache = {};
-
-async function fetchZoneName(lat, lng) {
-  const key = lat.toFixed(3) + ',' + lng.toFixed(3);
-  if (zoneNameCache[key]) return zoneNameCache[key];
-  try {
-    const geocoder = new google.maps.Geocoder();
-    return await new Promise((resolve) => {
-      geocoder.geocode({ location: { lat, lng }, language: 'ko' }, (results, status) => {
-        if (status !== 'OK' || !results.length) { resolve(null); return; }
-        // 동/구/시 순서로 적절한 지명 추출
-        const priorities = ['sublocality_level_2','sublocality_level_1','locality','administrative_area_level_2'];
-        for (const type of priorities) {
-          const comp = results[0].address_components.find(c => c.types.includes(type));
-          if (comp) {
-            zoneNameCache[key] = comp.long_name;
-            resolve(comp.long_name);
-            return;
-          }
-        }
-        // fallback: 첫 번째 결과 formatted_address에서 짧게 추출
-        const short = results[0].formatted_address.split(' ').slice(-2).join(' ');
-        zoneNameCache[key] = short;
-        resolve(short);
-      });
-    });
-  } catch(e) { return null; }
-}
-
+// 구역 이름 추출 (첫 번째 항목 이름 기반)
 function getZoneName(group) {
-  // 동기 fallback (캐시 없을 때) — 첫 번째 아이템 이름 사용
   const names = group.items.map(i => i.item.name).filter(Boolean);
   if (names.length <= 2) return names.join(' · ');
-  // 캐시된 지역명 있으면 사용
-  if (group.center) {
-    const key = group.center.lat.toFixed(3) + ',' + group.center.lng.toFixed(3);
-    if (zoneNameCache[key]) return zoneNameCache[key];
-  }
-  return names[0]; // 외 없이 첫 번째 이름만
+  return names[0] + ' 외';
 }
 
 function renderScheduleList() {
@@ -5909,23 +5737,13 @@ function renderScheduleList() {
   list.innerHTML = '';
   const typeIcon = { food:'🍜', cafe:'☕', sight:'🏛️', hotel:'🏨', shop:'🛍️', move:'🚆' };
 
-  // 위치 없는 카드 경고 배너
-  const noLocCount = items.filter(it => !it.lat || !it.lng).length;
-  const hasLocCount = items.filter(it => it.lat && it.lng).length;
-  if (noLocCount > 0 && hasLocCount >= 1) {
-    const banner = document.createElement('div');
-    banner.style.cssText = 'background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:10px;padding:8px 12px;font-size:11px;color:#E65100;display:flex;align-items:center;gap:6px;margin-bottom:4px;';
-    banner.innerHTML = `⚠️ <span>${noLocCount}개 일정에 위치가 없어서 경로가 일부 표시 안 될 수 있어요. 일정 편집 → 📍 위치 지정으로 추가하세요.</span>`;
-    list.appendChild(banner);
-  }
-
   // 그룹핑 (3개 이상일 때만)
   const groups = items.length >= 5 ? groupItemsByZone(items) : null;
   const useGroups = groups && groups.length > 1 && groups.some(g => g.items.length >= 2);
 
   if (useGroups) {
     groups.forEach((group, gIdx) => {
-      const isCollapsed = zoneCollapseState[getZoneKey(currentDay, gIdx)] !== false; // 기본값 묶임
+      const isCollapsed = !!zoneCollapseState[getZoneKey(currentDay, gIdx)];
 
       if (group.items.length >= 2) {
         // 구역 그룹 래퍼
@@ -5947,16 +5765,6 @@ function renderScheduleList() {
           <span class="zgh-name">${zoneName}</span>
           <span class="zgh-count">${countLabel}</span>
           <span class="zgh-arrow">▼</span>`;
-
-        // 비동기로 실제 동네이름 가져와서 업데이트
-        if (group.center && window.google) {
-          fetchZoneName(group.center.lat, group.center.lng).then(name => {
-            if (name) {
-              const nameEl = header.querySelector('.zgh-name');
-              if (nameEl) nameEl.textContent = name;
-            }
-          });
-        }
         zoneDiv.appendChild(header);
 
         // 카드 바디
@@ -6099,7 +5907,79 @@ function buildTransitCard(from, to, fromIdx) {
   return wrap;
 }
 
-const MAPS_API_KEY = 'AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ'; // 기존 호환용
+
+// ── Google Routes API ─────────────────────────────────────────
+const MAPS_API_KEY = 'AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ';
+
+async function routesAPIRequest(from, to, travelMode, depTime) {
+  const body = {
+    origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
+    destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
+    travelMode,
+    computeAlternativeRoutes: false,
+    languageCode: 'ko',
+  };
+  if (travelMode === 'DRIVE') body.routingPreference = 'TRAFFIC_AWARE';
+  if (travelMode === 'TRANSIT' && depTime) body.departureTime = depTime.toISOString();
+
+  try {
+    const res = await fetch(
+      `https://routes.googleapis.com/directions/v2:computeRoutes?key=${MAPS_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-FieldMask': 'routes.polyline.encodedPolyline,routes.legs.polyline.encodedPolyline,routes.legs.steps.polyline.encodedPolyline,routes.legs.steps.transitDetails,routes.legs.steps.travelMode,routes.distanceMeters,routes.legs.distanceMeters,routes.duration,routes.legs.duration,routes.staticDuration',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.warn('[Routes API] error:', res.status, err?.error?.message);
+      return null;
+    }
+    const data = await res.json();
+    if (!data.routes?.length) return null;
+    return data.routes[0];
+  } catch(e) {
+    console.warn('[Routes API] fetch error:', e);
+    return null;
+  }
+}
+
+function decodePolyline(encoded) {
+  if (!encoded) return [];
+  if (window.google?.maps?.geometry?.encoding) {
+    return window.google.maps.geometry.encoding.decodePath(encoded)
+      .map(p => ({ lat: p.lat(), lng: p.lng() }));
+  }
+  const pts = []; let idx = 0, lat = 0, lng = 0;
+  while (idx < encoded.length) {
+    let b, shift = 0, result = 0;
+    do { b = encoded.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    shift = 0; result = 0;
+    do { b = encoded.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    pts.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return pts;
+}
+
+function routesDurTxt(route, _t) {
+  const leg = route.legs?.[0];
+  const sec = parseInt(leg?.duration || leg?.staticDuration || route.duration || '0');
+  const m = Math.round(sec / 60);
+  return m >= 60
+    ? `${Math.floor(m/60)}${_t.transitHour||'시간'} ${m%60>0?m%60+(_t.transitMin||'분'):''}`
+    : `${m}${_t.transitMin||'분'}`;
+}
+
+function routesDistTxt(route) {
+  const m = route.distanceMeters || route.legs?.[0]?.distanceMeters || 0;
+  return m >= 1000 ? `${(m/1000).toFixed(1)}km` : `${m}m`;
+}
 
 // Directions API 호출
 function fetchDirections(from, to, mode, fromIdx) {
@@ -6112,121 +5992,14 @@ function fetchDirections(from, to, mode, fromIdx) {
   if (bodyEl) bodyEl.classList.add('loading');
 
   const modeInfo = MODE_LIST.find(m => m.id === mode) || MODE_LIST[0];
-  const svc = new google.maps.DirectionsService();
 
-  function getDepTime(lng) {
-    const offset = Math.round(lng / 15);
-    const now = new Date();
-    const dep = new Date(now);
-    const targetUTC = (10 - offset + 48) % 24;
-    dep.setUTCHours(targetUTC, 0, 0, 0);
-    if (dep <= now) dep.setDate(dep.getDate() + 1);
-    return dep;
+  async function doRequest(rmMode, opts, onOK, onFail) {
+    const dep = rmMode === 'TRANSIT' ? _routeDepTime(from.lng) : null;
+    const route = await routesAPIRequest(from, to, rmMode, dep);
+    if (route) onOK(route);
+    else onFail('ZERO_RESULTS');
   }
 
-  function doRequest(travelMode, opts, onOK, onFail) {
-    svc.route({
-      origin:      new google.maps.LatLng(from.lat, from.lng),
-      destination: new google.maps.LatLng(to.lat,   to.lng),
-      travelMode,
-      provideRouteAlternatives: travelMode === google.maps.TravelMode.TRANSIT,
-      ...opts,
-    }, (result, status) => {
-      if (status === google.maps.DirectionsStatus.OK) onOK(result);
-      else {
-        console.warn('[Directions] status:', status, travelMode,
-          `(${from.lat.toFixed(3)},${from.lng.toFixed(3)}) → (${to.lat.toFixed(3)},${to.lng.toFixed(3)})`);
-        onFail(status);
-      }
-    });
-  }
-
-  // ── 노선 배지 HTML (대중교통)
-  function transitBadges(legs) {
-    const ICON = { BUS:'🚌', SUBWAY:'🚇', TRAM:'🚊', RAIL:'🚆',
-      HEAVY_RAIL:'🚄', HIGH_SPEED_TRAIN:'🚅', COMMUTER_TRAIN:'🚆',
-      FERRY:'⛴️', CABLE_CAR:'🚡', OTHER:'🚌' };
-    const COL  = { BUS:'#FF6D00', SUBWAY:'#1565C0', TRAM:'#6A1B9A',
-      RAIL:'#2E7D32', HEAVY_RAIL:'#1B5E20', HIGH_SPEED_TRAIN:'#C62828',
-      COMMUTER_TRAIN:'#1B5E20', FERRY:'#00838F', OTHER:'#1565C0' };
-    const steps = legs.steps.filter(s => s.travel_mode === 'TRANSIT' && s.transit);
-    if (!steps.length) return '';
-    const parts = steps.map(s => {
-      const vt  = s.transit.line?.vehicle?.type || 'OTHER';
-      const col = COL[vt]  || '#1565C0';
-      const ico = ICON[vt] || '🚌';
-      const nm  = s.transit.line?.short_name || s.transit.line?.name || '';
-      return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:10px;
-        background:${col}20;border-radius:6px;padding:1px 5px;color:${col};font-weight:700;">
-        ${ico}${nm ? ' ' + nm : ''}</span>`;
-    });
-    return `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px;align-items:center;">
-      ${parts.map((p, i) => (i > 0 ? '<span style="color:#ccc;font-size:9px;">→</span>' : '') + p).join('')}
-    </div>`;
-  }
-
-  // ── 모드별 요청
-  if (mode === 'transit') {
-    const dep = getDepTime(from.lng);
-    doRequest(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
-      (result) => {
-        const leg = result.routes[0].legs[0];
-        let durTxt = leg.duration.text;
-        if (result.routes.length > 1) {
-          const avgSec = Math.round(result.routes.reduce((s, r) => s + r.legs[0].duration.value, 0) / result.routes.length);
-          const m = Math.round(avgSec / 60);
-          durTxt = m >= 60
-            ? `${Math.floor(m/60)}${_t.transitHour||'시간'} ${m%60>0?m%60+(_t.transitMin||'분'):''} (${result.routes.length}루트 평균)`
-            : `${m}${_t.transitMin||'분'} (${result.routes.length}루트 평균)`;
-        }
-        showResult(leg.distance.text, durTxt, modeInfo.label, null, transitBadges(leg));
-      },
-      () => {
-        doRequest(google.maps.TravelMode.DRIVING, {},
-          (r2) => {
-            const leg = r2.routes[0].legs[0];
-            showResult(leg.distance.text, leg.duration.text,
-              _t.transitNoPublicFallback||'🚌 대중교통 없음 (자동차 기준)', 'var(--red)', '');
-          },
-          () => showError(_t.transitNoPublic||'🚌 이 구간 대중교통 정보가 없어요')
-        );
-      }
-    );
-  } else if (mode === 'driving') {
-    doRequest(google.maps.TravelMode.DRIVING, {},
-      (result) => {
-        const leg = result.routes[0].legs[0];
-        showResult(leg.distance.text, leg.duration.text, modeInfo.label, null, '');
-      },
-      () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
-    );
-  } else if (mode === 'walking') {
-    doRequest(google.maps.TravelMode.WALKING, {},
-      (result) => {
-        const leg = result.routes[0].legs[0];
-        showResult(leg.distance.text, leg.duration.text, modeInfo.label, null, '');
-      },
-      () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
-    );
-  } else if (mode === 'bicycling') {
-    doRequest(google.maps.TravelMode.BICYCLING, {},
-      (result) => {
-        const leg = result.routes[0].legs[0];
-        showResult(leg.distance.text, leg.duration.text, modeInfo.label, null, '');
-      },
-      () => {
-        doRequest(google.maps.TravelMode.WALKING, {},
-          (r2) => {
-            const leg = r2.routes[0].legs[0];
-            showResult(leg.distance.text, leg.duration.text,
-              modeInfo.label+' (도보 기준)', 'var(--ink3)', '');
-          },
-          () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
-        );
-      }
-    );
-  }
-}
   // ── 노선 배지 HTML (대중교통)
   function transitBadges(legs) {
     const ICON = { BUS:'🚌', SUBWAY:'🚇', TRAM:'🚊', RAIL:'🚆',
@@ -6286,7 +6059,43 @@ function fetchDirections(from, to, mode, fromIdx) {
     return;
   }
 
-
+  // ── 모드별 요청
+  if (mode === 'transit') {
+    doRequest('TRANSIT', {},
+      (route) => {
+        showResult(routesDistTxt(route), routesDurTxt(route, _t), modeInfo.label, null, '');
+      },
+      () => {
+        doRequest('DRIVE', {},
+          (r2) => showResult(routesDistTxt(r2), routesDurTxt(r2, _t),
+            _t.transitNoPublicFallback||'🚌 대중교통 없음 (자동차 기준)', 'var(--red)', ''),
+          () => showError(_t.transitNoPublic||'🚌 이 구간 대중교통 정보가 없어요')
+        );
+      }
+    );
+  } else if (mode === 'driving') {
+    doRequest('DRIVE', {},
+      (route) => showResult(routesDistTxt(route), routesDurTxt(route, _t), modeInfo.label, null, ''),
+      () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
+    );
+  } else if (mode === 'walking') {
+    doRequest('WALK', {},
+      (route) => showResult(routesDistTxt(route), routesDurTxt(route, _t), modeInfo.label, null, ''),
+      () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
+    );
+  } else if (mode === 'bicycling') {
+    doRequest('BICYCLE', {},
+      (route) => showResult(routesDistTxt(route), routesDurTxt(route, _t), modeInfo.label, null, ''),
+      () => {
+        doRequest('WALK', {},
+          (r2) => showResult(routesDistTxt(r2), routesDurTxt(r2, _t),
+            modeInfo.label+' (도보 기준)', 'var(--ink3)', ''),
+          () => showError(_t.transitNoRoute||'경로를 찾을 수 없어요')
+        );
+      }
+    );
+  }
+}
 
 // 이동수단 선택 팝업
 let openModePickerEl = null;
@@ -6477,35 +6286,10 @@ function saveScheduleItem() {
 }
 
 function deleteScheduleItem(idx) {
-  const item = scheduleData[currentDay]?.[idx];
-  if (!item) return;
-
-  const typeIcon = { food:'🍜', cafe:'☕', sight:'🏛️', hotel:'🏨', shop:'🛍️', move:'🚆' };
-  const t = LANG_MAP[currentLang] || LANG_MAP.ko;
-
-  // 팝업 내용 채우기
-  document.getElementById('del-confirm-title').textContent =
-    currentLang === 'ja' ? 'この予定を削除しますか？' : '일정을 삭제할까요?';
-  document.getElementById('del-confirm-icon').textContent = typeIcon[item.type] || '📌';
-  document.getElementById('del-confirm-name').textContent = item.name || '(이름 없음)';
-  document.getElementById('del-confirm-time').textContent = item.time
-    ? fmtTime(item.time) : (currentLang === 'ja' ? '시간 미설정' : '시간 미설정');
-
-  // 아이콘 배경색
-  const bgMap = { food:'#FEE8DF', cafe:'#F5E6D0', sight:'#DDEEFF', hotel:'#DDF3E4', shop:'#F3E5F5', move:'#EBEBEB' };
-  document.getElementById('del-confirm-icon').style.background = bgMap[item.type] || '#f0ede8';
-
-  // 예 버튼에 실제 삭제 연결
-  const yesBtn = document.getElementById('del-confirm-yes');
-  yesBtn.onclick = () => {
-    scheduleData[currentDay].splice(idx, 1);
-    renderScheduleList();
-    calcBudget();
-    autoSave();
-    closeOverlay('delete-confirm-overlay');
-  };
-
-  openOverlay('delete-confirm-overlay');
+  scheduleData[currentDay].splice(idx, 1);
+  renderScheduleList();
+  calcBudget();
+  autoSave();
 }
 
 // ── 예산 트래커 ───────────────────────────────────────────────
@@ -8154,6 +7938,7 @@ function mapFitRoute() {
   map.fitBounds(bounds, 60);
 }
 
+// ── 현재 위치 + 나침반 ────────────────────────────────────────
 // 모드: 0=off, 1=위치만, 2=위치+방향(나침반)
 let locMode       = 0;
 let locWatchId    = null;
@@ -8522,46 +8307,6 @@ function _polylineDashed(path, color, opacity) {
 }
 
 // 대중교통 step별 색상 경로
-// Routes API 버전 대중교통 폴리라인
-function _polylineTransitStepsFromRoute(route, fullPath) {
-  const steps = route.legs?.[0]?.steps || [];
-  // steps가 있으면 step별로, 없으면 전체 경로를 단일 폴리라인으로
-  if (steps.length === 0) {
-    // fallback: 전체 경로를 파란색으로
-    dayPolylines.push(new google.maps.Polyline({
-      path: fullPath, geodesic: true,
-      strokeColor: '#1565C0', strokeOpacity: 0.85, strokeWeight: 4, map, zIndex: 2,
-    }));
-    return;
-  }
-  steps.forEach(step => {
-    const path = decodePolyline(step.polyline?.encodedPolyline);
-    if (!path || path.length < 2) return;
-    const isTransit = step.travelMode === 'TRANSIT' || step.transitDetails;
-    const td = step.transitDetails;
-    if (isTransit && td) {
-      const vt = td.transitLine?.vehicle?.type || 'OTHER';
-      const color = TRANSIT_LINE_COLORS[vt] || '#1565C0';
-      const nm = td.transitLine?.nameShort || td.transitLine?.name || '';
-      const weight = ['SUBWAY','RAIL','HEAVY_RAIL','HIGH_SPEED_TRAIN'].includes(vt) ? 5 : 4;
-      dayPolylines.push(new google.maps.Polyline({
-        path, geodesic: true, strokeColor: '#fff', strokeOpacity: 0.9, strokeWeight: weight + 4, map, zIndex: 10,
-      }));
-      const poly = new google.maps.Polyline({
-        path, geodesic: true, strokeColor: color, strokeOpacity: 0.95, strokeWeight: weight, map, zIndex: 11,
-      });
-      dayPolylines.push(poly);
-    } else {
-      // 도보 구간
-      dayPolylines.push(new google.maps.Polyline({
-        path, geodesic: true, strokeColor: '#888', strokeOpacity: 0.5, strokeWeight: 2,
-        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.6, scale: 3 }, offset: '0', repeat: '12px' }],
-        map, zIndex: 2,
-      }));
-    }
-  });
-}
-
 function _polylineTransitSteps(steps) {
   if (!steps?.length) return;
   steps.forEach(step => {
@@ -8665,53 +8410,45 @@ function drawSegmentRoute(from, to, mode) {
     return;
   }
 
-  const svc = new google.maps.DirectionsService();
   const dep = _routeDepTime(from.lng);
 
-  function tryRoute(travelMode, opts, onSuccess, onFail) {
-    svc.route({
-      origin:      new google.maps.LatLng(from.lat, from.lng),
-      destination: new google.maps.LatLng(to.lat,   to.lng),
-      travelMode, ...opts,
-    }, (result, status) => {
-      if (status === google.maps.DirectionsStatus.OK) onSuccess(result);
-      else {
-        console.warn('[Directions] status:', status, travelMode,
-          `(${from.lat.toFixed(3)},${from.lng.toFixed(3)}) → (${to.lat.toFixed(3)},${to.lng.toFixed(3)})`);
-        onFail(status);
-      }
-    });
+  async function tryRoute(rmMode, onSuccess, onFail) {
+    const route = await routesAPIRequest(from, to, rmMode, rmMode === 'TRANSIT' ? dep : null);
+    if (route) onSuccess(route);
+    else onFail();
   }
 
+  const gp = r => { const p = decodePolyline(r.polyline?.encodedPolyline); return p.length ? p : straight; };
+
   if (mode === 'transit') {
-    tryRoute(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep } },
-      (result) => _polylineTransitSteps(result.routes[0].legs[0].steps),
-      () => {
-        tryRoute(google.maps.TravelMode.DRIVING, {},
-          (r2) => _polylineDashed(r2.routes[0].overview_path, '#9E9E9E', 0.6),
-          () => _polylineDashed(straight, '#9E9E9E', 0.4)
-        );
-      }
+    tryRoute('TRANSIT',
+      (r) => {
+        const steps = r.legs?.[0]?.steps || [];
+        if (steps.length) _polylineTransitSteps(steps);
+        else _polylineSolid(gp(r), cfg, mode, 0.85);
+      },
+      () => tryRoute('DRIVE',
+        (r2) => _polylineDashed(gp(r2), '#9E9E9E', 0.6),
+        () => _polylineDashed(straight, '#9E9E9E', 0.4)
+      )
     );
   } else if (mode === 'driving') {
-    tryRoute(google.maps.TravelMode.DRIVING, {},
-      (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.9),
+    tryRoute('DRIVE',
+      (r) => _polylineSolid(gp(r), cfg, mode, 0.9),
       () => _polylineSolid(straight, cfg, mode, 0.3)
     );
   } else if (mode === 'walking') {
-    tryRoute(google.maps.TravelMode.WALKING, {},
-      (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.85),
+    tryRoute('WALK',
+      (r) => _polylineSolid(gp(r), cfg, mode, 0.85),
       () => _polylineSolid(straight, cfg, mode, 0.3)
     );
   } else if (mode === 'bicycling') {
-    tryRoute(google.maps.TravelMode.BICYCLING, {},
-      (result) => _polylineSolid(result.routes[0].overview_path, cfg, mode, 0.85),
-      () => {
-        tryRoute(google.maps.TravelMode.WALKING, {},
-          (r2) => _polylineSolid(r2.routes[0].overview_path, cfg, mode, 0.7),
-          () => _polylineSolid(straight, cfg, mode, 0.3)
-        );
-      }
+    tryRoute('BICYCLE',
+      (r) => _polylineSolid(gp(r), cfg, mode, 0.85),
+      () => tryRoute('WALK',
+        (r2) => _polylineSolid(gp(r2), cfg, mode, 0.7),
+        () => _polylineSolid(straight, cfg, mode, 0.3)
+      )
     );
   }
 }
@@ -9308,8 +9045,6 @@ let allDayPolylines = [];
 function clearAllDayRoutes() {
   allDayPolylines.forEach(p => p.setMap(null));
   allDayPolylines = [];
-  Object.keys(allDayPolylineGroups).forEach(k => delete allDayPolylineGroups[k]);
-  if (allDayHoverWindow) allDayHoverWindow.close();
 }
 
 function drawAllDayRoutes() {
@@ -9323,7 +9058,7 @@ function drawAllDayRoutes() {
     const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
     if (locItems.length < 2) return;
 
-    const col = { ...DAY_COLORS[(day - 1) % DAY_COLORS.length], _day: day };
+    const col = DAY_COLORS[(day - 1) % DAY_COLORS.length];
 
     locItems.forEach((item, i) => {
       if (i >= locItems.length - 1) return;
@@ -9335,50 +9070,6 @@ function drawAllDayRoutes() {
   });
 }
 
-// Day별 폴리라인 그룹 (hover 시 해당 Day 전체 하이라이트용)
-const allDayPolylineGroups = {}; // { day: [polyline, ...] }
-let allDayHoverWindow = null;
-
-function _attachRouteHover(polyline, day, col) {
-  if (!allDayPolylineGroups[day]) allDayPolylineGroups[day] = [];
-  allDayPolylineGroups[day].push(polyline);
-
-  polyline.addListener('mouseover', (e) => {
-    // 해당 Day의 모든 폴리라인 하이라이트
-    (allDayPolylineGroups[day] || []).forEach(pl => {
-      pl.setOptions({ strokeWeight: 7, strokeOpacity: 1, zIndex: 100 });
-    });
-    // 툴팁 — 작은 말풍선
-    if (!allDayHoverWindow) {
-      allDayHoverWindow = new google.maps.InfoWindow({
-        disableAutoPan: true,
-        pixelOffset: new google.maps.Size(0, -4),
-      });
-      // 열린 후 DOM에 클래스 추가
-      google.maps.event.addListener(allDayHoverWindow, 'domready', () => {
-        const iw = document.querySelector('.gm-style-iw-c');
-        if (iw) iw.closest('.gm-style-iw-t')?.classList.add('route-tooltip-iw');
-      });
-    }
-    const label = currentLang === 'ja' ? `Day${day}` : `Day${day}`;
-    allDayHoverWindow.setContent(
-      `<div style="background:rgba(20,20,20,0.82);color:${col.stroke};font-size:13px;font-weight:800;padding:5px 12px;border-radius:8px;white-space:nowrap;letter-spacing:0.5px;text-shadow:0 0 8px rgba(0,0,0,0.6);border:2px solid ${col.stroke};">Day${day}</div>`
-    );
-    allDayHoverWindow.setPosition(e.latLng);
-    allDayHoverWindow.open(map);
-  });
-
-  polyline.addListener('mouseout', () => {
-    // 해당 Day 전체 원복
-    (allDayPolylineGroups[day] || []).forEach(pl => {
-      const origWeight = pl.get('_origWeight') || 4;
-      const origOpacity = pl.get('_origOpacity') || 0.9;
-      pl.setOptions({ strokeWeight: origWeight, strokeOpacity: origOpacity, zIndex: 2 });
-    });
-    if (allDayHoverWindow) allDayHoverWindow.close();
-  });
-}
-
 function drawAllDaySegment(from, to, mode, col) {
   if (!window.google || !map) return;
   const straight = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
@@ -9386,6 +9077,7 @@ function drawAllDaySegment(from, to, mode, col) {
     Math.pow(to.lat - from.lat, 2) + Math.pow(to.lng - from.lng, 2)
   ) * 111;
 
+  // 비행기 구간
   if (distKm > 300 && mode !== 'transit') {
     _allDayFlightArc(from, to, col);
     return;
@@ -9401,55 +9093,38 @@ function drawAllDaySegment(from, to, mode, col) {
         strokeColor: '#fff', strokeOpacity: 0.75, strokeWeight: 6, map, zIndex: 1,
       }));
     }
-    const pl = new google.maps.Polyline({
+    allDayPolylines.push(new google.maps.Polyline({
       path: routePath, geodesic: true,
       strokeColor: col.stroke, strokeOpacity: opacity, strokeWeight: 4, map, zIndex: 2,
-    });
-    pl.set('_origWeight', 4);
-    pl.set('_origOpacity', opacity);
-    col._opacity = opacity;
-    _attachRouteHover(pl, col._day, col);
-    allDayPolylines.push(pl);
+    }));
   }
 
-  const svc2 = new google.maps.DirectionsService();
-  const dep2 = _routeDepTime(from.lng);
-
-  function tryRoute2(travelMode, opts, onOK, onFail) {
-    svc2.route({
-      origin:      new google.maps.LatLng(from.lat, from.lng),
-      destination: new google.maps.LatLng(to.lat,   to.lng),
-      travelMode, ...opts,
-    }, (result, status) => {
-      if (status === google.maps.DirectionsStatus.OK) onOK(result);
-      else onFail(status);
-    });
+  async function tryRoute2(rmMode, onOK, onFail) {
+    const route = await routesAPIRequest(from, to, rmMode, rmMode === 'TRANSIT' ? dep : null);
+    if (route) onOK(route);
+    else onFail();
   }
+
+  const gp2 = r => { const p = decodePolyline(r.polyline?.encodedPolyline); return p.length ? p : straight; };
 
   if (mode === 'transit') {
-    tryRoute2(google.maps.TravelMode.TRANSIT, { transitOptions: { departureTime: dep2 } },
-      (r) => push(r.routes[0].overview_path, 0.85),
-      () => tryRoute2(google.maps.TravelMode.DRIVING, {},
-        (r2) => push(r2.routes[0].overview_path, 0.5),
-        () => push(straight, 0.25)
-      )
+    tryRoute2('TRANSIT',
+      (r) => push(gp2(r), 0.85),
+      () => tryRoute2('DRIVE', (r2) => push(gp2(r2), 0.5), () => push(straight, 0.25))
     );
   } else if (mode === 'bicycling') {
-    tryRoute2(google.maps.TravelMode.BICYCLING, {},
-      (r) => push(r.routes[0].overview_path, 0.8),
-      () => tryRoute2(google.maps.TravelMode.WALKING, {},
-        (r2) => push(r2.routes[0].overview_path, 0.7),
-        () => push(straight, 0.25)
-      )
+    tryRoute2('BICYCLE',
+      (r) => push(gp2(r), 0.8),
+      () => tryRoute2('WALK', (r2) => push(gp2(r2), 0.7), () => push(straight, 0.25))
     );
   } else if (mode === 'walking') {
-    tryRoute2(google.maps.TravelMode.WALKING, {},
-      (r) => push(r.routes[0].overview_path, 0.8),
+    tryRoute2('WALK',
+      (r) => push(gp2(r), 0.8),
       () => push(straight, 0.25)
     );
   } else {
-    tryRoute2(google.maps.TravelMode.DRIVING, {},
-      (r) => push(r.routes[0].overview_path, 0.9),
+    tryRoute2('DRIVE',
+      (r) => push(gp2(r), 0.9),
       () => push(straight, 0.25)
     );
   }
@@ -9780,7 +9455,7 @@ function restoreUIState() {
     if (tab === '0' || tab === null) {
       fitAllPins();
       drawAllDayRoutes(); // 초기 로드 시 전체 경로 표시
-      } else if (tab !== 'map' && tab !== null) {
+    } else if (tab !== 'map' && tab !== null) {
       clearAllDayRoutes();
       drawDayRoutes();
       fitDayBounds(currentDay);
@@ -10350,16 +10025,7 @@ const DOMESTIC_KEYWORDS = [
   '남해','하동','보령','태안','군산','익산','진주','창원','김해','양산','울진','삼척','동해','태백',
   '평창','정선','영월','홍천','화천','양구','인제','고성','양양','임실','완주','고창','부안','장흥',
   '해남','완도','진도','신안','함평','영광','무안','나주','담양','곡성','구례','화순','보성','고흥',
-  // 충북/경북 내륙
-  '단양','제천','충주','음성','진천','괴산','보은','옥천','영동','증평','청풍','수안보',
-  // 경북
-  '문경','상주','김천','구미','칠곡','성주','고령','청도','경산','영천','군위','의성','청송','영양','봉화','울릉',
-  // 전북
-  '남원','정읍','김제','무주','장수','진안',
-  // 경남
-  '밀양','의령','함안','창녕','고성','사천','하동','산청','함양','거창','합천',
-  // 기타
-  '국내','Korea','korea','한국','korea','KR',
+  '국내','Korea','korea','한국',
 ];
 
 let isDomestic = false;
@@ -11004,13 +10670,6 @@ document.addEventListener('keydown', (e) => {
   <div id="pdf-fullscreen-box">
     <div id="pdf-fullscreen-header">
       <span id="pdf-fullscreen-title"></span>
-      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;margin-right:10px;">
-        <button onclick="pdfZoom(-0.5)" title="축소"
-          style="width:30px;height:30px;border-radius:50%;border:1.5px solid #ddd;background:#f5f3ee;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#555;">－</button>
-        <span id="pdf-zoom-label" style="font-size:12px;color:#888;min-width:36px;text-align:center;">100%</span>
-        <button onclick="pdfZoom(+0.5)" title="확대"
-          style="width:30px;height:30px;border-radius:50%;border:1.5px solid #ddd;background:#f5f3ee;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#555;">＋</button>
-      </div>
       <button id="pdf-fullscreen-close" onclick="closePdfFullscreen()">✕</button>
     </div>
     <div id="pdf-canvas-wrap">
