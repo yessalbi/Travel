@@ -5909,6 +5909,16 @@ function renderScheduleList() {
   list.innerHTML = '';
   const typeIcon = { food:'🍜', cafe:'☕', sight:'🏛️', hotel:'🏨', shop:'🛍️', move:'🚆' };
 
+  // 위치 없는 카드 경고 배너
+  const noLocCount = items.filter(it => !it.lat || !it.lng).length;
+  const hasLocCount = items.filter(it => it.lat && it.lng).length;
+  if (noLocCount > 0 && hasLocCount >= 1) {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:10px;padding:8px 12px;font-size:11px;color:#E65100;display:flex;align-items:center;gap:6px;margin-bottom:4px;';
+    banner.innerHTML = `⚠️ <span>${noLocCount}개 일정에 위치가 없어서 경로가 일부 표시 안 될 수 있어요. 일정 편집 → 📍 위치 지정으로 추가하세요.</span>`;
+    list.appendChild(banner);
+  }
+
   // 그룹핑 (3개 이상일 때만)
   const groups = items.length >= 5 ? groupItemsByZone(items) : null;
   const useGroups = groups && groups.length > 1 && groups.some(g => g.items.length >= 2);
@@ -10280,7 +10290,16 @@ const DOMESTIC_KEYWORDS = [
   '남해','하동','보령','태안','군산','익산','진주','창원','김해','양산','울진','삼척','동해','태백',
   '평창','정선','영월','홍천','화천','양구','인제','고성','양양','임실','완주','고창','부안','장흥',
   '해남','완도','진도','신안','함평','영광','무안','나주','담양','곡성','구례','화순','보성','고흥',
-  '국내','Korea','korea','한국',
+  // 충북/경북 내륙
+  '단양','제천','충주','음성','진천','괴산','보은','옥천','영동','증평','청풍','수안보',
+  // 경북
+  '문경','상주','김천','구미','칠곡','성주','고령','청도','경산','영천','군위','의성','청송','영양','봉화','울릉',
+  // 전북
+  '남원','정읍','김제','무주','장수','진안',
+  // 경남
+  '밀양','의령','함안','창녕','고성','사천','하동','산청','함양','거창','합천',
+  // 기타
+  '국내','Korea','korea','한국','korea','KR',
 ];
 
 let isDomestic = false;
