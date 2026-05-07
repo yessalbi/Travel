@@ -6126,7 +6126,7 @@ async function routesAPIRequest(from, to, travelMode, depTime) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Goog-FieldMask': 'routes.polyline,routes.legs,routes.duration,routes.distanceMeters,routes.legs.steps.transitDetails,routes.legs.steps.travelMode,routes.legs.steps.polyline',
+          'X-Goog-FieldMask': 'routes.polyline.encodedPolyline,routes.legs.polyline.encodedPolyline,routes.legs.steps.polyline.encodedPolyline,routes.legs.steps.transitDetails,routes.legs.steps.travelMode,routes.distanceMeters,routes.legs.distanceMeters,routes.duration,routes.legs.duration,routes.staticDuration',
         },
         body: JSON.stringify(body),
       }
