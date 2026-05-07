@@ -189,14 +189,14 @@
 </script>
 
 <script>
-  window.MAPS_API_KEY = "AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo";
+  window.MAPS_API_KEY = "AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ";
   window.initMap = function() {
     window.mapsReady = true;
     document.dispatchEvent(new Event("maps-ready"));
   };
 </script>
 <script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo&libraries=places,geometry&callback=initMap&language=ko">
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ&libraries=places,geometry&callback=initMap&language=ko">
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -6101,7 +6101,7 @@ function buildTransitCard(from, to, fromIdx) {
 
 // ── Google Routes API (REST) ──────────────────────────────────
 // DirectionsService deprecated → Routes API로 대체
-const MAPS_API_KEY = 'AIzaSyD4e57bau7rfOtxjPhkMD0IIwF-WnKexxo';
+const MAPS_API_KEY = 'AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ';
 
 async function routesAPIRequest(from, to, travelMode, depTime) {
   // travelMode: 'DRIVE' | 'WALK' | 'BICYCLE' | 'TRANSIT'
