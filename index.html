@@ -9054,6 +9054,44 @@ let allDayPolylines = [];
 function clearAllDayRoutes() {
   allDayPolylines.forEach(p => p.setMap(null));
   allDayPolylines = [];
+  Object.keys(allDayPolylineGroups).forEach(k => delete allDayPolylineGroups[k]);
+  if (allDayHoverWindow) allDayHoverWindow.close();
+}
+
+// Day별 폴리라인 그룹 (hover 시 해당 Day 전체 하이라이트)
+const allDayPolylineGroups = {};
+let allDayHoverWindow = null;
+
+function _attachRouteHover(pl, day, col) {
+  if (!allDayPolylineGroups[day]) allDayPolylineGroups[day] = [];
+  allDayPolylineGroups[day].push(pl);
+
+  pl.addListener('mouseover', (e) => {
+    (allDayPolylineGroups[day] || []).forEach(p => {
+      p.setOptions({ strokeWeight: 7, strokeOpacity: 1, zIndex: 100 });
+    });
+    if (!allDayHoverWindow) {
+      allDayHoverWindow = new google.maps.InfoWindow({ disableAutoPan: true });
+      google.maps.event.addListener(allDayHoverWindow, 'domready', () => {
+        document.querySelectorAll('.gm-style-iw-c, .gm-style-iw, .gm-style-iw-chr, .gm-style-iw-tc').forEach(el => {
+          el.style.cssText = (el.style.cssText || '') + 'background:transparent!important;box-shadow:none!important;padding:0!important;border:none!important;';
+        });
+        document.querySelectorAll('.gm-ui-hover-effect').forEach(el => el.style.display = 'none');
+      });
+    }
+    allDayHoverWindow.setContent(
+      `<div style="background:rgba(20,20,20,0.82);color:${col.stroke};font-size:13px;font-weight:800;padding:5px 12px;border-radius:8px;white-space:nowrap;border:2px solid ${col.stroke};">Day${day}</div>`
+    );
+    allDayHoverWindow.setPosition(e.latLng);
+    allDayHoverWindow.open(map);
+  });
+
+  pl.addListener('mouseout', () => {
+    (allDayPolylineGroups[day] || []).forEach(p => {
+      p.setOptions({ strokeWeight: 4, strokeOpacity: p.get('_origOpacity') || 0.9, zIndex: 2 });
+    });
+    if (allDayHoverWindow) allDayHoverWindow.close();
+  });
 }
 
 function drawAllDayRoutes() {
@@ -9067,7 +9105,7 @@ function drawAllDayRoutes() {
     const locItems = items.filter(it => it.lat && it.lng && !isIncheonAirport(it.lat, it.lng));
     if (locItems.length < 2) return;
 
-    const col = DAY_COLORS[(day - 1) % DAY_COLORS.length];
+    const col = { ...DAY_COLORS[(day - 1) % DAY_COLORS.length], _day: day };
 
     locItems.forEach((item, i) => {
       if (i >= locItems.length - 1) return;
@@ -9102,10 +9140,13 @@ function drawAllDaySegment(from, to, mode, col) {
         strokeColor: '#fff', strokeOpacity: 0.75, strokeWeight: 6, map, zIndex: 1,
       }));
     }
-    allDayPolylines.push(new google.maps.Polyline({
+    const pl = new google.maps.Polyline({
       path: routePath, geodesic: true,
       strokeColor: col.stroke, strokeOpacity: opacity, strokeWeight: 4, map, zIndex: 2,
-    }));
+    });
+    pl.set('_origOpacity', opacity);
+    _attachRouteHover(pl, col._day, col);
+    allDayPolylines.push(pl);
   }
 
   async function tryRoute2(rmMode, onOK, onFail) {
