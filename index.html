@@ -2445,33 +2445,25 @@ html, body {
 .zone-group-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-top: 6px;
-  transition: all .25s;
+  gap: 4px;
+  padding-top: 4px;
+  transition: gap .2s;
 }
 .zone-group.collapsed .zone-group-body {
-  gap: 0;
-  padding-top: 4px;
-  max-height: 72px;
-  overflow: hidden;
-  position: relative;
-}
-.zone-group.collapsed .zone-group-body::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 28px;
-  background: linear-gradient(transparent, var(--cream));
-  pointer-events: none;
+  gap: 3px;
+  padding-top: 3px;
 }
 .zone-group.collapsed .schedule-item {
-  transform: scaleY(0.45);
-  transform-origin: top center;
-  margin-bottom: -20px;
-  opacity: 0.7;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  opacity: 0.85;
   pointer-events: none;
 }
-.zone-group.collapsed .schedule-item:nth-child(n+4) {
+.zone-group.collapsed .schedule-item .item-desc,
+.zone-group.collapsed .schedule-item .item-memo-wrap,
+.zone-group.collapsed .schedule-item .item-has-loc,
+.zone-group.collapsed .schedule-item .item-actions,
+.zone-group.collapsed .schedule-item .item-act-btn-memo {
   display: none;
 }
 .zone-group.collapsed .transit-card {
@@ -9073,10 +9065,22 @@ function _attachRouteHover(pl, day, col) {
     if (!allDayHoverWindow) {
       allDayHoverWindow = new google.maps.InfoWindow({ disableAutoPan: true });
       google.maps.event.addListener(allDayHoverWindow, 'domready', () => {
-        document.querySelectorAll('.gm-style-iw-c, .gm-style-iw, .gm-style-iw-chr, .gm-style-iw-tc').forEach(el => {
-          el.style.cssText = (el.style.cssText || '') + 'background:transparent!important;box-shadow:none!important;padding:0!important;border:none!important;';
+        // 흰 박스, 화살표, 닫기버튼 전부 제거
+        const hide = (sel) => document.querySelectorAll(sel).forEach(el => {
+          el.style.cssText += ';background:transparent!important;box-shadow:none!important;padding:0!important;border:none!important;display:none!important;';
         });
-        document.querySelectorAll('.gm-ui-hover-effect').forEach(el => el.style.display = 'none');
+        hide('.gm-style-iw-c');
+        hide('.gm-style-iw-t::after');
+        hide('.gm-style-iw-tc');
+        hide('.gm-style-iw-chr');
+        hide('.gm-ui-hover-effect');
+        // gm-style-iw-c는 숨기지 말고 투명하게
+        document.querySelectorAll('.gm-style-iw-c').forEach(el => {
+          el.style.cssText = 'background:transparent!important;box-shadow:none!important;padding:0!important;border:none!important;';
+        });
+        document.querySelectorAll('.gm-style-iw-d').forEach(el => {
+          el.style.cssText = 'overflow:visible!important;padding:0!important;';
+        });
       });
     }
     allDayHoverWindow.setContent(
