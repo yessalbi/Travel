@@ -11128,40 +11128,76 @@ document.addEventListener('keydown', (e) => {
   </nav>
 </div>
 
-<!-- 모바일 UI JavaScript -->
+
+<!-- ═══════════════════════════════════════════════════════
+     모바일 UI JavaScript — 완전 독립 구현
+═══════════════════════════════════════════════════════ -->
 <script>
-// ── 모바일 전용 상태 ──────────────────────────────────────────
-let mobCurrentTrip = null;       // 현재 선택된 여행 ID
-let mobCurrentTripData = null;   // 현재 여행 Firebase 데이터 (캐시)
-let mobCurrentDay = 1;
-let mobCurrentSchedTab = 'overview';
-let mobMap = null;
+'use strict';
+
+// ── 상태 ──────────────────────────────────────────────────────
+let mobCurrentTrip    = null;   // 현재 선택된 여행 ID
+let mobCurrentTripData= null;   // Firebase 캐시
+let mobCurrentDay     = 1;
+let mobCurrentSchedTab= 'overview';
+let mobMap            = null;
 let mobMapInitialized = false;
-let mobCurrentFilter = 'all';
-let mobPlacesUnsubscribe = null; // Firebase 실시간 리스너 해제용
-let mobIsDarkMode = false;
+let mobCurrentFilter  = 'all';
+let mobIsDarkMode     = false;
+let mobCurrentCat     = 'all';
+
+// ── 유틸 ──────────────────────────────────────────────────────
+function mobShowToast(msg) {
+  if (typeof showToast === 'function') { showToast(msg); return; }
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:99999;pointer-events:none;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// 액션 시트 열기 — 고유 ID로 관리
+function mobOpenSheet(id, html) {
+  document.getElementById(id)?.remove();
+  const sheet = document.createElement('div');
+  sheet.id = id;
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:19999;display:flex;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,0.45);';
+  sheet.innerHTML = `<div class="mob-sheet-body">${html}</div>`;
+  sheet.addEventListener('click', e => { if (e.target === sheet) mobCloseSheet(id); });
+  document.getElementById('mob-app').appendChild(sheet);
+}
+function mobCloseSheet(id) { document.getElementById(id)?.remove(); }
 
 // ── 탭 전환 ──────────────────────────────────────────────────
 function mobTab(tab) {
   document.querySelectorAll('.mob-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.mob-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('mob-' + tab).classList.add('active');
-  document.getElementById('mob-tab-' + tab).classList.add('active');
+  const page = document.getElementById('mob-' + tab);
+  const btn  = document.getElementById('mob-tab-' + tab);
+  if (page) page.classList.add('active');
+  if (btn)  btn.classList.add('active');
 
-  if (tab === 'map') mobInitMap();
-  if (tab === 'home') mobRenderTripList();
+  if (tab === 'map')      mobInitFullMap();
+  if (tab === 'home')     mobRenderTripList();
   if (tab === 'schedule') mobRenderSchedule();
-  if (tab === 'saved') mobRenderSaved();
-  if (tab === 'profile') mobRenderProfile();
+  if (tab === 'saved')    mobRenderSaved();
+  if (tab === 'profile')  mobRenderProfile();
 }
 
-// ── 홈 ───────────────────────────────────────────────────────
+// ── 홈: 여행 목록 ─────────────────────────────────────────────
 function mobRenderTripList() {
   const container = document.getElementById('mob-trip-list');
   if (!container) return;
-
-  // Firebase trip list 사용
   const trips = window._mobTripList || [];
+
+  // 인사말 갱신
+  const greetEl = document.getElementById('mob-greeting');
+  if (greetEl) {
+    const h = new Date().getHours();
+    const greet = h < 12 ? '좋은 아침이에요!' : h < 18 ? '안녕하세요!' : '좋은 저녁이에요!';
+    greetEl.innerHTML = `${greet} ✈️<br><small style="font-size:14px;font-weight:400;color:#999;">다음 여행을 계획해볼까요?</small>`;
+  }
+
   if (!trips.length) {
     container.innerHTML = `<div class="mob-empty-state" style="padding:30px 0;">
       <div style="font-size:40px;">✈️</div>
@@ -11172,26 +11208,40 @@ function mobRenderTripList() {
     return;
   }
 
-  const filtered = mobCurrentFilter === 'all' ? trips :
-    trips.filter(t => mobGetTripStatus(t) === mobCurrentFilter);
+  const filtered = mobCurrentFilter === 'all' ? trips
+    : trips.filter(t => mobGetTripStatus(t) === mobCurrentFilter);
+
+  if (!filtered.length) {
+    container.innerHTML = `<div class="mob-empty-state" style="padding:24px 0;">
+      <div style="font-size:32px;">🔍</div>
+      <div style="font-weight:700;margin:8px 0 4px;">해당 여행이 없어요</div>
+    </div>`;
+    return;
+  }
 
   container.innerHTML = filtered.map(trip => {
     const status = mobGetTripStatus(trip);
-    const statusLabel = {ongoing:'여행 중', upcoming:'예정', done:'완료', saved:'보관함'}[status] || '';
+    const statusMap = { ongoing:'여행 중', upcoming:'예정', done:'완료', saved:'보관함' };
+    const statusColor = { ongoing:'#3AAF7A', upcoming:'#3A8FE0', done:'#aaa', saved:'#888' };
+    const label = statusMap[status] || '';
+    const color = statusColor[status] || '#999';
+    const nights = trip.startDate && trip.endDate
+      ? Math.round((new Date(trip.endDate)-new Date(trip.startDate))/86400000)
+      : null;
     return `<div class="mob-trip-card" onclick="mobSelectTrip('${trip.id}')">
       <div class="mob-trip-icon">${mobTripIcon(trip)}</div>
       <div class="mob-trip-info">
         <div class="mob-trip-name">${trip.title || '(제목 없음)'}</div>
         <div class="mob-trip-date">${mobTripDateStr(trip)}</div>
-        <div class="mob-trip-detail">${trip.nights || ''}${trip.nights ? '박 '+(parseInt(trip.nights)+1)+'일' : ''}</div>
+        ${nights !== null ? `<div class="mob-trip-detail" style="font-size:11px;color:#aaa;">${nights}박${nights+1}일</div>` : ''}
       </div>
-      ${statusLabel ? `<span class="mob-trip-badge ${status}">${statusLabel}</span>` : ''}
+      ${label ? `<span class="mob-trip-badge ${status}" style="background:${color}20;color:${color};">${label}</span>` : ''}
     </div>`;
   }).join('');
 }
 
 function mobGetTripStatus(trip) {
-  if (trip.archived) return 'saved';
+  if (trip.isArchived) return 'saved';
   const today = new Date().toISOString().slice(0,10);
   if (!trip.startDate || !trip.endDate) return 'upcoming';
   if (trip.startDate <= today && trip.endDate >= today) return 'ongoing';
@@ -11201,15 +11251,17 @@ function mobGetTripStatus(trip) {
 
 function mobTripIcon(trip) {
   const t = (trip.title || '').toLowerCase();
-  if (t.includes('일본') || t.includes('japan')) return '🗾';
+  if (t.includes('일본')||t.includes('japan')||t.includes('도쿄')||t.includes('오사카')) return '🗾';
   if (t.includes('제주')) return '🌺';
-  if (t.includes('유럽') || t.includes('europe')) return '🏰';
-  if (t.includes('단양') || t.includes('국내')) return '⛰️';
+  if (t.includes('유럽')||t.includes('europe')) return '🏰';
+  if (t.includes('동남아')||t.includes('태국')||t.includes('베트남')) return '🌴';
+  if (t.includes('미국')||t.includes('usa')) return '🗽';
+  if (t.includes('국내')||t.includes('서울')||t.includes('부산')) return '🇰🇷';
   return '✈️';
 }
 
 function mobTripDateStr(trip) {
-  if (!trip.startDate) return '';
+  if (!trip.startDate) return '날짜 미설정';
   const s = trip.startDate.replace(/-/g,'.').slice(2);
   const e = trip.endDate ? trip.endDate.replace(/-/g,'.').slice(2) : '';
   return e ? `${s} ~ ${e}` : s;
@@ -11222,136 +11274,241 @@ function mobFilterTrips(el, filter) {
   mobRenderTripList();
 }
 
+// ── 새 여행 만들기 ────────────────────────────────────────────
 function mobNewTrip() {
-  // 새 여행 ID 생성 후 Firebase에 기본 데이터 저장, 바로 이동
+  if (!isAuthenticated && !window.fbSaveTrip) {
+    mobShowToast('로그인 후 이용해주세요');
+    return;
+  }
+  // 모바일 전용 여행 생성 팝업
+  mobOpenSheet('mob-newtrip-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 20px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:16px;">✈️ 새 여행 만들기</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">여행 제목</div>
+        <input id="mob-new-title" type="text" placeholder="예: 오사카 3박4일" maxlength="30"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">출발일</div>
+          <input id="mob-new-start" type="date"
+            style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;"
+            onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+        </div>
+        <div>
+          <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">귀국일</div>
+          <input id="mob-new-end" type="date"
+            style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;"
+            onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">이름 (선택)</div>
+        <input id="mob-new-author" type="text" placeholder="예: 홍길동"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      </div>
+    </div>
+    <button class="mob-primary-btn" style="margin-top:16px;" onclick="mobCreateTripConfirm()">🚀 여행 만들기</button>
+    <button onclick="mobCloseSheet('mob-newtrip-sheet')"
+      style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">
+      취소
+    </button>
+  `);
+  setTimeout(() => document.getElementById('mob-new-title')?.focus(), 200);
+}
+
+async function mobCreateTripConfirm() {
+  const title  = document.getElementById('mob-new-title')?.value.trim();
+  const start  = document.getElementById('mob-new-start')?.value;
+  const end    = document.getElementById('mob-new-end')?.value;
+  const author = document.getElementById('mob-new-author')?.value.trim();
+
+  if (!title) { mobShowToast('여행 제목을 입력해주세요'); return; }
+  if (start && end && new Date(end) < new Date(start)) {
+    mobShowToast('귀국일이 출발일보다 빠릅니다');
+    return;
+  }
+
   const newId = Math.random().toString(36).slice(2,9).toUpperCase();
   const payload = {
-    title: '',
-    startDate: '',
-    endDate: '',
-    author: '',
+    title, author: author || '',
+    startDate: start || '', endDate: end || '',
+    schedule: {}, expenseData: { food:[], cafe:[], sight:[], move:[], shop:[], hotel:[] },
+    checklist: {}, vouchers: {},
     updatedAt: new Date().toISOString(),
   };
-  if (window.fbSaveTrip) {
-    window.fbSaveTrip(newId, payload).then(() => {
-      // 여행 목록에 추가
-      if (typeof addTripToList === 'function') addTripToList(newId);
-      // 새 여행 선택
-      mobSelectTrip(newId);
-    }).catch(() => showToast('새 여행 생성에 실패했어요'));
-  } else {
-    showToast('Firebase 연결 중...');
+
+  try {
+    await window.fbSaveTrip(newId, payload);
+    if (typeof addTripToList === 'function') addTripToList(newId);
+    mobCloseSheet('mob-newtrip-sheet');
+    mobShowToast('새 여행이 만들어졌어요 ✓');
+    // 목록 갱신 후 바로 선택
+    await mobLoadTripList();
+    await mobSelectTrip(newId);
+  } catch(e) {
+    console.error('새 여행 생성 실패:', e);
+    mobShowToast('생성에 실패했어요. 네트워크를 확인해주세요');
   }
 }
 
-// ── 여행 선택 — Firebase에서 실제 데이터 로드 ─────────────────
+// ── 여행 선택 — Firebase 실제 로드 ───────────────────────────
 async function mobSelectTrip(tripId) {
-  mobCurrentTrip = tripId;
-  window.TRIP_ID = tripId;
-  mobCurrentTripData = null;
+  mobCurrentTrip    = tripId;
+  mobCurrentTripData= null;
+  window.TRIP_ID    = tripId;
 
-  // 탭 전환 먼저 (빠른 UX)
-  mobTab('schedule');
+  // URL 반영
+  const url = new URL(location.href);
+  url.searchParams.set('trip', tripId);
+  history.replaceState({}, '', url);
 
-  // Firebase에서 여행 메타 + 일정 데이터 로드
+  // 일정 탭으로 먼저 전환 (즉각 반응)
+  document.querySelectorAll('.mob-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.mob-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('mob-schedule')?.classList.add('active');
+  document.getElementById('mob-tab-schedule')?.classList.add('active');
+
+  // 로딩 표시
+  const detail = document.getElementById('mob-sched-detail');
+  const empty  = document.getElementById('mob-sched-empty');
+  if (detail) detail.style.display = 'flex';
+  if (empty)  empty.style.display  = 'none';
+  const summaryEl = document.getElementById('mob-trip-summary');
+  if (summaryEl) summaryEl.innerHTML = `<div style="padding:12px 16px;color:#999;font-size:13px;">불러오는 중…</div>`;
+
   try {
     const data = await window.fbGetTrip(tripId);
     if (data) {
       mobCurrentTripData = data;
 
-      // PC hidden 필드에도 반영 (autoSave 호환)
-      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
-      setVal('trip-title', data.title);
-      setVal('trip-start', data.startDate);
-      setVal('trip-end', data.endDate);
-      setVal('trip-author', data.author);
-      setVal('trip-note', data.note);
+      // 전역 데이터 동기화 (PC 함수들이 참조하는 전역 변수)
+      if (data.schedule)          window.scheduleData    = data.schedule;
+      if (data.expenseData)       window.expenseData     = data.expenseData;
+      if (data.checklist)         window.checklistData   = data.checklist;
+      if (data.vouchers)          window.voucherData     = data.vouchers;
+      if (data.customCheckItems)  window.customCheckItems  = data.customCheckItems  || [];
+      if (data.customVoucherItems)window.customVoucherItems= data.customVoucherItems|| [];
+      if (data.deletedCheckIds)   window.deletedCheckIds   = new Set(data.deletedCheckIds);
+      if (data.deletedVoucherIds) window.deletedVoucherIds = new Set(data.deletedVoucherIds);
+      if (data.transitModes)      window.transitModes    = data.transitModes;
+      if (data.placesSnapshot)    window.placesData      = data.placesSnapshot;
+      if (data.budgetTotal !== undefined) {
+        const bi = document.getElementById('budget-total-input');
+        if (bi) bi.value = data.budgetTotal;
+      }
+      if (data.budgetCurrency) {
+        const bs = document.getElementById('budget-currency-select');
+        if (bs) bs.value = data.budgetCurrency;
+        window.currentBudgetCurrency = data.budgetCurrency;
+      }
+      // totalDays 동기화
+      if (data.startDate && data.endDate) {
+        window.totalDays = Math.round((new Date(data.endDate)-new Date(data.startDate))/86400000) + 1;
+        window.currentDay = 1;
+      }
 
-      // scheduleData 전역에 동기화
-      if (data.schedule) window.scheduleData = data.schedule;
-      if (data.expenseData) window.expenseData = data.expenseData;
-      if (data.checklist) window.checklistData = data.checklist;
-      if (data.vouchers) window.voucherData = data.vouchers;
-      if (data.customCheckItems) window.customCheckItems = data.customCheckItems;
-      if (data.placesSnapshot) window.placesData = data.placesSnapshot;
+      // PC hidden 필드 동기화 (autoSave/saveAll 호환)
+      const sv = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v || ''; };
+      sv('trip-title',  data.title);
+      sv('trip-start',  data.startDate);
+      sv('trip-end',    data.endDate);
+      sv('trip-author', data.author);
+      sv('trip-note',   data.note);
 
-      // URL에도 반영
-      const url = new URL(location.href);
-      url.searchParams.set('trip', tripId);
-      history.replaceState({}, '', url);
+      // 오프라인 스냅샷 저장
+      if (window.offlineSave) window.offlineSave(tripId, data).catch(()=>{});
+    } else {
+      // 오프라인 폴백
+      const snap = await (window.offlineLoad ? window.offlineLoad(tripId) : Promise.resolve(null));
+      if (snap?.data) {
+        mobCurrentTripData = snap.data;
+        if (snap.data.schedule)    window.scheduleData  = snap.data.schedule;
+        if (snap.data.expenseData) window.expenseData   = snap.data.expenseData;
+        if (snap.data.checklist)   window.checklistData = snap.data.checklist;
+        if (snap.data.vouchers)    window.voucherData   = snap.data.vouchers;
+      }
     }
   } catch(e) {
-    console.warn('mobSelectTrip load error:', e);
+    console.warn('mobSelectTrip 로드 오류:', e);
+    // 오프라인 폴백
+    try {
+      const snap = await window.offlineLoad?.(tripId);
+      if (snap?.data) { mobCurrentTripData = snap.data; Object.assign(window, { scheduleData: snap.data.schedule||{} }); }
+    } catch(_) {}
   }
 
-  // UI 다시 그리기
+  // UI 렌더
   mobRenderSchedule();
 }
 
 // ── 일정 탭 ──────────────────────────────────────────────────
 function mobGoHome() {
-  mobCurrentTrip = null;
+  mobCurrentTrip  = null;
+  mobCurrentTripData = null;
+  mobCurrentSchedTab = 'overview';
   document.getElementById('mob-sched-detail').style.display = 'none';
-  document.getElementById('mob-sched-empty').style.display = 'flex';
-  document.getElementById('mob-sched-back').style.display = 'none';
+  document.getElementById('mob-sched-empty').style.display  = 'flex';
+  document.getElementById('mob-sched-back').style.display   = 'none';
   mobTab('home');
 }
 
 function mobRenderSchedule() {
   if (!mobCurrentTrip) {
     document.getElementById('mob-sched-detail').style.display = 'none';
-    document.getElementById('mob-sched-empty').style.display = 'flex';
-    document.getElementById('mob-sched-back').style.display = 'none';
+    document.getElementById('mob-sched-empty').style.display  = 'flex';
+    document.getElementById('mob-sched-back').style.display   = 'none';
     return;
   }
-
   document.getElementById('mob-sched-detail').style.display = 'flex';
-  document.getElementById('mob-sched-empty').style.display = 'none';
-  document.getElementById('mob-sched-back').style.display = 'block';
+  document.getElementById('mob-sched-empty').style.display  = 'none';
+  document.getElementById('mob-sched-back').style.display   = 'block';
 
-  // 데이터: Firebase 캐시 우선, 없으면 hidden 필드
-  const d = mobCurrentTripData || {};
-  const title = d.title || document.getElementById('trip-title')?.value || '여행';
-  const start = d.startDate || document.getElementById('trip-start')?.value || '';
-  const end   = d.endDate   || document.getElementById('trip-end')?.value   || '';
+  const d      = mobCurrentTripData || {};
+  const title  = d.title  || document.getElementById('trip-title')?.value || '여행';
+  const start  = d.startDate || document.getElementById('trip-start')?.value || '';
+  const end    = d.endDate   || document.getElementById('trip-end')?.value   || '';
+  const nights = start && end ? Math.round((new Date(end)-new Date(start))/86400000) : null;
+  const dateStr= start && end ? start.replace(/-/g,'.')+' ~ '+end.replace(/-/g,'.') : '날짜 미설정';
 
-  // 날짜 표시
-  const dateStr = start && end
-    ? start.replace(/-/g,'.') + ' ~ ' + end.replace(/-/g,'.')
-    : '날짜 미설정';
-  const status = mobGetCurrentStatus(start, end);
-  const statusColor = {
-    '여행 중 ✈️': '#3AAF7A',
-    '완료': '#888',
-    '예정': '#3A8FE0',
-  }[status] || '#E07A3A';
+  const status = mobTripStatus(start, end);
+  const sColor = { '여행 중 ✈️':'#3AAF7A', '완료':'#aaa', '예정':'#3A8FE0' }[status] || '#E07A3A';
 
-  const summary = document.getElementById('mob-trip-summary');
-  if (summary) {
-    summary.innerHTML = `
-      <div class="mob-trip-summary-name">${title}</div>
-      <div class="mob-trip-summary-date">${dateStr}</div>
-      <div class="mob-trip-summary-tags">
-        <span class="mob-summary-tag status" style="background:${statusColor}20;color:${statusColor};">${status}</span>
-        <button onclick="mobSchedMore()" style="margin-left:auto;border:none;background:none;font-size:18px;cursor:pointer;padding:0 4px;">⋯</button>
-      </div>`;
-  }
+  const summaryEl = document.getElementById('mob-trip-summary');
+  if (summaryEl) summaryEl.innerHTML = `
+    <div class="mob-trip-summary-name">${title}</div>
+    <div class="mob-trip-summary-date">${dateStr}${nights!==null?` · ${nights}박${nights+1}일`:''}</div>
+    <div class="mob-trip-summary-tags">
+      <span class="mob-summary-tag status" style="background:${sColor}18;color:${sColor};border:1px solid ${sColor}40;">${status}</span>
+    </div>`;
 
   document.getElementById('mob-sched-title').textContent = title;
 
-  // 현재 탭 다시 렌더
-  const activeTab = mobCurrentSchedTab || 'overview';
-  const activeBtn = document.querySelector(`.mob-stab[onclick*="${activeTab}"]`);
-  mobSchedTab(activeBtn, activeTab);
+  // 현재 탭 렌더
+  const tab = mobCurrentSchedTab || 'overview';
+  const activeBtn = document.querySelector(`.mob-stab[onclick*="'${tab}'"]`);
+  document.querySelectorAll('.mob-stab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mob-stab-page').forEach(p => p.classList.remove('active'));
+  if (activeBtn) activeBtn.classList.add('active');
+  else document.querySelector('.mob-stab')?.classList.add('active');
+  document.getElementById('mob-stab-' + tab)?.classList.add('active');
+
+  if (tab === 'overview') mobRenderOverview();
+  if (tab === 'timeline') mobRenderTimeline();
+  if (tab === 'booking')  mobRenderBooking();
+  if (tab === 'budget')   mobRenderBudget();
+  if (tab === 'map')      mobInitSchedMap();
 }
 
-function mobGetCurrentStatus(start, end) {
-  if (!start) start = document.getElementById('trip-start')?.value || '';
-  if (!end) end = document.getElementById('trip-end')?.value || '';
+function mobTripStatus(start, end) {
   const today = new Date().toISOString().slice(0,10);
   if (!start) return '예정';
-  if (start <= today && end >= today) return '여행 중 ✈️';
-  if (end < today) return '완료';
+  if (start <= today && (!end || end >= today)) return '여행 중 ✈️';
+  if (end && end < today) return '완료';
   return '예정';
 }
 
@@ -11360,121 +11517,239 @@ function mobSchedTab(el, tab) {
   document.querySelectorAll('.mob-stab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.mob-stab-page').forEach(p => p.classList.remove('active'));
   if (el) el.classList.add('active');
-  else {
-    const btn = document.querySelector(`.mob-stab[onclick*="${tab}"]`);
-    if (btn) btn.classList.add('active');
-  }
-  const page = document.getElementById('mob-stab-' + tab);
-  if (page) page.classList.add('active');
+  document.getElementById('mob-stab-' + tab)?.classList.add('active');
 
   if (tab === 'overview') mobRenderOverview();
   if (tab === 'timeline') mobRenderTimeline();
-  if (tab === 'booking') mobRenderBooking();
-  if (tab === 'budget') mobRenderBudget();
-  if (tab === 'map') mobInitSchedMap();
+  if (tab === 'booking')  mobRenderBooking();
+  if (tab === 'budget')   mobRenderBudget();
+  if (tab === 'map')      mobInitSchedMap();
 }
 
+// ── 더보기 메뉴 ──────────────────────────────────────────────
+function mobSchedMore() {
+  const tripId = mobCurrentTrip;
+  if (!tripId) return;
+  mobOpenSheet('mob-more-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:14px;">여행 관리</div>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobShareTrip('${tripId}')">🔗 여행 링크 공유하기</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobSaveTripOffline('${tripId}')">📥 오프라인 저장하기</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobArchiveTripMob('${tripId}')" style="color:#888;">🗂 보관함으로 이동</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet')" style="color:#555;border-top:1px solid #f0ede8;margin-top:4px;">취소</button>
+  `);
+}
+
+function mobShareTrip(tripId) {
+  const url = location.origin + location.pathname + '?trip=' + tripId;
+  if (navigator.share) navigator.share({ title: '여행 계획', url }).catch(()=>{});
+  else if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => mobShowToast('링크가 복사됐어요 ✓'));
+  else mobShowToast('링크: ' + url);
+}
+
+function mobSaveTripOffline(tripId) {
+  if (!mobCurrentTripData) { mobShowToast('저장할 데이터가 없어요'); return; }
+  window.offlineSave?.(tripId, mobCurrentTripData)
+    .then(()  => mobShowToast('오프라인 저장 완료 ✓'))
+    .catch(()  => mobShowToast('저장 실패'));
+}
+
+async function mobArchiveTripMob(tripId) {
+  if (!confirm('이 여행을 보관함으로 이동할까요?')) return;
+  await (typeof archiveTrip === 'function' ? archiveTrip(tripId) : window.fbSetArchived?.(tripId, true));
+  mobShowToast('보관함으로 이동했어요');
+  mobCurrentTrip = null;
+  mobCurrentTripData = null;
+  await mobLoadTripList();
+  mobTab('home');
+}
+
+// ── 개요 탭 ──────────────────────────────────────────────────
 function mobRenderOverview() {
   const el = document.getElementById('mob-overview-content');
   if (!el) return;
-
-  // mobCurrentTripData 우선 사용, 없으면 hidden field 폴백
   const d = mobCurrentTripData || {};
-  const title  = d.title  || document.getElementById('trip-title')?.value  || '';
-  const start  = d.startDate || document.getElementById('trip-start')?.value || '';
-  const end    = d.endDate   || document.getElementById('trip-end')?.value   || '';
-  const author = d.author || document.getElementById('trip-author')?.value || '';
-  const note   = d.note   || document.getElementById('trip-note')?.value   || '';
+  const title  = d.title  || '';
+  const start  = d.startDate || '';
+  const end    = d.endDate   || '';
+  const author = d.author || '';
+  const note   = d.note   || '';
+  const nights = start && end ? Math.round((new Date(end)-new Date(start))/86400000) : null;
 
-  // 일정 요약: 총 장소 수, 카테고리별 카운트
-  const sched = window.scheduleData || {};
+  // 일정 요약
+  const sched    = window.scheduleData || {};
   const allItems = Object.values(sched).flat();
-  const typeCnt = {};
-  allItems.forEach(it => { typeCnt[it.type] = (typeCnt[it.type] || 0) + 1; });
-  const typeLabels = {food:'🍜 식사', cafe:'☕ 카페', sight:'🏛️ 관광', hotel:'🏨 숙소', shop:'🛍️ 쇼핑', move:'🚆 이동'};
-  const typeRows = Object.entries(typeCnt).map(([k,v]) => `<span class="mob-tl-card-badge">${typeLabels[k]||k} ${v}</span>`).join('');
+  const typeCnt  = {};
+  allItems.forEach(it => { typeCnt[it.type] = (typeCnt[it.type]||0)+1; });
+  const typeEmoji = {food:'🍜',cafe:'☕',sight:'🏛️',hotel:'🏨',shop:'🛍️',move:'🚆'};
+  const typeRows  = Object.entries(typeCnt).map(([k,v]) =>
+    `<span class="mob-tl-card-badge">${typeEmoji[k]||'📌'} ${v}곳</span>`).join('');
 
-  // 예산 요약
-  const budget = d.budgetTotal || 0;
+  // 예산
+  const budget   = d.budgetTotal || 0;
   const currency = d.budgetCurrency || 'JPY';
   const expenses = window.expenseData || {};
-  const totalSpentKrw = Object.values(expenses).flat().reduce((s, e) => s + (e.amountKrw || 0), 0);
+  const totalSpent = Object.values(expenses).flat().reduce((s,e)=>s+(e.amountKrw||0),0);
 
-  // 날씨 뱃지 (목적지 기반)
-  const nights = start && end
-    ? Math.round((new Date(end) - new Date(start)) / 86400000)
-    : null;
-
-  el.innerHTML = `
-    <div style="padding:12px 16px 80px;">
-      <div class="mob-overview-section">
-        <div class="mob-overview-label">✈️ 여행지 / 제목</div>
-        <div class="mob-overview-value">${title || '(미입력)'}</div>
-      </div>
-      <div class="mob-overview-section">
-        <div class="mob-overview-label">📅 여행 기간</div>
-        <div class="mob-overview-value">${start && end
-          ? start.replace(/-/g,'.') + ' ~ ' + end.replace(/-/g,'.')
-            + (nights ? ` <span style="font-size:12px;color:#999;">${nights}박${nights+1}일</span>` : '')
-          : '(미입력)'}</div>
-      </div>
-      ${author ? `<div class="mob-overview-section"><div class="mob-overview-label">👤 작성자</div><div class="mob-overview-value">${author}</div></div>` : ''}
-      ${allItems.length ? `<div class="mob-overview-section"><div class="mob-overview-label">📌 일정 요약</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">${typeRows}</div></div>` : ''}
-      ${budget ? `<div class="mob-overview-section">
-        <div class="mob-overview-label">💰 예산 / 지출</div>
-        <div class="mob-overview-value">${currency === 'KRW' ? '₩' : '¥'}${Number(budget).toLocaleString()} <span style="font-size:13px;color:#E07A3A;">/ 사용 ₩${totalSpentKrw.toLocaleString()}</span></div>
-      </div>` : ''}
-      ${note ? `<div class="mob-overview-section"><div class="mob-overview-label">📝 메모</div><div style="font-size:13px;color:#555;white-space:pre-wrap;margin-top:4px;">${note}</div></div>` : ''}
-      <button class="mob-primary-btn" style="margin-top:8px;" onclick="mobOpenTripSetup()">✏️ 여행 정보 편집</button>
+  el.innerHTML = `<div style="padding:12px 0 80px;">
+    ${title ? `<div class="mob-overview-section">
+      <div class="mob-overview-label">✈️ 여행지 / 제목</div>
+      <div class="mob-overview-value">${title}</div>
+    </div>` : ''}
+    <div class="mob-overview-section">
+      <div class="mob-overview-label">📅 여행 기간</div>
+      <div class="mob-overview-value">${start && end
+        ? start.replace(/-/g,'.')+' ~ '+end.replace(/-/g,'.')
+          +(nights!==null ? `<span style="font-size:12px;color:#999;font-weight:400;"> · ${nights}박${nights+1}일</span>` : '')
+        : '(미설정)'}</div>
     </div>
-  `;
+    ${author ? `<div class="mob-overview-section"><div class="mob-overview-label">👤 작성자</div><div class="mob-overview-value">${author}</div></div>` : ''}
+    ${allItems.length ? `<div class="mob-overview-section">
+      <div class="mob-overview-label">📌 일정 요약 (${allItems.length}개)</div>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;">${typeRows}</div>
+    </div>` : ''}
+    ${budget ? `<div class="mob-overview-section">
+      <div class="mob-overview-label">💰 예산 / 지출</div>
+      <div class="mob-overview-value">${currency==='KRW'?'₩':'¥'}${Number(budget).toLocaleString()}
+        <span style="font-size:13px;color:#E07A3A;"> / 사용 ₩${totalSpent.toLocaleString()}</span></div>
+    </div>` : ''}
+    ${note ? `<div class="mob-overview-section">
+      <div class="mob-overview-label">📝 메모</div>
+      <div style="font-size:13px;color:#555;white-space:pre-wrap;margin-top:4px;line-height:1.6;">${note}</div>
+    </div>` : ''}
+    <button class="mob-primary-btn" style="margin-top:8px;" onclick="mobOpenTripSetup()">✏️ 여행 정보 편집</button>
+  </div>`;
 }
 
+// ── 여행 정보 편집 (모바일 전용 팝업) ─────────────────────────
 function mobOpenTripSetup() {
-  // 모바일에서 여행 설정 팝업 열기 (PC openTripSetup 활용)
-  if (typeof openTripSetup === 'function') {
-    // PC UI 팝업을 모바일 위에 표시
-    document.getElementById('mob-app').style.zIndex = '1';
-    openTripSetup();
-    // 팝업 닫힘 감지 후 데이터 다시 로드
-    const observer = new MutationObserver(() => {
-      const overlay = document.getElementById('trip-setup-overlay');
-      if (overlay && overlay.style.display === 'none') {
-        observer.disconnect();
-        document.getElementById('mob-app').style.zIndex = '';
-        // 저장 후 다시 로드
-        if (mobCurrentTrip) mobSelectTrip(mobCurrentTrip);
-      }
-    });
-    const overlay = document.getElementById('trip-setup-overlay');
-    if (overlay) observer.observe(overlay, { attributes: true, attributeFilter: ['style'] });
+  const d = mobCurrentTripData || {};
+  mobOpenSheet('mob-setup-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:16px;">✏️ 여행 정보 편집</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">여행 제목</div>
+        <input id="mob-edit-title" type="text" value="${d.title||''}" maxlength="30" placeholder="예: 오사카 3박4일"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">출발일</div>
+          <input id="mob-edit-start" type="date" value="${d.startDate||''}"
+            style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;"
+            onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+        </div>
+        <div>
+          <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">귀국일</div>
+          <input id="mob-edit-end" type="date" value="${d.endDate||''}"
+            style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;"
+            onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">이름</div>
+        <input id="mob-edit-author" type="text" value="${d.author||''}" placeholder="예: 홍길동"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">메모</div>
+        <textarea id="mob-edit-note" placeholder="여행 메모를 입력하세요" rows="3"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'">${d.note||''}</textarea>
+      </div>
+    </div>
+    <button class="mob-primary-btn" style="margin-top:16px;" onclick="mobSaveTripSetup()">💾 저장하기</button>
+    <button onclick="mobCloseSheet('mob-setup-sheet')"
+      style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>
+  `);
+}
+
+async function mobSaveTripSetup() {
+  const title  = document.getElementById('mob-edit-title')?.value.trim();
+  const start  = document.getElementById('mob-edit-start')?.value;
+  const end    = document.getElementById('mob-edit-end')?.value;
+  const author = document.getElementById('mob-edit-author')?.value.trim();
+  const note   = document.getElementById('mob-edit-note')?.value.trim();
+
+  if (!title) { mobShowToast('여행 제목을 입력해주세요'); return; }
+  if (start && end && new Date(end) < new Date(start)) {
+    mobShowToast('귀국일이 출발일보다 빠릅니다');
+    return;
+  }
+
+  const updates = { title, author: author||'', note: note||'', startDate: start||'', endDate: end||'', updatedAt: new Date().toISOString() };
+
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, updates);
+    // 캐시 갱신
+    mobCurrentTripData = { ...(mobCurrentTripData||{}), ...updates };
+    // PC hidden 필드 동기화
+    const sv = (id,v) => { const el=document.getElementById(id); if(el) el.value=v||''; };
+    sv('trip-title', title); sv('trip-start', start); sv('trip-end', end); sv('trip-author', author); sv('trip-note', note);
+    // totalDays 갱신
+    if (start && end) window.totalDays = Math.round((new Date(end)-new Date(start))/86400000)+1;
+
+    mobCloseSheet('mob-setup-sheet');
+    mobShowToast('저장됐어요 ✓');
+    mobRenderSchedule();
+    // 여행 목록 캐시 갱신
+    if (window._mobTripList) {
+      const idx = window._mobTripList.findIndex(t=>t.id===mobCurrentTrip);
+      if (idx>=0) window._mobTripList[idx] = { ...window._mobTripList[idx], ...updates };
+    }
+  } catch(e) {
+    console.error('여행 정보 저장 실패:', e);
+    mobShowToast('저장 실패 — 네트워크를 확인해주세요');
   }
 }
 
-// 타임라인
+// ── 타임라인 탭 ──────────────────────────────────────────────
 function mobRenderTimeline() {
-  const schedData = window.scheduleData || {};
-  const days = Object.keys(schedData).map(Number).sort((a,b)=>a-b);
+  const sched = window.scheduleData || {};
+  const days  = Object.keys(sched).map(Number).filter(d => !isNaN(d)).sort((a,b)=>a-b);
+  const start = (mobCurrentTripData||{}).startDate || document.getElementById('trip-start')?.value || '';
+
+  // 데이터 없으면 startDate 기반으로 Day1~N 생성
+  if (!days.length && start && (mobCurrentTripData||{}).endDate) {
+    const end = (mobCurrentTripData||{}).endDate;
+    const n   = Math.round((new Date(end)-new Date(start))/86400000)+1;
+    for (let i=1;i<=n;i++) days.push(i);
+  }
 
   // 날짜 칩
   const chipsEl = document.getElementById('mob-day-chips');
   if (chipsEl) {
-    chipsEl.innerHTML = days.map((day, i) => {
-      const label = mobDayLabel(day);
-      return `<button class="mob-day-chip${i===0?' active':''}" onclick="mobSelectDay(${day}, this)">${label}</button>`;
-    }).join('');
+    if (!days.length) {
+      chipsEl.innerHTML = '';
+    } else {
+      chipsEl.innerHTML = days.map((day,i) => {
+        const lbl = mobDayLabel(day, start);
+        return `<button class="mob-day-chip${i===0?' active':''}" onclick="mobSelectDay(${day},this)">${lbl}</button>`;
+      }).join('');
+    }
   }
 
   if (days.length) mobRenderDayTimeline(days[0]);
+  else {
+    const list = document.getElementById('mob-timeline-list');
+    if (list) list.innerHTML = `<div class="mob-empty-state" style="padding:40px 0;">
+      <div style="font-size:36px;">📅</div>
+      <div style="font-weight:700;margin:8px 0 4px;">일정이 없어요</div>
+      <div style="font-size:13px;color:#999;">아래 버튼으로 추가해보세요</div>
+    </div>`;
+  }
 }
 
-function mobDayLabel(day) {
-  const start = document.getElementById('trip-start')?.value;
-  if (start) {
-    const d = new Date(start);
+function mobDayLabel(day, startDate) {
+  const s = startDate || (mobCurrentTripData||{}).startDate || document.getElementById('trip-start')?.value;
+  if (s) {
+    const d = new Date(s);
     d.setDate(d.getDate() + day - 1);
-    const m = d.getMonth() + 1;
-    const dt = d.getDate();
+    const m   = d.getMonth()+1;
+    const dt  = d.getDate();
     const dow = ['일','월','화','수','목','금','토'][d.getDay()];
     return `${m}/${dt}(${dow})`;
   }
@@ -11483,446 +11758,773 @@ function mobDayLabel(day) {
 
 function mobSelectDay(day, el) {
   mobCurrentDay = day;
+  window.currentDay = day; // PC 전역 동기화
   document.querySelectorAll('.mob-day-chip').forEach(c => c.classList.remove('active'));
-  if (el) el.classList.add('active');
+  el?.classList.add('active');
   mobRenderDayTimeline(day);
 }
 
 function mobRenderDayTimeline(day) {
   const list = document.getElementById('mob-timeline-list');
   if (!list) return;
-  const items = (window.scheduleData || {})[day] || [];
-  const typeIcon = {food:'🍜', cafe:'☕', sight:'🏛️', hotel:'🏨', shop:'🛍️', move:'🚆'};
-  const typeLabel = {food:'식사', cafe:'카페', sight:'관광', hotel:'숙소', shop:'쇼핑', move:'이동'};
-  const typeColor = {food:'#E8430A', cafe:'#AD6B2F', sight:'#1565C0', hotel:'#2E7D32', shop:'#7B1FA2', move:'#888'};
+  const items = (window.scheduleData||{})[day] || [];
+  const typeIcon  = {food:'🍜',cafe:'☕',sight:'🏛️',hotel:'🏨',shop:'🛍️',move:'🚆'};
+  const typeLabel = {food:'식사',cafe:'카페',sight:'관광',hotel:'숙소',shop:'쇼핑',move:'이동'};
+  const typeColor = {food:'#E8430A',cafe:'#AD6B2F',sight:'#1565C0',hotel:'#2E7D32',shop:'#7B1FA2',move:'#888'};
 
   if (!items.length) {
-    list.innerHTML = `<div class="mob-empty-state"><div style="font-size:36px;">📋</div><div style="font-weight:700;margin:8px 0 4px;">일정이 없어요</div><div style="font-size:13px;color:#999;">아래 버튼으로 추가해보세요</div></div>`;
+    list.innerHTML = `<div class="mob-empty-state" style="padding:40px 0;">
+      <div style="font-size:36px;">📋</div>
+      <div style="font-weight:700;margin:8px 0 4px;">이 날 일정이 없어요</div>
+      <div style="font-size:13px;color:#999;">아래 버튼으로 추가해보세요</div>
+    </div>`;
     return;
   }
 
-  list.innerHTML = items.map((item, i) => {
-    const color = typeColor[item.type] || '#E07A3A';
-    const isLast = i === items.length - 1;
+  list.innerHTML = items.map((item,i) => {
+    const color  = typeColor[item.type] || '#E07A3A';
+    const isLast = i === items.length-1;
+    const timeStr = item.time ? (typeof fmtTime==='function' ? fmtTime(item.time) : item.time) : '';
     return `<div class="mob-timeline-item">
-      <div class="mob-timeline-time">${item.time ? fmtTime(item.time) : ''}</div>
+      <div class="mob-timeline-time">${timeStr}</div>
       <div class="mob-timeline-line">
-        <div class="mob-tl-dot" style="background:${color};box-shadow:0 0 0 1.5px ${color};"></div>
-        ${!isLast ? '<div class="mob-tl-bar"></div>' : ''}
+        <div class="mob-tl-dot" style="background:${color};box-shadow:0 0 0 3px ${color}30;"></div>
+        ${!isLast?'<div class="mob-tl-bar"></div>':''}
       </div>
       <div class="mob-timeline-card" style="border-left-color:${color};" onclick="mobShowItemDetail(${day},${i})">
-        <div class="mob-tl-card-type">${typeIcon[item.type]||'📌'} ${typeLabel[item.type]||''}</div>
+        <div class="mob-tl-card-type" style="color:${color};">${typeIcon[item.type]||'📌'} ${typeLabel[item.type]||''}</div>
         <div class="mob-tl-card-name">${item.name}</div>
-        ${item.desc ? `<div class="mob-tl-card-sub">${item.desc}</div>` : ''}
-        ${item.memo ? `<span class="mob-tl-card-badge">📝 메모 있음</span>` : ''}
+        ${item.desc?`<div class="mob-tl-card-sub">${item.desc}</div>`:''}
+        ${item.memo?`<span class="mob-tl-card-badge">📝 메모</span>`:''}
+        ${item.lat?`<span class="mob-tl-card-badge" style="color:#3AAF7A;">📍 위치</span>`:''}
       </div>
     </div>`;
   }).join('');
 }
 
 function mobShowItemDetail(day, idx) {
-  // 기존 PC 일정 편집 팝업 활용
-  window.currentDay = day;
-  if (typeof openEditSchedule === 'function') openEditSchedule(idx);
+  const item = (window.scheduleData||{})[day]?.[idx];
+  if (!item) return;
+  const typeLabel = {food:'🍜 식사',cafe:'☕ 카페',sight:'🏛️ 관광',hotel:'🏨 숙소',shop:'🛍️쇼핑',move:'🚆 이동'};
+  const timeStr = item.time ? (typeof fmtTime==='function' ? fmtTime(item.time) : item.time) : '';
+
+  mobOpenSheet('mob-item-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:13px;color:#E07A3A;font-weight:600;margin-bottom:4px;">${typeLabel[item.type]||item.type}</div>
+    <div style="font-size:19px;font-weight:700;color:#2c2c2a;margin-bottom:4px;">${item.name}</div>
+    ${timeStr?`<div style="font-size:13px;color:#999;margin-bottom:8px;">⏰ ${timeStr}</div>`:''}
+    ${item.desc?`<div style="font-size:14px;color:#555;margin-bottom:10px;line-height:1.5;">${item.desc}</div>`:''}
+    ${item.memo?`<div style="background:#f5f3ee;border-radius:10px;padding:12px;margin-bottom:10px;font-size:13px;color:#555;white-space:pre-wrap;">📝 ${item.memo}</div>`:''}
+    ${item.lat?`<button class="mob-sheet-btn" style="color:#3A8FE0;" onclick="mobCloseSheet('mob-item-sheet');mobShowPinOnMap(${item.lat},${item.lng},'${item.name.replace(/'/g,"\\'")}')">🗺️ 지도에서 보기</button>`:''}
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-item-sheet');mobEditItem(${day},${idx})">✏️ 편집</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-item-sheet');mobDeleteItem(${day},${idx})" style="color:#E03A3A;">🗑️ 삭제</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-item-sheet')" style="color:#999;border-top:1px solid #f0ede8;margin-top:4px;">닫기</button>
+  `);
 }
 
+function mobShowPinOnMap(lat, lng, name) {
+  mobTab('map');
+  setTimeout(() => {
+    if (!mobMap) return;
+    mobMap.panTo({lat, lng});
+    mobMap.setZoom(16);
+    new google.maps.Marker({ position:{lat,lng}, map:mobMap, title:name });
+  }, 600);
+}
+
+// 일정 추가 — 모바일 전용 팝업
 function mobAddSchedule() {
-  if (typeof openAddSchedule === 'function') openAddSchedule();
-  else if (typeof openEditSchedule === 'function') openEditSchedule(-1);
+  window.currentDay = mobCurrentDay; // PC 전역에 현재 Day 설정
+  mobOpenSheet('mob-add-sched-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 12px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:12px;">＋ 일정 추가</div>
+
+    <!-- 유형 선택 -->
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:6px;">유형</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">
+      ${[['food','🍜','식사'],['cafe','☕','카페'],['sight','🏛️','관광'],['hotel','🏨','숙소'],['shop','🛍️','쇼핑'],['move','🚆','이동']].map(([type,ico,lbl])=>
+        `<button id="mob-type-${type}" onclick="mobSelectAddType('${type}')"
+          style="padding:8px 4px;border-radius:10px;border:1.5px solid #e0ddd6;background:#fff;font-size:12px;cursor:pointer;font-family:inherit;transition:all .12s;">
+          ${ico}<br>${lbl}
+        </button>`).join('')}
+    </div>
+
+    <!-- 장소명 -->
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">장소 이름</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <input id="mob-add-name" type="text" placeholder="예: 도톤보리" maxlength="50"
+        style="flex:1;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;"
+        onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      <button onclick="mobSearchPlaceForAdd()" style="padding:0 12px;border:1.5px solid #3A8FE0;border-radius:10px;background:none;color:#3A8FE0;font-size:20px;cursor:pointer;">🔍</button>
+    </div>
+
+    <!-- 시간 -->
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">시간</div>
+    <input id="mob-add-time" type="time"
+      style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px;"
+      onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+
+    <!-- 메모 -->
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">메모 (선택)</div>
+    <textarea id="mob-add-desc" placeholder="간단한 메모" rows="2"
+      style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;resize:none;box-sizing:border-box;margin-bottom:4px;"
+      onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"></textarea>
+    <div id="mob-add-latlng-info" style="font-size:11px;color:#3AAF7A;min-height:16px;margin-bottom:10px;"></div>
+
+    <button class="mob-primary-btn" onclick="mobSaveAddSchedule()">＋ 추가하기</button>
+    <button onclick="mobCloseSheet('mob-add-sched-sheet')"
+      style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>
+  `);
+
+  // 기본 유형 선택
+  window._mobAddType = 'food';
+  window._mobAddLat  = null;
+  window._mobAddLng  = null;
+  setTimeout(() => mobSelectAddType('food'), 50);
 }
 
-function mobSchedMore() {
-  // 여행 공유 / 저장 액션 시트
-  const tripId = mobCurrentTrip;
-  if (!tripId) return;
-
-  // 간단한 액션 시트 (모달)
-  const sheet = document.createElement('div');
-  sheet.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,0.45);';
-  sheet.innerHTML = `
-    <div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 32px;">
-      <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 20px;"></div>
-      <div style="font-size:15px;font-weight:700;margin-bottom:14px;">여행 관리</div>
-      <button onclick="mobShareTrip('${tripId}');this.closest('div[style]').remove();"
-        style="width:100%;padding:14px;border:none;background:#f5f3ee;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;text-align:left;margin-bottom:8px;">
-        🔗 여행 링크 공유하기
-      </button>
-      <button onclick="mobSaveTripOffline('${tripId}');this.closest('div[style]').remove();"
-        style="width:100%;padding:14px;border:none;background:#f5f3ee;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;text-align:left;margin-bottom:8px;">
-        📥 오프라인 저장하기
-      </button>
-      <button onclick="mobArchiveTripMob('${tripId}');this.closest('div[style]').remove();"
-        style="width:100%;padding:14px;border:none;background:#f5f3ee;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;text-align:left;color:#888;margin-bottom:8px;">
-        🗂 보관함으로 이동
-      </button>
-      <button onclick="this.closest('div[style]').remove();"
-        style="width:100%;padding:14px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;color:#555;">
-        취소
-      </button>
-    </div>`;
-  sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
-  document.body.appendChild(sheet);
+function mobSelectAddType(type) {
+  window._mobAddType = type;
+  document.querySelectorAll('[id^="mob-type-"]').forEach(el => {
+    el.style.background = '#fff';
+    el.style.borderColor = '#e0ddd6';
+    el.style.color = '#333';
+  });
+  const btn = document.getElementById('mob-type-' + type);
+  if (btn) { btn.style.background='#FEF5EE'; btn.style.borderColor='#E07A3A'; btn.style.color='#E07A3A'; }
 }
 
-function mobShareTrip(tripId) {
-  const url = location.origin + location.pathname + '?trip=' + tripId;
-  if (navigator.share) {
-    navigator.share({ title: '여행 계획', url });
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(() => showToast('링크가 복사됐어요 ✓'));
-  } else {
-    showToast('링크: ' + url);
-  }
+function mobSearchPlaceForAdd() {
+  const q = document.getElementById('mob-add-name')?.value.trim();
+  if (!q) { mobShowToast('장소명을 먼저 입력해주세요'); return; }
+  if (!window.google?.maps) { mobShowToast('지도가 아직 준비 중이에요'); return; }
+
+  // PlacesService로 검색
+  const svc = new google.maps.places.PlacesService(document.createElement('div'));
+  svc.textSearch({ query: q }, (results, status) => {
+    if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) {
+      mobShowToast('검색 결과가 없어요'); return;
+    }
+    const p = results[0];
+    window._mobAddLat = p.geometry?.location?.lat();
+    window._mobAddLng = p.geometry?.location?.lng();
+    const infoEl = document.getElementById('mob-add-latlng-info');
+    if (infoEl) infoEl.textContent = `📍 ${p.formatted_address || p.name} — 위치 자동 설정됨`;
+    // 이름 자동 채우기
+    const nameEl = document.getElementById('mob-add-name');
+    if (nameEl && !nameEl.value.trim()) nameEl.value = p.name;
+  });
 }
 
-function mobSaveTripOffline(tripId) {
-  const payload = mobCurrentTripData;
-  if (!payload) { showToast('저장할 데이터가 없어요'); return; }
-  if (window.offlineSave) {
-    window.offlineSave(tripId, payload)
-      .then(() => showToast('오프라인 저장 완료 ✓'))
-      .catch(() => showToast('저장 실패'));
-  }
+async function mobSaveAddSchedule() {
+  const name = document.getElementById('mob-add-name')?.value.trim();
+  if (!name) { mobShowToast('장소 이름을 입력해주세요'); return; }
+
+  const rawTime = document.getElementById('mob-add-time')?.value; // "HH:MM"
+  const desc    = document.getElementById('mob-add-desc')?.value.trim();
+  const type    = window._mobAddType || 'food';
+  const lat     = window._mobAddLat  || null;
+  const lng     = window._mobAddLng  || null;
+
+  // 시간 포맷: "HH:MM" → "HH:MM" (그대로 사용, fmtTime이 변환)
+  const item = { type, name, desc: desc||'', lat, lng, time: rawTime||'', memo:'' };
+
+  const day = mobCurrentDay;
+  if (!window.scheduleData) window.scheduleData = {};
+  if (!window.scheduleData[day]) window.scheduleData[day] = [];
+  window.scheduleData[day].push(item);
+  // 시간순 정렬
+  window.scheduleData[day].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+
+  // Firebase 저장
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, { schedule: window.scheduleData, updatedAt: new Date().toISOString() });
+    if (mobCurrentTripData) mobCurrentTripData.schedule = window.scheduleData;
+  } catch(e) { console.warn('일정 저장 실패:', e); }
+
+  mobCloseSheet('mob-add-sched-sheet');
+  mobShowToast(`"${name}" 추가됐어요 ✓`);
+  mobRenderDayTimeline(day);
 }
 
-async function mobArchiveTripMob(tripId) {
-  if (!confirm('이 여행을 보관함으로 이동할까요?')) return;
-  if (typeof archiveTrip === 'function') {
-    await archiveTrip(tripId);
-    showToast('보관함으로 이동했어요');
-    mobCurrentTrip = null;
-    mobCurrentTripData = null;
-    mobTab('home');
-  }
+// 일정 편집
+function mobEditItem(day, idx) {
+  const item = (window.scheduleData||{})[day]?.[idx];
+  if (!item) return;
+  const timeVal = item.time ? (item.time.length===5 ? item.time : item.time.slice(0,5)) : '';
+
+  mobOpenSheet('mob-edit-sched-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 12px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:12px;">✏️ 일정 편집</div>
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:6px;">유형</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">
+      ${[['food','🍜','식사'],['cafe','☕','카페'],['sight','🏛️','관광'],['hotel','🏨','숙소'],['shop','🛍️','쇼핑'],['move','🚆','이동']].map(([type,ico,lbl])=>
+        `<button id="mob-etype-${type}" onclick="mobSelectEditType('${type}')"
+          style="padding:8px 4px;border-radius:10px;border:1.5px solid #e0ddd6;background:#fff;font-size:12px;cursor:pointer;font-family:inherit;">
+          ${ico}<br>${lbl}
+        </button>`).join('')}
+    </div>
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">장소 이름</div>
+    <input id="mob-edit-item-name" type="text" value="${item.name||''}" maxlength="50"
+      style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px;"
+      onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">시간</div>
+    <input id="mob-edit-item-time" type="time" value="${timeVal}"
+      style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px;"
+      onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;">메모</div>
+    <textarea id="mob-edit-item-desc" rows="2"
+      style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;resize:none;box-sizing:border-box;margin-bottom:10px;"
+      onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'">${item.desc||''}</textarea>
+    <button class="mob-primary-btn" onclick="mobSaveEditItem(${day},${idx})">💾 저장</button>
+    <button onclick="mobCloseSheet('mob-edit-sched-sheet')"
+      style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>
+  `);
+  window._mobEditType = item.type || 'food';
+  setTimeout(() => mobSelectEditType(item.type||'food'), 50);
 }
 
-// 예약 — Firebase에서 로드된 실제 데이터 사용
+function mobSelectEditType(type) {
+  window._mobEditType = type;
+  document.querySelectorAll('[id^="mob-etype-"]').forEach(el => {
+    el.style.background='#fff'; el.style.borderColor='#e0ddd6'; el.style.color='#333';
+  });
+  const btn = document.getElementById('mob-etype-' + type);
+  if (btn) { btn.style.background='#FEF5EE'; btn.style.borderColor='#E07A3A'; btn.style.color='#E07A3A'; }
+}
+
+async function mobSaveEditItem(day, idx) {
+  const name = document.getElementById('mob-edit-item-name')?.value.trim();
+  if (!name) { mobShowToast('이름을 입력해주세요'); return; }
+  const time = document.getElementById('mob-edit-item-time')?.value || '';
+  const desc = document.getElementById('mob-edit-item-desc')?.value.trim() || '';
+  const type = window._mobEditType || 'food';
+
+  const prev = (window.scheduleData||{})[day]?.[idx] || {};
+  window.scheduleData[day][idx] = { ...prev, type, name, time, desc };
+  window.scheduleData[day].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, { schedule: window.scheduleData, updatedAt: new Date().toISOString() });
+    if (mobCurrentTripData) mobCurrentTripData.schedule = window.scheduleData;
+  } catch(e) { console.warn('편집 저장 실패:', e); }
+
+  mobCloseSheet('mob-edit-sched-sheet');
+  mobShowToast('저장됐어요 ✓');
+  mobRenderDayTimeline(day);
+}
+
+async function mobDeleteItem(day, idx) {
+  if (!confirm('이 일정을 삭제할까요?')) return;
+  window.scheduleData[day].splice(idx, 1);
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, { schedule: window.scheduleData, updatedAt: new Date().toISOString() });
+    if (mobCurrentTripData) mobCurrentTripData.schedule = window.scheduleData;
+  } catch(e) {}
+  mobShowToast('삭제됐어요');
+  mobRenderDayTimeline(day);
+}
+
+// ── 예약 탭 ──────────────────────────────────────────────────
 function mobRenderBooking() {
   const el = document.getElementById('mob-booking-content');
   if (!el) return;
-
   const d = mobCurrentTripData || {};
-  const isDomestic = d.isDomestic;
 
-  if (isDomestic) {
-    // 국내 여행 숙소 카드
-    const hotelName = d.domHotelName || '';
-    const hotelAddr = d.domHotelAddr || '';
-    const depart = d.domDepart || '';
-    const ret = d.domReturn || '';
+  if (d.isDomestic) {
     el.innerHTML = `<div style="padding:12px 0;">
       <div class="mob-booking-card">
-        <div class="mob-booking-header">
-          <span class="mob-booking-type">🚗 국내 여행</span>
-          <span class="mob-booking-status">국내</span>
-        </div>
-        ${hotelName ? `<div class="mob-booking-name">${hotelName}</div>` : ''}
-        ${hotelAddr ? `<div class="mob-booking-sub">📍 ${hotelAddr}</div>` : ''}
-        ${depart ? `<div class="mob-booking-sub">출발: ${depart}</div>` : ''}
-        ${ret ? `<div class="mob-booking-sub">귀가: ${ret}</div>` : ''}
-        ${!hotelName && !hotelAddr ? '<div style="color:#999;font-size:13px;">숙소 정보 없음</div>' : ''}
+        <div class="mob-booking-header"><span class="mob-booking-type">🚗 국내 여행</span><span class="mob-booking-status">국내</span></div>
+        ${d.domHotelName?`<div class="mob-booking-name">${d.domHotelName}</div>`:''}
+        ${d.domHotelAddr?`<div class="mob-booking-sub">📍 ${d.domHotelAddr}</div>`:''}
+        ${d.domDepart?`<div class="mob-booking-sub">출발 ${d.domDepart}</div>`:''}
+        ${d.domReturn?`<div class="mob-booking-sub">귀가 ${d.domReturn}</div>`:''}
+        ${!d.domHotelName&&!d.domHotelAddr?'<div style="color:#999;font-size:13px;">숙소 정보 없음</div>':''}
       </div>
-      ${d.domHotelLat ? `<button class="mob-primary-btn" style="margin-top:8px;" onclick="mobShowHotelOnMap()">🗺️ 숙소 지도에서 보기</button>` : ''}
+      ${d.domHotelLat?`<button class="mob-primary-btn" style="margin-top:8px;" onclick="mobShowHotelOnMap()">🗺️ 숙소 지도에서 보기</button>`:''}
+      <button class="mob-primary-btn" style="margin-top:8px;background:#3D3D38;" onclick="mobOpenTripSetup()">✏️ 숙소 정보 편집</button>
     </div>`;
     return;
   }
 
-  // 국제 항공편
-  const dep = {
-    airline: d.flightAirline || '',
-    from: d.flightFrom || '',
-    to: d.flightTo || '',
-    depart: d.flightDepart || '',
-    arrive: d.flightArrive || '',
-  };
-  const ret = {
-    airline: d.returnAirline || '',
-    from: d.returnFrom || '',
-    to: d.returnTo || '',
-    depart: d.returnDepart || '',
-    arrive: d.returnArrive || '',
-  };
-
-  const hasVouchers = window.voucherData && Object.values(window.voucherData).some(Boolean);
   const cards = [];
-
-  if (dep.from || dep.to || dep.airline) {
+  if (d.flightFrom||d.flightTo||d.flightAirline) {
     cards.push(`<div class="mob-booking-card">
       <div class="mob-booking-header">
         <span class="mob-booking-type">✈️ 출국편</span>
-        ${dep.airline ? `<span class="mob-booking-status">${dep.airline}</span>` : ''}
+        ${d.flightAirline?`<span class="mob-booking-status">${d.flightAirline}</span>`:''}
       </div>
-      <div class="mob-booking-name">${dep.from || 'ICN'} → ${dep.to || '?'}</div>
-      ${dep.depart ? `<div class="mob-booking-sub">출발 ${dep.depart} ${dep.arrive ? '→ 도착 '+dep.arrive : ''}</div>` : ''}
+      <div class="mob-booking-name">${d.flightFrom||'ICN'} → ${d.flightTo||'?'}</div>
+      ${d.flightDepart?`<div class="mob-booking-sub">출발 ${d.flightDepart}${d.flightArrive?' → 도착 '+d.flightArrive:''}</div>`:''}
     </div>`);
   }
-  if (ret.from || ret.to || ret.airline) {
+  if (d.returnFrom||d.returnTo||d.returnAirline) {
     cards.push(`<div class="mob-booking-card">
       <div class="mob-booking-header">
         <span class="mob-booking-type">🛬 귀국편</span>
-        ${ret.airline ? `<span class="mob-booking-status">${ret.airline}</span>` : ''}
+        ${d.returnAirline?`<span class="mob-booking-status">${d.returnAirline}</span>`:''}
       </div>
-      <div class="mob-booking-name">${ret.from || '?'} → ${ret.to || 'ICN'}</div>
-      ${ret.depart ? `<div class="mob-booking-sub">출발 ${ret.depart} ${ret.arrive ? '→ 도착 '+ret.arrive : ''}</div>` : ''}
+      <div class="mob-booking-name">${d.returnFrom||'?'} → ${d.returnTo||'ICN'}</div>
+      ${d.returnDepart?`<div class="mob-booking-sub">출발 ${d.returnDepart}${d.returnArrive?' → 도착 '+d.returnArrive:''}</div>`:''}
     </div>`);
   }
 
-  // 바우처 섹션
-  const VOUCHER_ITEMS = window.VOUCHER_ITEMS || [];
-  const customV = window.customVoucherItems || [];
-  const allVouchers = [...VOUCHER_ITEMS, ...customV];
-  const checkedVouchers = allVouchers.filter(v => window.voucherData?.[v.id]);
-
-  if (checkedVouchers.length) {
-    const vHtml = checkedVouchers.map(v => `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0ede8;">
-      <span style="font-size:18px;">${v.emoji}</span>
-      <span style="font-size:14px;font-weight:600;">${v.label}</span>
-      <span style="margin-left:auto;font-size:11px;color:#3AAF7A;font-weight:700;">✓ 완료</span>
-    </div>`).join('');
+  // 바우처 완료 항목
+  const allV = [...(window.VOUCHER_ITEMS||[]), ...(window.customVoucherItems||[])];
+  const doneV = allV.filter(v => window.voucherData?.[v.id]);
+  if (doneV.length) {
     cards.push(`<div class="mob-booking-card" style="margin-top:4px;">
       <div class="mob-booking-header"><span class="mob-booking-type">🎫 바우처</span></div>
-      ${vHtml}
+      ${doneV.map(v=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0ede8;">
+        <span style="font-size:18px;">${v.emoji}</span>
+        <span style="font-size:14px;font-weight:600;">${v.label}</span>
+        <span style="margin-left:auto;font-size:11px;color:#3AAF7A;font-weight:700;">✓</span>
+      </div>`).join('')}
     </div>`);
   }
 
-  el.innerHTML = cards.length
-    ? `<div style="padding:12px 0;">${cards.join('')}
-        <button class="mob-primary-btn" style="margin-top:8px;background:#3A8FE0;" onclick="mobTab('saved');setTimeout(()=>mobSavedTab(document.querySelectorAll('.mob-saved-tab')[1],'voucher'),100)">
-          🎫 바우처 관리하기
-        </button>
-      </div>`
-    : `<div class="mob-empty-state"><div style="font-size:36px;">🎫</div>
-        <div style="font-weight:700;margin:8px 0 4px;">예약 정보가 없어요</div>
-        <div style="font-size:13px;color:#999;">여행 정보 편집에서 항공편을 입력하세요</div>
-        <button class="mob-primary-btn" style="margin-top:12px;max-width:220px;" onclick="mobOpenTripSetup()">항공편 입력하기</button>
-      </div>`;
+  el.innerHTML = `<div style="padding:12px 0 80px;">
+    ${cards.length ? cards.join('') : `<div class="mob-empty-state">
+      <div style="font-size:36px;">🎫</div>
+      <div style="font-weight:700;margin:8px 0 4px;">예약 정보가 없어요</div>
+      <div style="font-size:13px;color:#999;">여행 정보 편집에서 항공편을 입력하세요</div>
+    </div>`}
+    <button class="mob-primary-btn" style="margin-top:8px;" onclick="mobOpenFlightEdit()">✈️ 항공편 편집</button>
+    <button class="mob-primary-btn" style="margin-top:8px;background:#3A8FE0;" onclick="mobTab('saved');setTimeout(()=>{mobSavedTab(document.querySelectorAll('.mob-saved-tab')[1],'voucher');},100)">🎫 바우처 관리</button>
+  </div>`;
+}
+
+// 항공편 편집 — 모바일 전용 팝업
+function mobOpenFlightEdit() {
+  const d = mobCurrentTripData || {};
+  mobOpenSheet('mob-flight-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 12px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:14px;">✈️ 항공편 편집</div>
+    <div style="font-size:13px;font-weight:700;color:#555;margin-bottom:8px;">출국편</div>
+    ${mobFlightRow('mob-fa-airline','항공사',d.flightAirline||'','예: 제주항공 7C1601')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      ${mobFlightRowInline('mob-fa-from','출발 공항',d.flightFrom||'','ICN')}
+      ${mobFlightRowInline('mob-fa-to','도착 공항',d.flightTo||'','NRT')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+      ${mobFlightRowInline('mob-fa-dep','출발 시간',d.flightDepart||'','HH:MM','time')}
+      ${mobFlightRowInline('mob-fa-arr','도착 시간',d.flightArrive||'','HH:MM','time')}
+    </div>
+    <div style="font-size:13px;font-weight:700;color:#555;margin-bottom:8px;">귀국편</div>
+    ${mobFlightRow('mob-fr-airline','항공사',d.returnAirline||'','예: 대한항공 KE123')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      ${mobFlightRowInline('mob-fr-from','출발 공항',d.returnFrom||'','NRT')}
+      ${mobFlightRowInline('mob-fr-to','도착 공항',d.returnTo||'','ICN')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+      ${mobFlightRowInline('mob-fr-dep','출발 시간',d.returnDepart||'','HH:MM','time')}
+      ${mobFlightRowInline('mob-fr-arr','도착 시간',d.returnArrive||'','HH:MM','time')}
+    </div>
+    <button class="mob-primary-btn" onclick="mobSaveFlightEdit()">💾 저장하기</button>
+    <button onclick="mobCloseSheet('mob-flight-sheet')"
+      style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>
+  `);
+}
+
+function mobFlightRow(id, label, val, ph) {
+  return `<div style="margin-bottom:8px;">
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">${label}</div>
+    <input id="${id}" type="text" value="${val}" placeholder="${ph}"
+      style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+      onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+  </div>`;
+}
+function mobFlightRowInline(id, label, val, ph, type='text') {
+  return `<div style="margin-bottom:8px;">
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">${label}</div>
+    <input id="${id}" type="${type}" value="${val}" placeholder="${ph}"
+      style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;"
+      onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+  </div>`;
+}
+
+async function mobSaveFlightEdit() {
+  const g = id => document.getElementById(id)?.value.trim()||'';
+  const updates = {
+    flightAirline: g('mob-fa-airline'), flightFrom: g('mob-fa-from'), flightTo: g('mob-fa-to'),
+    flightDepart:  g('mob-fa-dep'),     flightArrive: g('mob-fa-arr'),
+    returnAirline: g('mob-fr-airline'), returnFrom: g('mob-fr-from'), returnTo: g('mob-fr-to'),
+    returnDepart:  g('mob-fr-dep'),     returnArrive: g('mob-fr-arr'),
+    isDomestic: false,
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, updates);
+    mobCurrentTripData = { ...(mobCurrentTripData||{}), ...updates };
+    mobCloseSheet('mob-flight-sheet');
+    mobShowToast('항공편 저장됐어요 ✓');
+    mobRenderBooking();
+  } catch(e) { mobShowToast('저장 실패'); }
 }
 
 function mobShowHotelOnMap() {
   const d = mobCurrentTripData || {};
   if (!d.domHotelLat || !d.domHotelLng) return;
-  // 지도 탭으로 이동 후 해당 위치 이동
   mobTab('map');
   setTimeout(() => {
-    if (mobMap) {
-      mobMap.panTo({ lat: d.domHotelLat, lng: d.domHotelLng });
-      mobMap.setZoom(16);
-      new google.maps.Marker({
-        position: { lat: d.domHotelLat, lng: d.domHotelLng },
-        map: mobMap,
-        title: d.domHotelName || '숙소',
-        icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44"><path d="M18 2C9.16 2 2 9.16 2 18c0 10.5 16 26 16 26s16-15.5 16-26C34 9.16 26.84 2 18 2z" fill="#4A90E2" stroke="#fff" stroke-width="2"/><text x="18" y="23" text-anchor="middle" font-size="14">🏨</text></svg>'), scaledSize: new google.maps.Size(36,44), anchor: new google.maps.Point(18,44) }
-      });
-    }
-  }, 500);
+    if (!mobMap) return;
+    mobMap.panTo({ lat: d.domHotelLat, lng: d.domHotelLng });
+    mobMap.setZoom(16);
+    new google.maps.Marker({
+      position:{lat:d.domHotelLat, lng:d.domHotelLng}, map:mobMap, title:d.domHotelName||'숙소',
+      icon:{url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44"><path d="M18 2C9.16 2 2 9.16 2 18c0 10.5 16 26 16 26s16-15.5 16-26C34 9.16 26.84 2 18 2z" fill="#4A90E2" stroke="#fff" stroke-width="2"/><text x="18" y="23" text-anchor="middle" font-size="14">🏨</text></svg>'),scaledSize:new google.maps.Size(36,44),anchor:new google.maps.Point(18,44)}
+    });
+  }, 600);
 }
 
-// 경비 — 실제 expenseData + budgetTotal 사용
+// ── 경비 탭 ──────────────────────────────────────────────────
 function mobRenderBudget() {
   const el = document.getElementById('mob-budget-content');
   if (!el) return;
-
-  const d = mobCurrentTripData || {};
-  const budgetTotal = d.budgetTotal || 0;
-  const budgetCurrency = d.budgetCurrency || 'JPY';
-
-  // expenseData: { food:[{name,amountKrw,color},...], cafe:[], ... }
-  const expenses = window.expenseData || {};
-  const catLabels = { food:'🍜 식사', cafe:'☕ 카페', sight:'🏛️ 관광', move:'🚆 이동', shop:'🛍️ 쇼핑', hotel:'🏨 숙소' };
+  const d          = mobCurrentTripData || {};
+  const budget     = d.budgetTotal  || 0;
+  const currency   = d.budgetCurrency || 'JPY';
+  const expenses   = window.expenseData || { food:[], cafe:[], sight:[], move:[], shop:[], hotel:[] };
+  const catLabels  = {food:'🍜 식사',cafe:'☕ 카페',sight:'🏛️ 관광',move:'🚆 이동',shop:'🛍️ 쇼핑',hotel:'🏨 숙소'};
+  const currSym    = currency==='KRW'?'₩':currency==='USD'?'$':currency==='EUR'?'€':'¥';
 
   let totalKrw = 0;
   const catRows = Object.entries(expenses).map(([cat, items]) => {
-    if (!items || !items.length) return '';
-    const catTotal = items.reduce((s,i) => s + (i.amountKrw || 0), 0);
+    if (!items?.length) return '';
+    const catTotal = items.reduce((s,i)=>s+(i.amountKrw||0),0);
     totalKrw += catTotal;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f5f3ee;">
-      <span style="font-size:14px;">${catLabels[cat] || cat}</span>
-      <span style="font-size:14px;font-weight:700;color:#2c2c2a;">₩${catTotal.toLocaleString()}</span>
+    return `<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f5f3ee;">
+      <span style="font-size:14px;flex:1;">${catLabels[cat]||cat}</span>
+      <span style="font-weight:700;color:#2c2c2a;">₩${catTotal.toLocaleString()}</span>
     </div>`;
   }).filter(Boolean).join('');
 
-  // 예산 소진율
-  const usedPct = budgetTotal > 0 ? Math.min(Math.round(totalKrw / budgetTotal * 100), 100) : 0;
-  const barColor = usedPct > 80 ? '#E03A3A' : usedPct > 60 ? '#E07A3A' : '#3AAF7A';
-
-  // 일별 지출 분석
-  const schedData = window.scheduleData || {};
-  const dayCount = Object.keys(schedData).length;
+  const usedPct  = budget>0 ? Math.min(Math.round(totalKrw/budget*100),100) : 0;
+  const barColor = usedPct>80?'#E03A3A':usedPct>60?'#E07A3A':'#3AAF7A';
+  const dayCount = Object.keys(window.scheduleData||{}).length;
 
   el.innerHTML = `<div style="padding:12px 0 80px;">
-    ${budgetTotal > 0 ? `<div class="mob-booking-card">
+    ${budget>0?`<div class="mob-booking-card">
       <div class="mob-booking-header">
         <span class="mob-booking-type">💰 예산 현황</span>
         <span style="font-size:12px;color:${barColor};font-weight:700;">${usedPct}% 사용</span>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
         <span style="font-size:12px;color:#999;">총 예산</span>
-        <span style="font-size:14px;font-weight:700;">${budgetCurrency === 'KRW' ? '₩' : '¥'}${Number(budgetTotal).toLocaleString()}</span>
+        <span style="font-weight:700;">${currSym}${Number(budget).toLocaleString()}</span>
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
         <span style="font-size:12px;color:#999;">사용 금액</span>
-        <span style="font-size:14px;font-weight:700;color:${barColor};">₩${totalKrw.toLocaleString()}</span>
+        <span style="font-weight:700;color:${barColor};">₩${totalKrw.toLocaleString()}</span>
       </div>
       <div style="height:8px;background:#f0ede8;border-radius:4px;overflow:hidden;">
         <div style="height:100%;width:${usedPct}%;background:${barColor};border-radius:4px;transition:width .4s;"></div>
       </div>
-    </div>` : ''}
-
-    ${catRows ? `<div class="mob-booking-card" style="margin-top:4px;">
+    </div>`:''}
+    ${catRows?`<div class="mob-booking-card" style="margin-top:4px;">
       <div class="mob-booking-header"><span class="mob-booking-type">📊 카테고리별 지출</span></div>
       ${catRows}
-      <div style="display:flex;justify-content:space-between;padding-top:9px;">
+      <div style="display:flex;justify-content:space-between;padding-top:10px;">
         <span style="font-size:14px;font-weight:700;">합계</span>
         <span style="font-size:16px;font-weight:700;color:#E07A3A;">₩${totalKrw.toLocaleString()}</span>
       </div>
-    </div>` : ''}
-
-    ${dayCount > 0 ? `<div class="mob-booking-card" style="margin-top:4px;">
-      <div class="mob-booking-header"><span class="mob-booking-type">📅 일별 평균 지출</span></div>
-      <div style="font-size:22px;font-weight:700;color:#2c2c2a;margin:4px 0;">
-        ₩${dayCount > 0 ? Math.round(totalKrw / dayCount).toLocaleString() : 0}
-        <span style="font-size:13px;color:#999;font-weight:400;"> / 일</span>
-      </div>
-    </div>` : ''}
-
-    ${!catRows ? `<div class="mob-empty-state"><div style="font-size:36px;">💸</div>
+    </div>`:''}
+    ${dayCount>0&&totalKrw>0?`<div class="mob-booking-card" style="margin-top:4px;">
+      <div class="mob-booking-header"><span class="mob-booking-type">📅 일 평균 지출</span></div>
+      <div style="font-size:22px;font-weight:700;">₩${Math.round(totalKrw/dayCount).toLocaleString()}<span style="font-size:13px;color:#999;font-weight:400;"> / 일</span></div>
+    </div>`:''}
+    ${!catRows?`<div class="mob-empty-state" style="padding:32px 0;">
+      <div style="font-size:36px;">💸</div>
       <div style="font-weight:700;margin:8px 0 4px;">지출 내역이 없어요</div>
-      <div style="font-size:13px;color:#999;">일정 탭에서 지출을 추가해보세요</div>
-    </div>` : ''}
-
-    <button class="mob-primary-btn" style="margin-top:8px;background:#3D3D38;" onclick="mobOpenExpense()">
-      ＋ 지출 추가하기
-    </button>
+    </div>`:''}
+    <button class="mob-primary-btn" style="margin-top:8px;background:#3D3D38;" onclick="mobOpenExpenseSheet()">＋ 지출 추가</button>
+    ${!budget?`<button class="mob-primary-btn" style="margin-top:8px;" onclick="mobOpenBudgetSet()">💰 예산 설정</button>`:''}
   </div>`;
 }
 
-function mobOpenExpense() {
-  // PC 지출 팝업 활용
-  if (typeof openExpensePopup === 'function') openExpensePopup();
-  else if (document.getElementById('expense-overlay')) {
-    document.getElementById('expense-overlay').style.display = 'flex';
-  }
+// 지출 추가 — 모바일 전용
+function mobOpenExpenseSheet(defaultCat) {
+  const cats = [['food','🍜','식사'],['cafe','☕','카페'],['sight','🏛️','관광'],['move','🚆','이동'],['shop','🛍️','쇼핑'],['hotel','🏨','숙소']];
+  window._mobExpCat = defaultCat || 'food';
+
+  // Day 탭
+  const sched = window.scheduleData || {};
+  const days  = Object.keys(sched).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+  window._mobExpDay = mobCurrentDay;
+  const dayTabs = days.length
+    ? days.map(d=>`<button id="mob-expday-${d}" onclick="mobExpSelectDay(${d})"
+        style="padding:4px 10px;border-radius:14px;border:1.5px solid #e0ddd6;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;background:${d===mobCurrentDay?'#1a1a18':'#fff'};color:${d===mobCurrentDay?'#fff':'#999'};">
+        D${d}</button>`).join('')
+    : '<span style="font-size:12px;color:#999;">일정 없음</span>';
+
+  mobOpenSheet('mob-expense-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 12px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:12px;">＋ 지출 추가</div>
+
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:6px;">카테고리</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">
+      ${cats.map(([cat,ico,lbl])=>`<button id="mob-excat-${cat}" onclick="mobExpSelectCat('${cat}')"
+        style="padding:8px 4px;border-radius:10px;border:1.5px solid #e0ddd6;background:#fff;font-size:12px;cursor:pointer;font-family:inherit;">
+        ${ico}<br>${lbl}</button>`).join('')}
+    </div>
+
+    <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:6px;">Day</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;">${dayTabs}</div>
+
+    <div style="display:grid;grid-template-columns:1fr 100px 70px;gap:6px;margin-bottom:8px;">
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">항목명</div>
+        <input id="mob-exp-name" type="text" placeholder="예: 라멘"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">금액</div>
+        <input id="mob-exp-amount" type="number" placeholder="0" min="0"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"
+          oninput="mobExpPreview()" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">통화</div>
+        <select id="mob-exp-unit" onchange="mobExpPreview()"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 4px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+          <option value="KRW">₩</option>
+          <option value="JPY" selected>¥</option>
+          <option value="USD">$</option>
+          <option value="EUR">€</option>
+          <option value="THB">฿</option>
+          <option value="VND">₫</option>
+        </select>
+      </div>
+    </div>
+    <div id="mob-exp-preview" style="font-size:11px;color:#999;text-align:right;min-height:16px;margin-bottom:10px;"></div>
+    <button class="mob-primary-btn" onclick="mobSaveExpense()">＋ 추가하기</button>
+    <button onclick="mobCloseSheet('mob-expense-sheet')"
+      style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">닫기</button>
+  `);
+  setTimeout(() => { mobExpSelectCat(defaultCat||'food'); document.getElementById('mob-exp-name')?.focus(); }, 60);
 }
 
-// ── 지도 탭 ──────────────────────────────────────────────────
-function mobInitMap() {
-  if (mobMapInitialized) { mobLoadPlaces(); return; }
-  if (!window.google || !window.google.maps) return;
+function mobExpSelectCat(cat) {
+  window._mobExpCat = cat;
+  document.querySelectorAll('[id^="mob-excat-"]').forEach(el=>{
+    el.style.background='#fff'; el.style.borderColor='#e0ddd6'; el.style.color='#333';
+  });
+  const btn = document.getElementById('mob-excat-'+cat);
+  if (btn){btn.style.background='#FEF5EE';btn.style.borderColor='#E07A3A';btn.style.color='#E07A3A';}
+}
+
+function mobExpSelectDay(day) {
+  window._mobExpDay = day;
+  document.querySelectorAll('[id^="mob-expday-"]').forEach(el=>{
+    el.style.background='#fff'; el.style.color='#999';
+  });
+  const btn = document.getElementById('mob-expday-'+day);
+  if (btn){btn.style.background='#1a1a18';btn.style.color='#fff';}
+}
+
+function mobExpPreview() {
+  const amt  = parseFloat(document.getElementById('mob-exp-amount')?.value)||0;
+  const unit = document.getElementById('mob-exp-unit')?.value||'JPY';
+  const el   = document.getElementById('mob-exp-preview');
+  if (!el||!amt) { if(el) el.textContent=''; return; }
+  // 환율 (window.exchangeRate 가 있으면 사용)
+  const rate = unit==='KRW' ? 1 : (window.exchangeRates?.[unit] || (unit==='JPY'?9.5:1350));
+  const krw  = Math.round(amt * rate);
+  el.textContent = unit==='KRW' ? '' : `≈ ₩${krw.toLocaleString()}`;
+}
+
+async function mobSaveExpense() {
+  const name   = document.getElementById('mob-exp-name')?.value.trim();
+  const amt    = parseFloat(document.getElementById('mob-exp-amount')?.value)||0;
+  const unit   = document.getElementById('mob-exp-unit')?.value||'JPY';
+  const cat    = window._mobExpCat||'food';
+
+  if (!name) { mobShowToast('항목명을 입력해주세요'); return; }
+  if (!amt)  { mobShowToast('금액을 입력해주세요'); return; }
+
+  const rate   = unit==='KRW' ? 1 : (window.exchangeRates?.[unit] || (unit==='JPY'?9.5:1350));
+  const amountKrw = unit==='KRW' ? amt : Math.round(amt * rate);
+
+  if (!window.expenseData) window.expenseData = { food:[], cafe:[], sight:[], move:[], shop:[], hotel:[] };
+  if (!window.expenseData[cat]) window.expenseData[cat] = [];
+  window.expenseData[cat].push({ name, amount: amt, unit, amountKrw, day: window._mobExpDay||1, id: Date.now()+'_'+Math.random().toString(36).slice(2,6) });
+
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, { expenseData: window.expenseData, updatedAt: new Date().toISOString() });
+    if (mobCurrentTripData) mobCurrentTripData.expenseData = window.expenseData;
+  } catch(e) {}
+
+  document.getElementById('mob-exp-name').value  = '';
+  document.getElementById('mob-exp-amount').value = '';
+  mobShowToast(`"${name}" 추가됐어요 ✓`);
+  // 시트는 열어두고 계속 추가 가능
+  mobRenderBudget();
+}
+
+function mobOpenBudgetSet() {
+  const d = mobCurrentTripData || {};
+  mobOpenSheet('mob-budget-set-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:12px;">💰 예산 설정</div>
+    <div style="display:grid;grid-template-columns:1fr 100px;gap:8px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">총 예산</div>
+        <input id="mob-budget-amt" type="number" value="${d.budgetTotal||''}" placeholder="예: 500000"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">통화</div>
+        <select id="mob-budget-cur"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+          ${['KRW','JPY','USD','EUR','THB','VND','TWD'].map(c=>`<option value="${c}" ${d.budgetCurrency===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <button class="mob-primary-btn" onclick="mobSaveBudget()">💾 저장하기</button>
+    <button onclick="mobCloseSheet('mob-budget-set-sheet')"
+      style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>
+  `);
+}
+
+async function mobSaveBudget() {
+  const amt = parseFloat(document.getElementById('mob-budget-amt')?.value)||0;
+  const cur = document.getElementById('mob-budget-cur')?.value||'JPY';
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, { budgetTotal: amt, budgetCurrency: cur, updatedAt: new Date().toISOString() });
+    if (mobCurrentTripData){ mobCurrentTripData.budgetTotal=amt; mobCurrentTripData.budgetCurrency=cur; }
+    window.currentBudgetCurrency = cur;
+    const bi=document.getElementById('budget-total-input'); if(bi) bi.value=amt;
+    const bc=document.getElementById('budget-currency-select'); if(bc) bc.value=cur;
+    mobCloseSheet('mob-budget-set-sheet');
+    mobShowToast('예산 저장됐어요 ✓');
+    mobRenderBudget();
+  } catch(e){ mobShowToast('저장 실패'); }
+}
+
+// ── 지도 탭 (전체 지도) ─────────────────────────────────────
+function mobInitFullMap() {
   const el = document.getElementById('mob-fullmap');
-  if (!el) return;
+  if (!el || !window.google?.maps) {
+    if (!window.google?.maps) {
+      document.addEventListener('maps-ready', () => mobInitFullMap(), { once:true });
+    }
+    return;
+  }
+  if (!mobMap) {
+    let center = { lat:35.6762, lng:139.6503 };
+    const allPins = Object.values(window.scheduleData||{}).flat().filter(i=>i.lat&&i.lng);
+    if (allPins.length) center = { lat:allPins[0].lat, lng:allPins[0].lng };
 
-  // 현재 여행의 핀 중심으로
-  let center = { lat: 35.6762, lng: 139.6503 };
-  const allPins = Object.values(window.scheduleData || {}).flat().filter(i => i.lat && i.lng);
-  if (allPins.length) center = { lat: allPins[0].lat, lng: allPins[0].lng };
-
-  mobMap = new google.maps.Map(el, {
-    center, zoom: 13,
-    disableDefaultUI: true,
-    gestureHandling: 'greedy',
-    styles: window.mapStyleGray || [],
-  });
-  mobMapInitialized = true;
-
-  // 기존 일정 핀 표시
-  allPins.forEach(pin => {
-    new google.maps.Marker({
-      position: { lat: pin.lat, lng: pin.lng },
-      map: mobMap,
-      title: pin.name,
+    mobMap = new google.maps.Map(el, {
+      center, zoom:13,
+      disableDefaultUI:true,
+      zoomControl:true,
+      gestureHandling:'greedy',
     });
-  });
+    mobMapInitialized = true;
 
+    // 일정 핀 표시
+    allPins.forEach(pin => {
+      new google.maps.Marker({
+        position:{lat:pin.lat, lng:pin.lng},
+        map:mobMap, title:pin.name,
+      });
+    });
+  }
+  google.maps.event.trigger(mobMap, 'resize');
   mobLoadPlaces();
 }
 
 function mobInitSchedMap() {
-  setTimeout(() => mobInitMap(), 100);
+  setTimeout(() => mobInitFullMap(), 150);
 }
 
-let mobCurrentCat = 'all';
 function mobMapCat(el, cat) {
-  document.querySelectorAll('.mob-cat').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mob-cat').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
   mobCurrentCat = cat;
   mobLoadPlaces();
 }
 
 function mobMapSearch() {
-  const q = document.getElementById('mob-map-search')?.value;
+  const q = document.getElementById('mob-map-search')?.value.trim();
   if (!q || !mobMap || !window.google) return;
-  const service = new google.maps.places.PlacesService(mobMap);
-  service.textSearch({ query: q, location: mobMap.getCenter(), radius: 5000 }, (results, status) => {
-    if (status === google.maps.places.PlacesServiceStatus.OK) {
-      mobRenderPlaces(results.slice(0, 10));
+  const svc = new google.maps.places.PlacesService(mobMap);
+  svc.textSearch({ query:q, location:mobMap.getCenter(), radius:5000 }, (results, status) => {
+    if (status===google.maps.places.PlacesServiceStatus.OK && results.length) {
+      mobRenderPlaces(results.slice(0,10));
       if (results[0]?.geometry?.location) mobMap.panTo(results[0].geometry.location);
-    }
+    } else { mobShowToast('검색 결과가 없어요'); }
   });
 }
 
 function mobLoadPlaces() {
   if (!mobMap || !window.google) return;
-  const typeMap = { sight:'tourist_attraction', food:'restaurant', cafe:'cafe', hotel:'lodging', shop:'shopping_mall' };
-  const type = typeMap[mobCurrentCat] || 'tourist_attraction';
-
-  const center = mobMap.getCenter();
-  const service = new google.maps.places.PlacesService(mobMap);
-  const req = { location: center, radius: 3000, type };
-  if (mobCurrentCat === 'all') {
-    req.type = 'tourist_attraction';
-    delete req.radius;
-    req.rankBy = google.maps.places.RankBy.PROMINENCE;
-  }
-
-  service.nearbySearch(req, (results, status) => {
-    if (status === google.maps.places.PlacesServiceStatus.OK) {
-      mobRenderPlaces(results.slice(0, 10));
-    }
+  const typeMap = {sight:'tourist_attraction',food:'restaurant',cafe:'cafe',hotel:'lodging',shop:'shopping_mall'};
+  const type    = typeMap[mobCurrentCat] || 'tourist_attraction';
+  const svc     = new google.maps.places.PlacesService(mobMap);
+  const req     = mobCurrentCat==='all'
+    ? { location:mobMap.getCenter(), rankBy:google.maps.places.RankBy.PROMINENCE, type:'tourist_attraction' }
+    : { location:mobMap.getCenter(), radius:3000, type };
+  svc.nearbySearch(req, (results, status) => {
+    if (status===google.maps.places.PlacesServiceStatus.OK) mobRenderPlaces(results.slice(0,10));
   });
 }
 
 function mobRenderPlaces(places) {
-  const el = document.getElementById('mob-places-list');
+  const el      = document.getElementById('mob-places-list');
   const countEl = document.getElementById('mob-places-count');
   if (!el) return;
   if (countEl) countEl.textContent = `${places.length}곳`;
+  window._mobPlaces = places;
 
-  el.innerHTML = places.map((p, i) => {
-    const photo = p.photos?.[0]?.getUrl({ maxWidth: 80 }) || '';
-    const rating = p.rating ? `⭐ ${p.rating} (${p.user_ratings_total || 0})` : '';
-    const types = (p.types || []).slice(0,2).join(', ');
+  el.innerHTML = places.map((p,i) => {
+    const photo  = p.photos?.[0]?.getUrl({maxWidth:80}) || '';
+    const rating = p.rating ? `⭐ ${p.rating}` : '';
+    const type   = (p.types||[]).slice(0,2).map(t=>t.replace(/_/g,' ')).join(', ');
     return `<div class="mob-place-item" onclick="mobSelectPlace(${i})">
-      <div class="mob-place-thumb">${photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;">` : '🏛️'}</div>
+      <div class="mob-place-thumb">${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;">`:'🏛️'}</div>
       <div class="mob-place-info">
         <div class="mob-place-name">${p.name}</div>
-        <div class="mob-place-sub">${types}</div>
-        ${rating ? `<div class="mob-place-rating">${rating}</div>` : ''}
+        <div class="mob-place-sub">${type}</div>
+        ${rating?`<div class="mob-place-rating">${rating}</div>`:''}
       </div>
-      <button class="mob-place-add-btn" onclick="event.stopPropagation();mobAddPlaceToSchedule('${p.name.replace(/'/g,"\\'")}',${p.geometry?.location?.lat()},${p.geometry?.location?.lng()})">+ 추가</button>
+      <button class="mob-place-add-btn" onclick="event.stopPropagation();mobAddPlaceToSchedule('${p.name.replace(/'/g,"\\'")}',${p.geometry?.location?.lat()||0},${p.geometry?.location?.lng()||0})">+ 추가</button>
     </div>`;
   }).join('');
-
-  window._mobPlaces = places;
 }
 
 function mobSelectPlace(idx) {
-  const p = (window._mobPlaces || [])[idx];
+  const p = (window._mobPlaces||[])[idx];
   if (!p || !mobMap) return;
   mobMap.panTo(p.geometry.location);
   mobMap.setZoom(16);
 }
 
-function mobAddPlaceToSchedule(name, lat, lng) {
-  if (typeof savePoiToPlaces === 'function') savePoiToPlaces(name, lat, lng, '', '');
-  if (typeof showToast === 'function') showToast(`"${name}" 일정에 추가됐어요 ✓`);
+async function mobAddPlaceToSchedule(name, lat, lng) {
+  if (!mobCurrentTrip) { mobShowToast('먼저 여행을 선택해주세요'); return; }
+  const day  = mobCurrentDay || 1;
+  const item = { type:'sight', name, lat, lng, time:'', desc:'', memo:'' };
+  if (!window.scheduleData) window.scheduleData = {};
+  if (!window.scheduleData[day]) window.scheduleData[day] = [];
+  window.scheduleData[day].push(item);
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, { schedule:window.scheduleData, updatedAt:new Date().toISOString() });
+    if (mobCurrentTripData) mobCurrentTripData.schedule = window.scheduleData;
+  } catch(e) {}
+  mobShowToast(`"${name}" Day${day}에 추가됐어요 ✓`);
 }
 
-// ── 저장 탭 ──────────────────────────────────────────────────
+// ── 저장 탭 (체크리스트/바우처) ───────────────────────────────
 function mobSavedTab(el, tab) {
-  document.querySelectorAll('.mob-saved-tab').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  document.querySelectorAll('.mob-saved-content').forEach(c => c.style.display = 'none');
-  document.getElementById('mob-saved-' + tab).style.display = 'block';
+  document.querySelectorAll('.mob-saved-tab').forEach(b=>b.classList.remove('active'));
+  el?.classList.add('active');
+  document.querySelectorAll('.mob-saved-content').forEach(c=>c.style.display='none');
+  const content = document.getElementById('mob-saved-' + tab);
+  if (content) content.style.display='block';
 }
 
 function mobRenderSaved() {
@@ -11934,47 +12536,66 @@ function mobRenderSaved() {
 function mobRenderChecklist() {
   const el = document.getElementById('mob-saved-check');
   if (!el) return;
-  const items = window.CHECKLIST_ITEMS || [];
-  const data = window.checklistData || {};
-  const done = items.filter(i => data[i.id]).length;
-  const total = items.length;
+
+  const baseItems   = (window.CHECKLIST_ITEMS || []).filter(i => !(window.deletedCheckIds||new Set()).has(i.id));
+  const customItems = window.customCheckItems || [];
+  const items       = [...baseItems, ...customItems];
+  const data        = window.checklistData || {};
+  const done        = items.filter(i=>data[i.id]).length;
+  const total       = items.length;
 
   // 진행률 카드
   const prog = document.getElementById('mob-checklist-progress');
-  if (prog) {
-    prog.innerHTML = `<div style="font-size:13px;font-weight:700;color:#2c2c2a;">준비물 체크리스트</div>
-      <div style="font-size:12px;color:#aaa;margin-top:2px;">${done} / ${total} 완료</div>
-      <div class="mob-progress-bar"><div class="mob-progress-fill" style="width:${total?Math.round(done/total*100):0}%"></div></div>`;
-  }
+  if (prog) prog.innerHTML = `
+    <div style="font-size:13px;font-weight:700;color:#2c2c2a;">준비물 체크리스트</div>
+    <div style="font-size:12px;color:#aaa;margin-top:2px;">${done} / ${total} 완료</div>
+    <div class="mob-progress-bar"><div class="mob-progress-fill" style="width:${total?Math.round(done/total*100):0}%"></div></div>`;
 
   el.innerHTML = items.map(item => {
     const checked = !!data[item.id];
     return `<div class="mob-check-item" onclick="mobToggleCheck('${item.id}')">
       <div class="mob-check-box${checked?' done':''}">${checked?'✓':''}</div>
-      <span class="mob-check-label${checked?' done':''}">${item.emoji} ${item.label}</span>
+      <span class="mob-check-label${checked?' done':''}">${item.emoji||''} ${item.label}</span>
     </div>`;
   }).join('');
 }
 
-function mobToggleCheck(id) {
-  if (typeof toggleCheck === 'function') {
-    toggleCheck(id);
-    mobRenderChecklist();
-  }
+async function mobToggleCheck(id) {
+  if (!window.checklistData) window.checklistData = {};
+  window.checklistData[id] = !window.checklistData[id];
+  mobRenderChecklist();
+  // Firebase 저장
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, { checklist:window.checklistData, updatedAt:new Date().toISOString() });
+    if (mobCurrentTripData) mobCurrentTripData.checklist = window.checklistData;
+  } catch(e) {}
 }
 
 function mobRenderVouchers() {
   const el = document.getElementById('mob-saved-voucher');
   if (!el) return;
-  const items = window.VOUCHER_ITEMS || [];
-  const data = window.voucherData || {};
+  const baseItems   = (window.VOUCHER_ITEMS||[]).filter(i=>!(window.deletedVoucherIds||new Set()).has(i.id));
+  const customItems = window.customVoucherItems||[];
+  const items       = [...baseItems, ...customItems];
+  const data        = window.voucherData || {};
+
   el.innerHTML = items.map(item => {
     const checked = !!data[item.id];
-    return `<div class="mob-check-item">
+    return `<div class="mob-check-item" onclick="mobToggleVoucher('${item.id}')">
       <div class="mob-check-box${checked?' done':''}">${checked?'✓':''}</div>
-      <span class="mob-check-label${checked?' done':''}">${item.emoji} ${item.label}</span>
+      <span class="mob-check-label${checked?' done':''}">${item.emoji||''} ${item.label}</span>
     </div>`;
   }).join('');
+}
+
+async function mobToggleVoucher(id) {
+  if (!window.voucherData) window.voucherData = {};
+  window.voucherData[id] = !window.voucherData[id];
+  mobRenderVouchers();
+  try {
+    await window.fbSaveTrip(mobCurrentTrip, { vouchers:window.voucherData, updatedAt:new Date().toISOString() });
+    if (mobCurrentTripData) mobCurrentTripData.vouchers = window.voucherData;
+  } catch(e) {}
 }
 
 function mobRenderPlacesSaved() {
@@ -11987,39 +12608,63 @@ function mobRenderPlacesSaved() {
   }
   el.innerHTML = places.map(p => `
     <div class="mob-place-item">
-      <div class="mob-place-thumb">${p.img ? `<img src="${p.img}" style="width:100%;height:100%;object-fit:cover;">` : '📍'}</div>
+      <div class="mob-place-thumb">${p.img?`<img src="${p.img}" style="width:100%;height:100%;object-fit:cover;">`:''}</div>
       <div class="mob-place-info">
-        <div class="mob-place-name">${p.name}</div>
-        <div class="mob-place-sub">${p.desc || ''}</div>
+        <div class="mob-place-name">${p.name||''}</div>
+        <div class="mob-place-sub">${p.desc||p.category||''}</div>
       </div>
+      ${p.lat?`<button class="mob-place-add-btn" style="border-color:#3A8FE0;color:#3A8FE0;" onclick="mobShowPinOnMap(${p.lat},${p.lng},'${(p.name||'').replace(/'/g,"\\'")}')">지도</button>`:''}
     </div>`).join('');
 }
 
-// ── 프로필 ────────────────────────────────────────────────────
+// ── 알림 ────────────────────────────────────────────────────
+function mobShowNotifications() {
+  const trips = window._mobTripList || [];
+  const today = new Date().toISOString().slice(0,10);
+  const notifs = [];
+  trips.forEach(t => {
+    if (!t.startDate) return;
+    const diff = Math.round((new Date(t.startDate)-new Date(today))/86400000);
+    if (diff===0)  notifs.push({ icon:'🎉', msg:`오늘 "${t.title}" 출발이에요!`, color:'#E07A3A' });
+    if (diff===1)  notifs.push({ icon:'✈️', msg:`내일 "${t.title}" 출발이에요!`, color:'#3A8FE0' });
+    if (diff===3)  notifs.push({ icon:'📅', msg:`"${t.title}" 출발 3일 전이에요`, color:'#3AAF7A' });
+    if (diff===7)  notifs.push({ icon:'🗓️', msg:`"${t.title}" 출발 1주일 전이에요`, color:'#888' });
+  });
+
+  mobOpenSheet('mob-notif-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px;">🔔 알림</div>
+    ${notifs.length
+      ? notifs.map(n=>`<div style="display:flex;align-items:center;gap:10px;padding:12px;background:#FEF5EE;border-radius:10px;margin-bottom:8px;">
+          <span style="font-size:20px;">${n.icon}</span>
+          <span style="font-size:14px;font-weight:600;color:${n.color};">${n.msg}</span>
+        </div>`).join('')
+      : '<div style="text-align:center;padding:24px;color:#999;font-size:14px;">새 알림이 없어요</div>'
+    }
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-notif-sheet')" style="color:#555;">닫기</button>
+  `);
+}
+
+// ── 프로필 탭 ────────────────────────────────────────────────
 function mobRenderProfile() {
-  const d = mobCurrentTripData || {};
-  const name = document.getElementById('trip-author')?.value
-    || (window._mobTripList || []).find(t => t.id === mobCurrentTrip)?.author
-    || '여행자';
-  const id = window.TRIP_ID || '';
+  const d      = mobCurrentTripData || {};
+  const author = d.author || document.getElementById('trip-author')?.value
+    || (window._mobTripList||[]).find(t=>t.id===mobCurrentTrip)?.author || '여행자';
+  const id     = mobCurrentTrip || '';
+
   const nameEl = document.getElementById('mob-profile-name');
-  const idEl = document.getElementById('mob-profile-id');
-  if (nameEl) nameEl.textContent = name;
-  if (idEl) idEl.textContent = id ? `Trip ID: ${id}` : '';
+  const idEl   = document.getElementById('mob-profile-id');
+  if (nameEl) nameEl.textContent = author;
+  if (idEl)   idEl.textContent   = id ? `Trip ID: ${id}` : '';
 
-  const langLabel = document.getElementById('mob-lang-label');
-  if (langLabel) langLabel.textContent = (window.currentLang === 'ja') ? '日本語' : '한국어';
+  const langLabel  = document.getElementById('mob-lang-label');
+  const themeLabel = document.getElementById('mob-theme-label');
+  const offCount   = document.getElementById('mob-offline-count');
+  if (langLabel)  langLabel.textContent  = (window.currentLang==='ja') ? '日本語' : '한국어';
+  if (themeLabel) themeLabel.textContent = mobIsDarkMode ? '다크 모드' : '라이트 모드';
 
-  // 다크모드 상태 반영
-  const themeItem = document.getElementById('mob-theme-label');
-  if (themeItem) themeItem.textContent = mobIsDarkMode ? '다크 모드' : '라이트 모드';
-
-  // 오프라인 저장 여행 수 표시
-  if (window.offlineList) {
-    window.offlineList().then(list => {
-      const el = document.getElementById('mob-offline-count');
-      if (el) el.textContent = list.length + '개 저장됨';
-    });
+  if (window.offlineList && offCount) {
+    window.offlineList().then(list => { offCount.textContent = list.length + '개 저장됨'; }).catch(()=>{});
   }
 }
 
@@ -12028,156 +12673,144 @@ function mobToggleLang() {
   mobRenderProfile();
 }
 
-function mobGoToPC() {
-  document.getElementById('mob-app').style.display = 'none';
-}
+function mobToggleDarkMode() {
   mobIsDarkMode = !mobIsDarkMode;
+  const root = document.documentElement;
   if (mobIsDarkMode) {
-    document.documentElement.style.setProperty('--cream', '#1a1a1e');
-    document.documentElement.style.setProperty('--white', '#242428');
-    document.documentElement.style.setProperty('--stone', '#2a2a2e');
-    document.documentElement.style.setProperty('--sand', '#3a3a3e');
-    document.documentElement.style.setProperty('--ink', '#f0f0ee');
-    document.documentElement.style.setProperty('--ink2', '#c8c8c4');
-    document.documentElement.style.setProperty('--ink3', '#888880');
-    document.getElementById('mob-app').style.background = '#1a1a1e';
+    root.style.setProperty('--cream','#1a1a1e');
+    root.style.setProperty('--white','#242428');
+    root.style.setProperty('--stone','#2a2a2e');
+    root.style.setProperty('--sand','#3a3a3e');
+    root.style.setProperty('--ink','#f0f0ee');
+    root.style.setProperty('--ink2','#c8c8c4');
+    root.style.setProperty('--ink3','#888880');
+    const app = document.getElementById('mob-app');
+    if (app) app.style.background='#1a1a1e';
   } else {
-    document.documentElement.style.setProperty('--cream', '#FAFAF7');
-    document.documentElement.style.setProperty('--white', '#FFFFFF');
-    document.documentElement.style.setProperty('--stone', '#F2F0EB');
-    document.documentElement.style.setProperty('--sand', '#E8E4DC');
-    document.documentElement.style.setProperty('--ink', '#1A1A18');
-    document.documentElement.style.setProperty('--ink2', '#3D3D38');
-    document.documentElement.style.setProperty('--ink3', '#6B6B64');
-    document.getElementById('mob-app').style.background = '';
+    root.style.setProperty('--cream','#FAFAF7');
+    root.style.setProperty('--white','#FFFFFF');
+    root.style.setProperty('--stone','#F2F0EB');
+    root.style.setProperty('--sand','#E8E4DC');
+    root.style.setProperty('--ink','#1A1A18');
+    root.style.setProperty('--ink2','#3D3D38');
+    root.style.setProperty('--ink3','#6B6B64');
+    const app = document.getElementById('mob-app');
+    if (app) app.style.background='';
   }
   const themeLabel = document.getElementById('mob-theme-label');
   if (themeLabel) themeLabel.textContent = mobIsDarkMode ? '다크 모드' : '라이트 모드';
-  showToast(mobIsDarkMode ? '🌙 다크 모드 켜짐' : '☀️ 라이트 모드 켜짐');
+  mobShowToast(mobIsDarkMode ? '🌙 다크 모드' : '☀️ 라이트 모드');
 }
 
+function mobGoToPC() {
+  document.getElementById('mob-app').style.display = 'none';
+}
+
+// ── 오프라인 저장 목록 ────────────────────────────────────────
 function mobShowOfflineTrips() {
-  if (!window.offlineList) { showToast('오프라인 데이터 없음'); return; }
+  if (!window.offlineList) { mobShowToast('오프라인 데이터 없음'); return; }
   window.offlineList().then(list => {
-    if (!list.length) { showToast('오프라인 저장된 여행이 없어요'); return; }
-    const sheet = document.createElement('div');
-    sheet.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,0.45);';
-    const rows = list.map(item => `
-      <div style="padding:12px 0;border-bottom:1px solid #f0ede8;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:20px;">📦</span>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;">${item.data?.title || item.tripId}</div>
-          <div style="font-size:11px;color:#999;">${item.savedAt ? new Date(item.savedAt).toLocaleDateString('ko-KR') : ''}</div>
-        </div>
-        <button onclick="mobLoadOffline('${item.tripId}')" style="border:none;background:#E07A3A;color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">불러오기</button>
-      </div>`).join('');
-    sheet.innerHTML = `
-      <div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 40px;max-height:60vh;overflow-y:auto;">
-        <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"></div>
-        <div style="font-size:15px;font-weight:700;margin-bottom:12px;">📦 오프라인 저장 목록</div>
-        ${rows}
-        <button onclick="this.closest('div[style]').remove();" style="width:100%;margin-top:14px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;">닫기</button>
-      </div>`;
-    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
-    document.body.appendChild(sheet);
-  });
-}
-
-function mobLoadOffline(tripId) {
-  document.querySelectorAll('div[style*="9999"]').forEach(el => el.remove());
-  if (window.offlineLoad) {
-    window.offlineLoad(tripId).then(snap => {
-      if (!snap) { showToast('데이터를 불러올 수 없어요'); return; }
-      mobCurrentTrip = tripId;
-      mobCurrentTripData = snap.data;
-      window.TRIP_ID = tripId;
-      if (snap.data?.schedule) window.scheduleData = snap.data.schedule;
-      if (snap.data?.expenseData) window.expenseData = snap.data.expenseData;
-      if (snap.data?.checklist) window.checklistData = snap.data.checklist;
-      mobTab('schedule');
-      showToast('오프라인 데이터 불러옴 ✓');
-    });
-  }
-}
-
-function mobShowNotifications() {
-  const trips = window._mobTripList || [];
-  const today = new Date().toISOString().slice(0, 10);
-  const notifs = [];
-
-  trips.forEach(t => {
-    if (!t.startDate) return;
-    const diff = Math.round((new Date(t.startDate) - new Date(today)) / 86400000);
-    if (diff === 1) notifs.push(`✈️ 내일 "${t.title}" 출발이에요!`);
-    else if (diff === 3) notifs.push(`📅 "${t.title}" 출발 3일 전이에요`);
-    else if (diff === 7) notifs.push(`🗓️ "${t.title}" 출발 1주일 전이에요`);
-  });
-
-  const sheet = document.createElement('div');
-  sheet.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,0.45);';
-  sheet.innerHTML = `
-    <div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 40px;max-height:60vh;overflow-y:auto;">
+    if (!list.length) { mobShowToast('오프라인 저장된 여행이 없어요'); return; }
+    mobOpenSheet('mob-offline-sheet', `
       <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"></div>
-      <div style="font-size:15px;font-weight:700;margin-bottom:12px;">🔔 알림</div>
-      ${notifs.length
-        ? notifs.map(n => `<div style="padding:12px;background:#FEF5EE;border-radius:10px;margin-bottom:8px;font-size:14px;">${n}</div>`).join('')
-        : '<div style="text-align:center;padding:24px;color:#999;font-size:14px;">새 알림이 없어요</div>'
-      }
-      <button onclick="this.closest('div[style]').remove();" style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;">닫기</button>
-    </div>`;
-  sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
-  document.body.appendChild(sheet);
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px;">📦 오프라인 저장 목록</div>
+      ${list.map(item=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f0ede8;">
+          <span style="font-size:20px;">📦</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">${item.data?.title||item.tripId}</div>
+            <div style="font-size:11px;color:#999;">${item.savedAt?new Date(item.savedAt).toLocaleDateString('ko-KR'):''}</div>
+          </div>
+          <button onclick="mobCloseSheet('mob-offline-sheet');mobLoadOffline('${item.tripId}')"
+            style="border:none;background:#E07A3A;color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;">불러오기</button>
+        </div>`).join('')}
+      <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-offline-sheet')" style="color:#555;margin-top:4px;">닫기</button>
+    `);
+  }).catch(() => mobShowToast('불러오기 실패'));
 }
+
+async function mobLoadOffline(tripId) {
+  try {
+    const snap = await window.offlineLoad?.(tripId);
+    if (!snap) { mobShowToast('데이터를 불러올 수 없어요'); return; }
+    mobCurrentTrip     = tripId;
+    mobCurrentTripData = snap.data;
+    window.TRIP_ID     = tripId;
+    if (snap.data?.schedule)    window.scheduleData  = snap.data.schedule;
+    if (snap.data?.expenseData) window.expenseData   = snap.data.expenseData;
+    if (snap.data?.checklist)   window.checklistData = snap.data.checklist;
+    if (snap.data?.vouchers)    window.voucherData   = snap.data.vouchers;
+    mobTab('schedule');
+    mobShowToast('오프라인 데이터 불러옴 ✓');
+  } catch(e) { mobShowToast('불러오기 실패'); }
+}
+
+// ── CSS 추가: 모바일 시트 버튼 공통 스타일 ────────────────────
+(function injectMobStyles() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .mob-sheet-body {
+      background:#fff;
+      border-radius:20px 20px 0 0;
+      padding:20px 16px 40px;
+      max-height:85vh;
+      overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+    .mob-sheet-btn {
+      display:block;width:100%;padding:14px;
+      border:none;background:#f5f3ee;border-radius:12px;
+      font-size:14px;font-weight:600;cursor:pointer;
+      text-align:left;margin-bottom:6px;
+      font-family:inherit;color:#2c2c2a;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .mob-sheet-btn:active { background:#ede9e2; }
+    .mob-trip-badge {
+      font-size:11px;font-weight:700;padding:3px 10px;
+      border-radius:20px;white-space:nowrap;flex-shrink:0;
+    }
+  `;
+  document.head.appendChild(style);
+})();
 
 // ── 초기화 ────────────────────────────────────────────────────
 function mobInit() {
   if (window.innerWidth > 768) return;
-
-  // Firebase 여행 목록 로드
   mobLoadTripList();
-
-  // 기존 데이터 로드 완료 후 연동
-  const origApply = window.applyTripData;
-  if (origApply) {
-    window.applyTripData = function(data) {
-      origApply.call(this, data);
-      // 모바일 UI 갱신
-      if (mobCurrentTrip) {
-        setTimeout(() => {
-          if (mobCurrentSchedTab === 'timeline') mobRenderTimeline();
-          if (mobCurrentSchedTab === 'overview') mobRenderOverview();
-        }, 100);
-      }
-    };
-  }
 }
 
 async function mobLoadTripList() {
   try {
     if (!window.db) return;
-    // updatedAt 내림차순 정렬
     let trips = [];
     try {
-      const snap = await window.db.collection('trips').orderBy('updatedAt', 'desc').get();
-      snap.forEach(doc => { const d = doc.data(); if (d.title !== undefined) trips.push({ id: doc.id, ...d }); });
+      const snap = await window.db.collection('trips').orderBy('updatedAt','desc').get();
+      snap.forEach(doc => { const d=doc.data(); if(d.title!==undefined) trips.push({id:doc.id,...d}); });
     } catch(e) {
-      // 인덱스 없으면 정렬 없이
       const snap = await window.db.collection('trips').get();
-      snap.forEach(doc => { const d = doc.data(); if (d.title !== undefined) trips.push({ id: doc.id, ...d }); });
-      trips.sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
+      snap.forEach(doc => { const d=doc.data(); if(d.title!==undefined) trips.push({id:doc.id,...d}); });
+      trips.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
     }
     window._mobTripList = trips;
     mobRenderTripList();
 
-    // 현재 URL에 trip ID 있으면 자동 선택 후 데이터 로드
+    // URL에 trip ID 있으면 자동 로드
     const urlTrip = new URLSearchParams(location.search).get('trip');
-    if (urlTrip) {
-      mobCurrentTrip = urlTrip;
-      await mobSelectTrip(urlTrip);
-    }
+    if (urlTrip) await mobSelectTrip(urlTrip);
   } catch(e) {
     console.warn('mob trip list error:', e);
   }
+}
+
+// 인증 완료 후 mobInit 재실행 (firebase auth 완료 이후에도 동작하도록)
+if (typeof firebase !== 'undefined') {
+  firebase.auth().onAuthStateChanged(user => {
+    if (user && window.innerWidth <= 768 && !window._mobInited) {
+      window._mobInited = true;
+      mobLoadTripList();
+    }
+  });
 }
 
 // DOM 준비 후 실행
