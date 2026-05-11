@@ -10927,7 +10927,6 @@ document.addEventListener('keydown', (e) => {
         <button class="mob-filter" data-filter="ongoing" onclick="mobFilterTrips(this,'ongoing')">여행 중</button>
         <button class="mob-filter" data-filter="upcoming" onclick="mobFilterTrips(this,'upcoming')">예정</button>
         <button class="mob-filter" data-filter="done" onclick="mobFilterTrips(this,'done')">완료</button>
-        <button class="mob-filter" data-filter="saved" onclick="mobFilterTrips(this,'saved')">보관함</button>
       </div>
 
       <!-- 내 여행 목록 -->
@@ -11013,6 +11012,10 @@ document.addEventListener('keydown', (e) => {
 
   <!-- 지도 탭 -->
   <div class="mob-page" id="mob-map">
+    <!-- 선택된 여행 제목 상단 고정 -->
+    <div id="mob-map-trip-title" style="display:none;position:absolute;top:0;left:0;right:0;z-index:10;background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);padding:10px 16px;font-size:13px;font-weight:700;color:#2c2c2a;border-bottom:1px solid #ede9e2;">
+      <span id="mob-map-trip-title-text"></span>
+    </div>
     <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
     <!-- 지도 위 검색바 -->
     <div class="mob-map-searchbar">
@@ -11039,7 +11042,10 @@ document.addEventListener('keydown', (e) => {
   <!-- 저장 탭 (체크리스트/바우처) -->
   <div class="mob-page" id="mob-saved">
     <div class="mob-header">
-      <div class="mob-header-title">챙겨야할 것</div>
+      <div style="display:flex;flex-direction:column;">
+        <div class="mob-header-title">챙겨야할 것</div>
+        <div id="mob-saved-trip-title" style="font-size:11px;color:#E07A3A;font-weight:600;margin-top:1px;display:none;"></div>
+      </div>
     </div>
     <div class="mob-scroll">
       <!-- 진행률 -->
@@ -11068,6 +11074,7 @@ document.addEventListener('keydown', (e) => {
         <div>
           <div id="mob-profile-name" style="font-weight:700;font-size:16px;">여행자</div>
           <div id="mob-profile-id" style="font-size:12px;color:#999;margin-top:2px;"></div>
+          <div id="mob-build-badge" style="display:none;font-size:10px;color:#aaa;margin-top:4px;letter-spacing:0.3px;"></div>
         </div>
       </div>
       <div class="mob-menu-list">
@@ -11353,10 +11360,38 @@ function mobTab(tab) {
   if (page) page.classList.add('active');
   if (btn)  btn.classList.add('active');
 
-  if (tab === 'map')      mobInitFullMap();
+  const tripTitle = (mobCurrentTripData?.title) || document.getElementById('trip-title')?.value || '';
+
+  if (tab === 'map') {
+    mobInitFullMap();
+    // 지도 탭 여행 제목 표시
+    const mapTitleEl  = document.getElementById('mob-map-trip-title');
+    const mapTitleTxt = document.getElementById('mob-map-trip-title-text');
+    if (mapTitleEl) {
+      if (tripTitle) {
+        mapTitleEl.style.display = 'block';
+        if (mapTitleTxt) mapTitleTxt.textContent = '✈️ ' + tripTitle;
+        // 검색바·카테고리 위치 조정
+        const searchbar = document.querySelector('.mob-map-searchbar');
+        if (searchbar) searchbar.style.top = '50px';
+        const cats = document.querySelector('.mob-map-cats');
+        if (cats) cats.style.top = '106px';
+      } else {
+        mapTitleEl.style.display = 'none';
+      }
+    }
+  }
   if (tab === 'home')     mobRenderTripList();
   if (tab === 'schedule') mobRenderSchedule();
-  if (tab === 'saved')    mobRenderSaved();
+  if (tab === 'saved') {
+    mobRenderSaved();
+    // 저장 탭 여행 제목 표시
+    const savedTitleEl = document.getElementById('mob-saved-trip-title');
+    if (savedTitleEl) {
+      if (tripTitle) { savedTitleEl.textContent = '✈️ ' + tripTitle; savedTitleEl.style.display = 'block'; }
+      else savedTitleEl.style.display = 'none';
+    }
+  }
   if (tab === 'profile')  mobRenderProfile();
 }
 
@@ -11403,30 +11438,30 @@ function mobRenderTripList() {
 
   container.innerHTML = filtered.map(trip => {
     const status = mobGetTripStatus(trip);
-    const statusMap = { ongoing:'여행 중', upcoming:'예정', done:'완료', saved:'보관함' };
-    const statusColor = { ongoing:'#3AAF7A', upcoming:'#3A8FE0', done:'#aaa', saved:'#888' };
+    const statusMap   = { ongoing:'여행 중', upcoming:'예정', done:'완료' };
+    const statusColor = { ongoing:'#3AAF7A', upcoming:'#3A8FE0', done:'#aaa' };
     const label = statusMap[status] || '';
     const color = statusColor[status] || '#999';
     const nights = trip.startDate && trip.endDate
       ? Math.round((new Date(trip.endDate)-new Date(trip.startDate))/86400000)
       : null;
+    const isAdmin = mobIsAdmin || sessionStorage.getItem('adminMode') === '1';
     return `<div class="mob-trip-card" onclick="mobSelectTrip('${trip.id}')">
       <div class="mob-trip-icon">${mobTripIcon(trip)}</div>
       <div class="mob-trip-info">
         <div class="mob-trip-name">${trip.title || '(제목 없음)'}</div>
         <div class="mob-trip-date">${mobTripDateStr(trip)}</div>
-        ${nights !== null ? `<div class="mob-trip-detail" style="font-size:11px;color:#aaa;">${nights}박${nights+1}일</div>` : ''}
+        ${nights !== null ? `<div class="mob-trip-detail">${nights}박${nights+1}일</div>` : ''}
       </div>
       ${label ? `<span class="mob-trip-badge ${status}" style="background:${color}20;color:${color};">${label}</span>` : ''}
+      ${isAdmin ? `<button class="mob-trip-del-btn" onclick="event.stopPropagation();mobAdminDeleteTrip('${trip.id}','${(trip.title||'(제목 없음)').replace(/'/g,"\\'")}')">🗑️</button>` : ''}
     </div>`;
   }).join('');
 
-  // 영감 카드 렌더 (매번 홈 표시 시 갱신)
   mobRenderInspire(4);
 }
 
 function mobGetTripStatus(trip) {
-  if (trip.isArchived) return 'saved';
   const today = new Date().toISOString().slice(0,10);
   if (!trip.startDate || !trip.endDate) return 'upcoming';
   if (trip.startDate <= today && trip.endDate >= today) return 'ongoing';
@@ -12803,27 +12838,112 @@ function mobRenderChecklist() {
   const el = document.getElementById('mob-saved-check');
   if (!el) return;
 
-  const baseItems   = (window.CHECKLIST_ITEMS || []).filter(i => !(window.deletedCheckIds||new Set()).has(i.id));
+  // PC와 동일한 CHECKLIST_ITEMS 사용
+  const baseItems   = (window.CHECKLIST_ITEMS || [
+    { id:'passport',    label:'여권',           emoji:'🛂' },
+    { id:'id-card',     label:'신분증',          emoji:'🪪' },
+    { id:'intl-license',label:'국제면허증',       emoji:'🚗' },
+    { id:'toiletry',    label:'세면도구',         emoji:'🧴' },
+    { id:'adapter',     label:'변압기 / 어댑터',  emoji:'🔌' },
+    { id:'visit-japan', label:'Visit Japan Web',  emoji:'🇯🇵' },
+  ]).filter(i => !(window.deletedCheckIds||new Set()).has(i.id));
+
   const customItems = window.customCheckItems || [];
   const items       = [...baseItems, ...customItems];
   const data        = window.checklistData || {};
-  const done        = items.filter(i=>data[i.id]).length;
-  const total       = items.length;
+  const done        = items.filter(i => data[i.id]).length;
 
-  // 진행률 카드
+  // 진행률 바
   const prog = document.getElementById('mob-checklist-progress');
   if (prog) prog.innerHTML = `
-    <div style="font-size:13px;font-weight:700;color:#2c2c2a;">준비물 체크리스트</div>
-    <div style="font-size:12px;color:#aaa;margin-top:2px;">${done} / ${total} 완료</div>
-    <div class="mob-progress-bar"><div class="mob-progress-fill" style="width:${total?Math.round(done/total*100):0}%"></div></div>`;
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:700;color:#2c2c2a;">준비물 체크리스트</div>
+      <div style="font-size:12px;color:#aaa;">${done} / ${items.length} 완료</div>
+    </div>
+    <div class="mob-progress-bar"><div class="mob-progress-fill" style="width:${items.length?Math.round(done/items.length*100):0}%"></div></div>`;
 
   el.innerHTML = items.map(item => {
     const checked = !!data[item.id];
+    const isCustom = customItems.includes(item);
     return `<div class="mob-check-item" onclick="mobToggleCheck('${item.id}')">
       <div class="mob-check-box${checked?' done':''}">${checked?'✓':''}</div>
-      <span class="mob-check-label${checked?' done':''}">${item.emoji||''} ${item.label}</span>
+      <span class="mob-check-label${checked?' done':''}">
+        ${item.emoji ? `<span>${item.emoji}</span>` : ''} ${item.label}
+      </span>
+      ${isCustom ? `<button onclick="event.stopPropagation();mobDeleteCheckItem('${item.id}')"
+        style="border:none;background:none;color:#ccc;font-size:14px;cursor:pointer;padding:2px 6px;margin-left:auto;">✕</button>` : ''}
     </div>`;
-  }).join('');
+  }).join('') + `
+    <button onclick="mobAddCheckItem()"
+      style="width:100%;margin-top:10px;padding:11px;border:2px dashed #e0ddd6;background:#fff;border-radius:12px;font-size:13px;font-weight:600;color:#E07A3A;cursor:pointer;font-family:inherit;">
+      ＋ 준비물 추가
+    </button>`;
+}
+
+function mobAddCheckItem() {
+  mobOpenSheet('mob-add-check-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:14px;">＋ 준비물 추가</div>
+    <div style="display:grid;grid-template-columns:60px 1fr;gap:8px;margin-bottom:12px;">
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">이모지</div>
+        <input id="mob-check-emoji" type="text" maxlength="2" placeholder="🧳"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 8px;font-size:20px;text-align:center;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">항목명</div>
+        <input id="mob-check-label" type="text" maxlength="30" placeholder="예: 우산, 선크림"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"
+          onkeydown="if(event.key==='Enter')mobSaveCheckItem()" />
+      </div>
+    </div>
+    <button class="mob-primary-btn" onclick="mobSaveCheckItem()">＋ 추가하기</button>
+    <button onclick="mobCloseSheet('mob-add-check-sheet')"
+      style="width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>
+  `);
+  setTimeout(() => document.getElementById('mob-check-label')?.focus(), 150);
+}
+
+async function mobSaveCheckItem() {
+  const label = document.getElementById('mob-check-label')?.value.trim();
+  const emoji = document.getElementById('mob-check-emoji')?.value.trim() || '📌';
+  if (!label) { mobShowToast('항목명을 입력해주세요'); return; }
+
+  const id = 'custom-' + Date.now();
+  if (!window.customCheckItems) window.customCheckItems = [];
+  window.customCheckItems.push({ id, label, emoji });
+
+  // Firebase 저장
+  if (mobCurrentTrip) {
+    try {
+      await window.fbSaveTrip(mobCurrentTrip, {
+        customCheckItems: window.customCheckItems,
+        updatedAt: new Date().toISOString()
+      });
+      if (mobCurrentTripData) mobCurrentTripData.customCheckItems = window.customCheckItems;
+    } catch(e) { console.warn('체크리스트 저장 실패:', e); }
+  }
+
+  mobCloseSheet('mob-add-check-sheet');
+  mobShowToast(`"${label}" 추가됐어요 ✓`);
+  mobRenderChecklist();
+}
+
+async function mobDeleteCheckItem(id) {
+  window.customCheckItems = (window.customCheckItems||[]).filter(i => i.id !== id);
+  if (window.checklistData) delete window.checklistData[id];
+  if (mobCurrentTrip) {
+    try {
+      await window.fbSaveTrip(mobCurrentTrip, {
+        customCheckItems: window.customCheckItems,
+        checklist: window.checklistData,
+        updatedAt: new Date().toISOString()
+      });
+    } catch(e) {}
+  }
+  mobRenderChecklist();
 }
 
 async function mobToggleCheck(id) {
@@ -12923,6 +13043,30 @@ function mobRenderProfile() {
   if (nameEl) nameEl.textContent = author;
   if (idEl)   idEl.textContent   = id ? `Trip ID: ${id}` : '';
 
+  // 관리자일 때 빌드 배지 표시
+  const buildBadgeEl = document.getElementById('mob-build-badge');
+  if (buildBadgeEl) {
+    if (mobIsAdmin || sessionStorage.getItem('adminMode') === '1') {
+      buildBadgeEl.style.display = 'block';
+      // PC build-badge에서 텍스트 가져오기
+      const pcBadge = document.getElementById('build-badge');
+      if (pcBadge?.textContent && pcBadge.textContent !== 'Build : ···') {
+        buildBadgeEl.textContent = pcBadge.textContent + '.ver';
+      } else {
+        // GitHub API 직접 호출
+        fetch('https://api.github.com/repos/yessalbi/Travel/commits/main',
+          { headers: { Accept: 'application/vnd.github.v3+json' } })
+          .then(r => r.json())
+          .then(d => {
+            const hash = d.sha?.slice(0,7);
+            if (hash) buildBadgeEl.textContent = `(${hash}).ver`;
+          }).catch(() => { buildBadgeEl.textContent = '(-----).ver'; });
+      }
+    } else {
+      buildBadgeEl.style.display = 'none';
+    }
+  }
+
   const langLabel  = document.getElementById('mob-lang-label');
   const themeLabel = document.getElementById('mob-theme-label');
   const offCount   = document.getElementById('mob-offline-count');
@@ -13004,9 +13148,47 @@ function mobLogout() {
   window._mobInited = false;
   mobCurrentTrip = null;
   mobCurrentTripData = null;
-  // 홈 탭으로 이동 후 게이트 표시
   mobTab('home');
   mobShowAuthGate();
+}
+
+async function mobAdminDeleteTrip(tripId, tripTitle) {
+  // 확인 팝업
+  mobOpenSheet('mob-delete-confirm-sheet', `
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 20px;"></div>
+    <div style="font-size:18px;text-align:center;margin-bottom:12px;">🗑️</div>
+    <div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:8px;">여행을 삭제할까요?</div>
+    <div style="font-size:14px;color:#555;text-align:center;margin-bottom:20px;line-height:1.6;">
+      "<span style="font-weight:700;color:#E53935;">${tripTitle}</span>"<br>
+      <span style="font-size:12px;color:#aaa;">삭제하면 복구할 수 없어요</span>
+    </div>
+    <button onclick="mobAdminDeleteConfirm('${tripId}','${tripTitle.replace(/'/g,"\\'")}');mobCloseSheet('mob-delete-confirm-sheet');"
+      style="width:100%;padding:14px;border:none;border-radius:12px;background:#E53935;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px;">
+      삭제하기
+    </button>
+    <button onclick="mobCloseSheet('mob-delete-confirm-sheet')"
+      style="width:100%;padding:14px;border:1.5px solid #e0ddd6;border-radius:12px;background:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:#555;">
+      취소
+    </button>
+  `);
+}
+
+async function mobAdminDeleteConfirm(tripId, tripTitle) {
+  try {
+    await window.fbDeleteTrip(tripId);
+    // 목록에서 제거
+    window._mobTripList = (window._mobTripList||[]).filter(t => t.id !== tripId);
+    // 현재 열려있던 여행이면 닫기
+    if (mobCurrentTrip === tripId) {
+      mobCurrentTrip = null;
+      mobCurrentTripData = null;
+    }
+    mobRenderTripList();
+    mobShowToast(`"${tripTitle}" 삭제됐어요`);
+  } catch(e) {
+    console.error('삭제 실패:', e);
+    mobShowToast('삭제 실패 — ' + (e.message || '오류'));
+  }
 }
 
 // ── 오프라인 저장 목록 ────────────────────────────────────────
@@ -13073,6 +13255,12 @@ async function mobLoadOffline(tripId) {
       font-size:11px;font-weight:700;padding:3px 10px;
       border-radius:20px;white-space:nowrap;flex-shrink:0;
     }
+    .mob-trip-del-btn {
+      border:none;background:none;font-size:18px;cursor:pointer;
+      padding:4px 6px;flex-shrink:0;opacity:0.5;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .mob-trip-del-btn:active { opacity:1; }
   `;
   document.head.appendChild(style);
 })();
