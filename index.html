@@ -6048,62 +6048,36 @@ function isDomesticCoord(lat, lng) {
   return lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132;
 }
 
-// 현재 여행이 국내 여행인지 판단
+// 현재 여행이 국내 여행인지 판단 (모든 소스 체크)
 function isTripDomestic() {
-  // 1. Firebase 데이터의 isDomestic 필드
-  if (typeof isDomestic !== 'undefined' && isDomestic) return true;
-  // 2. 여행 제목 키워드
-  const title = document.getElementById('trip-title')?.value || '';
-  if (DOMESTIC_KEYWORDS && DOMESTIC_KEYWORDS.some(k => title.includes(k))) return true;
-  // 3. 일정의 첫 번째 핀 좌표로 판단
+  // 1. PC 전역 isDomestic 변수 (switchFlightSection으로 설정됨)
+  if (typeof isDomestic !== 'undefined' && isDomestic === true) return true;
+  // 2. Firebase 데이터 캐시 (모바일)
+  const d = window.mobCurrentTripData || null;
+  if (d?.isDomestic === true) return true;
+  // 3. 여행 제목 키워드
+  const title = document.getElementById('trip-title')?.value
+    || d?.title
+    || (window._mobTripList||[]).find(t=>t.id===window.TRIP_ID)?.title
+    || '';
+  if (title && typeof DOMESTIC_KEYWORDS !== 'undefined' && DOMESTIC_KEYWORDS.some(k => title.includes(k))) return true;
+  // 4. 일정 첫 번째 핀 좌표
   const sched = window.scheduleData || {};
   const firstPin = Object.values(sched).flat().find(i => i.lat && i.lng);
   if (firstPin) return isDomesticCoord(firstPin.lat, firstPin.lng);
   return false;
 }
 
-// 카카오 Directions API 요청
+// 카카오 Directions API 요청 (올바른 엔드포인트)
+// 자동차: apis-navi.kakao.com/v1/directions (REST API 키로 CORS 허용)
+// 도보/대중교통: 카카오 공식 미지원 → OSRM 폴백 or 직선
 async function kakaoRouteRequest(from, to, mode) {
-  // 카카오 이동수단 매핑
-  // MOTORCYCLE 제외, 기본: FASTEST(자동차), WALK(도보), TRANSIT(대중교통)
-  const modeMap = {
-    driving:    'car',
-    walking:    'walk',
-    transit:    'transit',
-    bicycling:  'walk',  // 카카오 자전거 미지원 → 도보 폴백
-  };
-  const kakaoMode = modeMap[mode] || 'car';
+  if (KAKAO_REST_KEY === 'YOUR_KAKAO_REST_API_KEY') return null;
 
   try {
-    if (kakaoMode === 'transit') {
-      // 카카오 대중교통 경로: Mobility API
-      const url = `https://apis-navi.kakaomobility.com/v1/directions`
-        + `?origin=${from.lng},${from.lat}`
-        + `&destination=${to.lng},${to.lat}`
-        + `&priority=RECOMMEND`;
-      const res = await fetch(url, {
-        headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data.routes?.[0]?.result_code !== 0) return null;
-      return { kakao: true, mode: 'transit', data: data.routes[0] };
-    } else if (kakaoMode === 'walk') {
-      // 카카오 도보 경로
-      const url = `https://apis-navi.kakaomobility.com/v1/directions`
-        + `?origin=${from.lng},${from.lat}`
-        + `&destination=${to.lng},${to.lat}`
-        + `&priority=RECOMMEND`;
-      const res = await fetch(url, {
-        headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data.routes?.[0]?.result_code !== 0) return null;
-      return { kakao: true, mode: 'walk', data: data.routes[0] };
-    } else {
-      // 카카오 자동차 경로: Mobility Directions API
-      const url = `https://apis-navi.kakaomobility.com/v1/directions`
+    if (mode === 'driving') {
+      // 카카오 자동차 경로 (클라이언트에서 CORS 허용됨)
+      const url = 'https://apis-navi.kakao.com/v1/directions'
         + `?origin=${from.lng},${from.lat}`
         + `&destination=${to.lng},${to.lat}`
         + `&priority=RECOMMEND`
@@ -6111,43 +6085,99 @@ async function kakaoRouteRequest(from, to, mode) {
       const res = await fetch(url, {
         headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        console.warn('[Kakao] driving API error:', res.status, await res.text().catch(()=>''));
+        return null;
+      }
       const data = await res.json();
-      if (data.routes?.[0]?.result_code !== 0) return null;
+      // result_code 0 = 정상
+      if (!data.routes?.length || data.routes[0].result_code !== 0) return null;
       return { kakao: true, mode: 'car', data: data.routes[0] };
     }
+
+    if (mode === 'walking') {
+      // 카카오 공식 도보 API 없음 → OSRM(오픈소스) 폴백
+      return await osrmRouteRequest(from, to, 'foot');
+    }
+
+    if (mode === 'transit') {
+      // 카카오 대중교통 공식 클라이언트 API 없음 → OSRM 폴백
+      return await osrmRouteRequest(from, to, 'driving'); // 차량 경로로 근사
+    }
+
+    if (mode === 'bicycling') {
+      return await osrmRouteRequest(from, to, 'cycling');
+    }
+
+    return null;
   } catch(e) {
     console.warn('[Kakao Route] error:', e);
     return null;
   }
 }
 
-// 카카오 경로 응답 → { lat, lng }[] 좌표 배열
+// OSRM 공개 API (도보/자전거 경로, 한국 지원)
+async function osrmRouteRequest(from, to, profile) {
+  // profile: 'foot' | 'cycling' | 'driving'
+  try {
+    const url = `https://router.project-osrm.org/route/v1/${profile}`
+      + `/${from.lng},${from.lat};${to.lng},${to.lat}`
+      + `?overview=full&geometries=geojson&steps=false`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.code !== 'Ok' || !data.routes?.length) return null;
+    const coords = data.routes[0].geometry?.coordinates || [];
+    if (!coords.length) return null;
+    return {
+      kakao: false, osrm: true, mode: profile,
+      path: coords.map(([lng, lat]) => ({ lat, lng })),
+      distance: data.routes[0].distance,
+      duration: data.routes[0].duration,
+    };
+  } catch(e) {
+    console.warn('[OSRM] error:', e);
+    return null;
+  }
+}
+
+// 카카오/OSRM 경로 응답 → { lat, lng }[] 좌표 배열
 function kakaoRouteToPath(result) {
-  if (!result?.kakao) return [];
+  if (!result) return [];
+  // OSRM 결과
+  if (result.osrm) return result.path || [];
+  // 카카오 자동차 결과
+  if (!result.kakao) return [];
   const sections = result.data?.sections || [];
   const path = [];
   sections.forEach(sec => {
     (sec.roads || []).forEach(road => {
       const vx = road.vertexes || [];
+      // 카카오 vertexes: [lng1, lat1, lng2, lat2, ...]
       for (let i = 0; i < vx.length - 1; i += 2) {
-        path.push({ lat: vx[i + 1], lng: vx[i] }); // 카카오: [lng, lat, lng, lat, ...]
+        path.push({ lat: vx[i + 1], lng: vx[i] });
       }
     });
   });
   return path;
 }
 
-// 카카오 경로 정보 텍스트 (거리, 시간)
+// 거리/시간 텍스트
 function kakaoRouteSummary(result) {
-  if (!result?.kakao) return null;
-  const summary = result.data?.summary;
-  if (!summary) return null;
-  const distM  = summary.distance || 0;
-  const durSec = summary.duration || 0;
-  const dist   = distM >= 1000 ? `${(distM/1000).toFixed(1)}km` : `${distM}m`;
-  const min    = Math.round(durSec / 60);
-  const dur    = min >= 60 ? `${Math.floor(min/60)}시간 ${min%60?min%60+'분':''}` : `${min}분`;
+  if (!result) return null;
+  let distM = 0, durSec = 0;
+  if (result.osrm) {
+    distM  = result.distance || 0;
+    durSec = result.duration || 0;
+  } else if (result.kakao) {
+    const summary = result.data?.summary;
+    if (!summary) return null;
+    distM  = summary.distance || 0;
+    durSec = summary.duration || 0;
+  } else return null;
+  const dist = distM >= 1000 ? `${(distM/1000).toFixed(1)}km` : `${Math.round(distM)}m`;
+  const min  = Math.round(durSec / 60);
+  const dur  = min >= 60 ? `${Math.floor(min/60)}시간${min%60?' '+min%60+'분':''}` : `${min}분`;
   return { dist, dur };
 }
 
