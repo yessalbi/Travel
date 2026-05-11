@@ -107,21 +107,20 @@
   // 전체 trips 목록 가져오기
   window.fbGetAllTrips = async () => {
     try {
-      // updatedAt 기준 정렬 시도
       const snap = await db.collection("trips").orderBy("updatedAt", "desc").get();
       const result = [];
       snap.forEach(doc => {
         const d = doc.data();
-        if (d.title) result.push({ id: doc.id, ...d }); // 제목 있는 것만
+        // title이 undefined인 시스템 문서만 제외, 빈 문자열('')은 포함
+        if (d.title !== undefined) result.push({ id: doc.id, ...d });
       });
       return result;
     } catch(e) {
-      // 인덱스 없으면 정렬 없이 가져오기
       const snap = await db.collection("trips").get();
       const result = [];
       snap.forEach(doc => {
         const d = doc.data();
-        if (d.title) result.push({ id: doc.id, ...d });
+        if (d.title !== undefined) result.push({ id: doc.id, ...d });
       });
       return result.sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
     }
@@ -13185,15 +13184,10 @@ async function mobLoadTripList() {
 
       // localStorage에 없으면 전체 DB에서 로드 (다른 기기 접속 등)
       if (!trips.length) {
-        const snap = await window.db.collection('trips')
-          .orderBy('updatedAt', 'desc').limit(50).get()
-          .catch(async () => window.db.collection('trips').get());
-        snap.forEach(doc => {
-          const d = doc.data();
-          if (d.title !== undefined && !trips.find(t => t.id === doc.id))
-            trips.push({ id: doc.id, ...d });
+        const snap = await window.fbGetAllTrips();
+        snap.forEach(t => {
+          if (!trips.find(x => x.id === t.id)) trips.push(t);
         });
-        trips.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
       }
     }
 
@@ -13204,10 +13198,15 @@ async function mobLoadTripList() {
     if (urlTrip) await mobSelectTrip(urlTrip);
 
   } catch(e) {
-    console.warn('mobLoadTripList 오류:', e);
-    if (container) container.innerHTML = `<div style="text-align:center;padding:20px;color:#E53935;font-size:13px;">불러오기 실패<br><small style="color:#aaa;">${e.message||''}</small></div>`;
+    console.error('mobLoadTripList 오류:', e);
+    if (container) container.innerHTML = `
+      <div style="text-align:center;padding:20px;color:#E53935;font-size:13px;">
+        불러오기 실패<br>
+        <small style="color:#aaa;font-size:11px;">${e.message||String(e)}</small><br>
+        <button onclick="mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;">다시 시도</button>
+      </div>`;
     window._mobTripList = [];
-    mobRenderTripList();
+    mobRenderInspire(4);
   }
 }
 
@@ -13233,17 +13232,17 @@ function mobInit() {
 }
 
 // db 준비될 때까지 대기 후 로드
+// window.db가 아닌 window.fbGetAllTrips 존재 여부로 판단 (db는 클로저 변수)
 function mobWaitDbAndLoad(attempts) {
   attempts = attempts || 0;
-  if (window.db) {
+  if (typeof window.fbGetAllTrips === 'function' && typeof window.fbGetTripMeta === 'function') {
     mobLoadTripList();
-  } else if (attempts < 20) {
-    setTimeout(() => mobWaitDbAndLoad(attempts + 1), 300);
+  } else if (attempts < 30) {
+    setTimeout(() => mobWaitDbAndLoad(attempts + 1), 200);
   } else {
-    // db 연결 실패 — 오프라인으로 진행
     window._mobTripList = [];
     mobRenderTripList();
-    mobShowToast('오프라인 모드로 실행 중');
+    mobShowToast('Firebase 연결 실패 — 오프라인 모드');
   }
 }
 </script>
