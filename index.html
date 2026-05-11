@@ -6039,6 +6039,118 @@ function buildTransitCard(from, to, fromIdx) {
 // ── Google Routes API ─────────────────────────────────────────
 const MAPS_API_KEY = 'AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ';
 
+// ── 카카오 Directions API (국내 경로) ─────────────────────────
+// 카카오 REST API 키 (JavaScript 앱 키와 별도 — REST API 키 입력)
+const KAKAO_REST_KEY = 'YOUR_KAKAO_REST_API_KEY'; // ← 카카오 개발자센터에서 REST API 키 입력
+
+// 좌표가 한반도 범위 내인지 체크 (위도 33~39, 경도 124~132)
+function isDomesticCoord(lat, lng) {
+  return lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132;
+}
+
+// 현재 여행이 국내 여행인지 판단
+function isTripDomestic() {
+  // 1. Firebase 데이터의 isDomestic 필드
+  if (typeof isDomestic !== 'undefined' && isDomestic) return true;
+  // 2. 여행 제목 키워드
+  const title = document.getElementById('trip-title')?.value || '';
+  if (DOMESTIC_KEYWORDS && DOMESTIC_KEYWORDS.some(k => title.includes(k))) return true;
+  // 3. 일정의 첫 번째 핀 좌표로 판단
+  const sched = window.scheduleData || {};
+  const firstPin = Object.values(sched).flat().find(i => i.lat && i.lng);
+  if (firstPin) return isDomesticCoord(firstPin.lat, firstPin.lng);
+  return false;
+}
+
+// 카카오 Directions API 요청
+async function kakaoRouteRequest(from, to, mode) {
+  // 카카오 이동수단 매핑
+  // MOTORCYCLE 제외, 기본: FASTEST(자동차), WALK(도보), TRANSIT(대중교통)
+  const modeMap = {
+    driving:    'car',
+    walking:    'walk',
+    transit:    'transit',
+    bicycling:  'walk',  // 카카오 자전거 미지원 → 도보 폴백
+  };
+  const kakaoMode = modeMap[mode] || 'car';
+
+  try {
+    if (kakaoMode === 'transit') {
+      // 카카오 대중교통 경로: Mobility API
+      const url = `https://apis-navi.kakaomobility.com/v1/directions`
+        + `?origin=${from.lng},${from.lat}`
+        + `&destination=${to.lng},${to.lat}`
+        + `&priority=RECOMMEND`;
+      const res = await fetch(url, {
+        headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.routes?.[0]?.result_code !== 0) return null;
+      return { kakao: true, mode: 'transit', data: data.routes[0] };
+    } else if (kakaoMode === 'walk') {
+      // 카카오 도보 경로
+      const url = `https://apis-navi.kakaomobility.com/v1/directions`
+        + `?origin=${from.lng},${from.lat}`
+        + `&destination=${to.lng},${to.lat}`
+        + `&priority=RECOMMEND`;
+      const res = await fetch(url, {
+        headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.routes?.[0]?.result_code !== 0) return null;
+      return { kakao: true, mode: 'walk', data: data.routes[0] };
+    } else {
+      // 카카오 자동차 경로: Mobility Directions API
+      const url = `https://apis-navi.kakaomobility.com/v1/directions`
+        + `?origin=${from.lng},${from.lat}`
+        + `&destination=${to.lng},${to.lat}`
+        + `&priority=RECOMMEND`
+        + `&car_fuel=GASOLINE&car_hipass=false&alternatives=false&road_details=false`;
+      const res = await fetch(url, {
+        headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.routes?.[0]?.result_code !== 0) return null;
+      return { kakao: true, mode: 'car', data: data.routes[0] };
+    }
+  } catch(e) {
+    console.warn('[Kakao Route] error:', e);
+    return null;
+  }
+}
+
+// 카카오 경로 응답 → { lat, lng }[] 좌표 배열
+function kakaoRouteToPath(result) {
+  if (!result?.kakao) return [];
+  const sections = result.data?.sections || [];
+  const path = [];
+  sections.forEach(sec => {
+    (sec.roads || []).forEach(road => {
+      const vx = road.vertexes || [];
+      for (let i = 0; i < vx.length - 1; i += 2) {
+        path.push({ lat: vx[i + 1], lng: vx[i] }); // 카카오: [lng, lat, lng, lat, ...]
+      }
+    });
+  });
+  return path;
+}
+
+// 카카오 경로 정보 텍스트 (거리, 시간)
+function kakaoRouteSummary(result) {
+  if (!result?.kakao) return null;
+  const summary = result.data?.summary;
+  if (!summary) return null;
+  const distM  = summary.distance || 0;
+  const durSec = summary.duration || 0;
+  const dist   = distM >= 1000 ? `${(distM/1000).toFixed(1)}km` : `${distM}m`;
+  const min    = Math.round(durSec / 60);
+  const dur    = min >= 60 ? `${Math.floor(min/60)}시간 ${min%60?min%60+'분':''}` : `${min}분`;
+  return { dist, dur };
+}
+
 async function routesAPIRequest(from, to, travelMode, depTime) {
   console.log('[Routes API] requesting:', travelMode, from.lat.toFixed(3), from.lng.toFixed(3), '→', to.lat.toFixed(3), to.lng.toFixed(3));
   const body = {
@@ -6123,6 +6235,32 @@ function fetchDirections(from, to, mode, fromIdx) {
   if (bodyEl) bodyEl.classList.add('loading');
 
   const modeInfo = MODE_LIST.find(m => m.id === mode) || MODE_LIST[0];
+
+  // ── 국내 → 카카오 API ──────────────────────────────────────
+  if (isTripDomestic() && isDomesticCoord(from.lat, from.lng)) {
+    kakaoRouteRequest(from, to, mode).then(result => {
+      if (bodyEl) bodyEl.classList.remove('loading');
+      const summary = result ? kakaoRouteSummary(result) : null;
+      if (summary) {
+        infoEl.innerHTML = `
+          <span class="transit-dist">${summary.dist}</span>
+          <span class="transit-sep">·</span>
+          <span class="transit-time">약 ${summary.dur}</span>
+          <span class="transit-sep">·</span>
+          <span style="font-size:11px;color:#E07A3A;">${modeInfo?.label||mode} 🇰🇷</span>`;
+        const badge = document.getElementById(`item-travel-${currentDay}-${fromIdx}`);
+        if (badge) badge.innerHTML = `<span class="item-travel-badge">${modeInfo?.icon||''} ${_t.travelNext||'다음까지'} ${summary.dur}</span>`;
+      } else {
+        infoEl.innerHTML = `<span class="transit-no-loc">경로를 찾을 수 없어요</span>`;
+      }
+    });
+    // 카카오 키 미설정 시 안내
+    if (KAKAO_REST_KEY === 'YOUR_KAKAO_REST_API_KEY') {
+      if (bodyEl) bodyEl.classList.remove('loading');
+      infoEl.innerHTML = `<span class="transit-no-loc" style="color:#E07A3A;">카카오 REST 키 필요</span>`;
+    }
+    return;
+  }
 
   async function doRequest(rmMode, opts, onOK, onFail) {
     const dep = rmMode === 'TRANSIT' ? _routeDepTime(from.lng) : null;
@@ -8527,9 +8665,8 @@ function _polylineFlightArc(from, to) {
 
 function drawSegmentRoute(from, to, mode) {
   if (!window.google || !map) return;
-  console.log('[drawSegmentRoute] mode:', mode, from.lat.toFixed(3), '→', to.lat.toFixed(3));
-  const cfg  = MODE_COLORS[mode] || MODE_COLORS.driving;
-  const straight = [{ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng }];
+  const cfg      = MODE_COLORS[mode] || MODE_COLORS.driving;
+  const straight = [{ lat:from.lat, lng:from.lng }, { lat:to.lat, lng:to.lng }];
 
   // 직선 거리 km
   const distKm = Math.sqrt(
@@ -8542,6 +8679,45 @@ function drawSegmentRoute(from, to, mode) {
     return;
   }
 
+  // ── 국내 여행 → 카카오 Directions API ─────────────────────
+  if (isTripDomestic() && isDomesticCoord(from.lat, from.lng)) {
+    _drawSegmentKakao(from, to, mode, cfg, straight);
+    return;
+  }
+
+  // ── 해외 여행 → Google Routes API ─────────────────────────
+  _drawSegmentGoogle(from, to, mode, cfg, straight);
+}
+
+// 카카오 경로 그리기
+async function _drawSegmentKakao(from, to, mode, cfg, straight) {
+  // 직선 점선 먼저 표시
+  _polylineDashed(straight, cfg.stroke || '#888', 0.4);
+
+  const result = await kakaoRouteRequest(from, to, mode);
+  if (!result) {
+    // 폴백: 직선 유지
+    return;
+  }
+  const path = kakaoRouteToPath(result);
+  if (!path.length) return;
+
+  // 기존 직선 점선 제거 (마지막 추가된 폴리라인)
+  if (dayPolylines.length) {
+    const last = dayPolylines[dayPolylines.length - 1];
+    last.setMap(null);
+    dayPolylines.pop();
+  }
+
+  if (mode === 'walking') {
+    _polylineDashed(path, cfg.stroke || '#3AAF7A', 0.85);
+  } else {
+    _polylineSolid(path, cfg, mode, 0.9);
+  }
+}
+
+// 구글 경로 그리기 (기존 로직 분리)
+async function _drawSegmentGoogle(from, to, mode, cfg, straight) {
   const dep = _routeDepTime(from.lng);
 
   async function tryRoute(rmMode, onSuccess, onFail) {
@@ -8551,40 +8727,35 @@ function drawSegmentRoute(from, to, mode) {
   }
 
   const gp = r => {
-    const enc = r.polyline?.encodedPolyline;
-    const p = decodePolyline(enc);
-    console.log('[gp] encoded length:', enc?.length, 'decoded points:', p.length);
-    return p.length ? p : straight;
+    const enc  = r.polyline?.encodedPolyline;
+    const path = decodePolyline(enc);
+    return path.length ? path : straight;
   };
 
   if (mode === 'transit') {
     tryRoute('TRANSIT',
-      (r) => {
-        const steps = r.legs?.[0]?.steps || [];
-        if (steps.length) _polylineTransitSteps(steps);
-        else _polylineSolid(gp(r), cfg, mode, 0.85);
-      },
+      (r) => { const steps = r.legs?.[0]?.steps||[]; steps.length ? _polylineTransitSteps(steps) : _polylineSolid(gp(r), cfg, mode, 0.85); },
       () => tryRoute('DRIVE',
         (r2) => _polylineDashed(gp(r2), '#9E9E9E', 0.6),
-        () => _polylineDashed(straight, '#9E9E9E', 0.4)
+        ()   => _polylineDashed(straight, '#9E9E9E', 0.4)
       )
     );
   } else if (mode === 'driving') {
     tryRoute('DRIVE',
       (r) => _polylineSolid(gp(r), cfg, mode, 0.9),
-      () => _polylineSolid(straight, cfg, mode, 0.3)
+      ()  => _polylineSolid(straight, cfg, mode, 0.3)
     );
   } else if (mode === 'walking') {
     tryRoute('WALK',
       (r) => _polylineSolid(gp(r), cfg, mode, 0.85),
-      () => _polylineSolid(straight, cfg, mode, 0.3)
+      ()  => _polylineSolid(straight, cfg, mode, 0.3)
     );
   } else if (mode === 'bicycling') {
     tryRoute('BICYCLE',
       (r) => _polylineSolid(gp(r), cfg, mode, 0.85),
-      () => tryRoute('WALK',
+      ()  => tryRoute('WALK',
         (r2) => _polylineSolid(gp(r2), cfg, mode, 0.7),
-        () => _polylineSolid(straight, cfg, mode, 0.3)
+        ()   => _polylineSolid(straight, cfg, mode, 0.3)
       )
     );
   }
@@ -12782,21 +12953,46 @@ function mobDrawSchedPins() {
   }
 }
 
-// 모바일 전용 경로 구간 그리기 (Routes API → 직선 폴백)
+// 모바일 전용 경로 구간 그리기 (국내: 카카오, 해외: Google Routes API)
 async function mobDrawRouteSegment(from, to, day, idx) {
-  const mode = (window.transitModes || {})[transitKey ? transitKey(day,idx) : `${day}_${idx}`] || 'driving';
+  const mode = (window.transitModes || {})[typeof transitKey === 'function' ? transitKey(day,idx) : `${day}_${idx}`] || 'driving';
   const modeColors = { driving:'#888888', walking:'#3AAF7A', transit:'#1565C0', bicycling:'#AD6B2F' };
-  const color = modeColors[mode] || '#888888';
+  const color  = modeColors[mode] || '#888888';
   const straight = [{ lat:from.lat, lng:from.lng }, { lat:to.lat, lng:to.lng }];
 
-  // 직선 점선 먼저 표시 (즉각 반응)
+  // 직선 점선 먼저 표시
   const tempPoly = new google.maps.Polyline({
-    path: straight, geodesic: true, strokeOpacity: 0, zIndex: 50, map: mobSchedMapObj,
-    icons: [{ icon:{ path:'M 0,-1 0,1', strokeOpacity:0.6, scale:2.5, strokeColor:color }, offset:'0', repeat:'12px' }],
+    path: straight, geodesic:true, strokeOpacity:0, zIndex:50, map:mobSchedMapObj,
+    icons:[{ icon:{ path:'M 0,-1 0,1', strokeOpacity:0.5, scale:2.5, strokeColor:color }, offset:'0', repeat:'12px' }],
   });
   (window._mobSchedPolylines = window._mobSchedPolylines||[]).push(tempPoly);
 
-  // Routes API로 실제 경로 요청
+  const removeTempPoly = () => {
+    tempPoly.setMap(null);
+    const i = (window._mobSchedPolylines||[]).indexOf(tempPoly);
+    if (i >= 0) window._mobSchedPolylines.splice(i, 1);
+  };
+
+  const drawPath = (path, dashed) => {
+    removeTempPoly();
+    const poly = new google.maps.Polyline(dashed ? {
+      path, strokeOpacity:0, zIndex:60, map:mobSchedMapObj,
+      icons:[{ icon:{ path:'M 0,-1 0,1', strokeOpacity:1, scale:3, strokeColor:color }, offset:'0', repeat:'12px' }],
+    } : {
+      path, strokeColor:color, strokeOpacity:0.85, strokeWeight:4, zIndex:60, map:mobSchedMapObj,
+    });
+    (window._mobSchedPolylines||[]).push(poly);
+  };
+
+  // ── 국내 → 카카오 ──────────────────────────────────────────
+  if (typeof isTripDomestic === 'function' && isTripDomestic() && typeof isDomesticCoord === 'function' && isDomesticCoord(from.lat, from.lng)) {
+    const result = await kakaoRouteRequest(from, to, mode);
+    const path   = result ? kakaoRouteToPath(result) : null;
+    if (path?.length) drawPath(path, mode === 'walking');
+    return;
+  }
+
+  // ── 해외 → Google Routes API ────────────────────────────────
   if (!window.routesAPIRequest) return;
   try {
     const rmMode = { driving:'DRIVE', walking:'WALK', transit:'TRANSIT', bicycling:'BICYCLE' }[mode] || 'DRIVE';
@@ -12804,43 +13000,30 @@ async function mobDrawRouteSegment(from, to, day, idx) {
     const route  = await routesAPIRequest(from, to, rmMode, dep);
     if (!route) return;
 
-    // 폴리라인 디코딩
-    const enc = route.polyline?.encodedPolyline;
+    const enc  = route.polyline?.encodedPolyline;
     const path = enc && typeof decodePolyline === 'function' ? decodePolyline(enc) : null;
     if (!path || path.length < 2) return;
 
-    // 임시 점선 제거 후 실제 경로로 교체
-    tempPoly.setMap(null);
-    const idx2 = window._mobSchedPolylines.indexOf(tempPoly);
-    if (idx2 >= 0) window._mobSchedPolylines.splice(idx2, 1);
-
+    removeTempPoly();
     if (mode === 'transit') {
-      // 대중교통: 구간별 색상
       const steps = route.legs?.[0]?.steps || [];
-      if (steps.length) {
+      if (steps.length && typeof _polylineTransitSteps === 'function') {
+        // 대중교통 구간별 색상 — mobSchedMapObj에 직접
         const COL = { BUS:'#FF6D00', SUBWAY:'#1565C0', TRAM:'#6A1B9A', RAIL:'#2E7D32', HEAVY_RAIL:'#1B5E20', HIGH_SPEED_TRAIN:'#C62828', OTHER:'#1565C0' };
         steps.forEach(step => {
-          const stepEnc  = step.polyline?.encodedPolyline || step.polyline?.points;
-          const stepPath = stepEnc ? decodePolyline(stepEnc) : null;
-          if (!stepPath || stepPath.length < 2) return;
-          const vt    = step.transit?.line?.vehicle?.type || 'OTHER';
-          const sPoly = new google.maps.Polyline({
-            path: stepPath, strokeColor: COL[vt]||'#1565C0',
-            strokeOpacity:0.85, strokeWeight:4, zIndex:60, map:mobSchedMapObj,
+          const sEnc  = step.polyline?.encodedPolyline || step.polyline?.points;
+          const sPath = sEnc ? decodePolyline(sEnc) : null;
+          if (!sPath?.length) return;
+          const vt   = step.transit?.line?.vehicle?.type || 'OTHER';
+          const poly = new google.maps.Polyline({
+            path:sPath, strokeColor:COL[vt]||'#1565C0', strokeOpacity:0.85, strokeWeight:4, zIndex:60, map:mobSchedMapObj,
           });
-          window._mobSchedPolylines.push(sPoly);
+          (window._mobSchedPolylines||[]).push(poly);
         });
         return;
       }
     }
-
-    // 일반 모드 실선
-    const finalPoly = new google.maps.Polyline({
-      path, strokeColor:color, strokeOpacity:mode==='walking'?0:0.85,
-      strokeWeight:4, zIndex:60, map:mobSchedMapObj,
-      icons: mode==='walking' ? [{ icon:{path:'M 0,-1 0,1',strokeOpacity:1,scale:3,strokeColor:color}, offset:'0', repeat:'12px' }] : [],
-    });
-    window._mobSchedPolylines.push(finalPoly);
+    drawPath(path, mode === 'walking');
   } catch(e) {
     // 직선 점선 유지
   }
