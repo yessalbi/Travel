@@ -8691,28 +8691,39 @@ function drawSegmentRoute(from, to, mode) {
 
 // 카카오 경로 그리기
 async function _drawSegmentKakao(from, to, mode, cfg, straight) {
-  // 직선 점선 먼저 표시
-  _polylineDashed(straight, cfg.stroke || '#888', 0.4);
-
-  const result = await kakaoRouteRequest(from, to, mode);
-  if (!result) {
-    // 폴백: 직선 유지
+  // KAKAO_REST_KEY 미설정 시 경고
+  if (KAKAO_REST_KEY === 'YOUR_KAKAO_REST_API_KEY') {
+    console.warn('[Kakao] REST API 키가 설정되지 않았습니다');
+    _polylineDashed(straight, cfg.stroke || '#E07A3A', 0.4);
     return;
   }
-  const path = kakaoRouteToPath(result);
-  if (!path.length) return;
 
-  // 기존 직선 점선 제거 (마지막 추가된 폴리라인)
-  if (dayPolylines.length) {
-    const last = dayPolylines[dayPolylines.length - 1];
-    last.setMap(null);
-    dayPolylines.pop();
-  }
+  // 직선 점선 먼저 표시 (참조 유지)
+  const tempPolylines = [];
+  const makeTempDashed = () => {
+    if (!dayPolylines) return;
+    const before = dayPolylines.length;
+    _polylineDashed(straight, cfg.stroke || '#888', 0.35);
+    for (let i = before; i < dayPolylines.length; i++) tempPolylines.push(dayPolylines[i]);
+  };
+  makeTempDashed();
 
-  if (mode === 'walking') {
-    _polylineDashed(path, cfg.stroke || '#3AAF7A', 0.85);
+  const result = await kakaoRouteRequest(from, to, mode);
+  const path   = result ? kakaoRouteToPath(result) : null;
+
+  // 직선 점선 제거
+  tempPolylines.forEach(p => { p.setMap(null); const i=dayPolylines.indexOf(p); if(i>=0) dayPolylines.splice(i,1); });
+
+  if (path && path.length >= 2) {
+    if (mode === 'walking' || mode === 'bicycling') {
+      _polylineDashed(path, cfg.stroke || '#3AAF7A', 0.85);
+    } else {
+      _polylineSolid(path, cfg, mode, 0.9);
+    }
   } else {
-    _polylineSolid(path, cfg, mode, 0.9);
+    // 카카오 실패 시 직선 유지
+    _polylineDashed(straight, cfg.stroke || '#888', 0.35);
+    console.warn('[Kakao] 경로 없음, 직선 폴백');
   }
 }
 
@@ -9464,9 +9475,20 @@ function drawAllDaySegment(from, to, mode, col) {
 
   // ── 국내 → 카카오 ──────────────────────────────────────────
   if (isTripDomestic() && isDomesticCoord(from.lat, from.lng)) {
+    if (KAKAO_REST_KEY === 'YOUR_KAKAO_REST_API_KEY') {
+      push(straight, 0.25);
+      return;
+    }
+    // 직선 임시 표시 후 실제 경로로 교체
+    const tempBefore = allDayPolylines.length;
+    push(straight, 0.2);
+    const tempPolys = allDayPolylines.slice(tempBefore);
+
     kakaoRouteRequest(from, to, mode).then(result => {
       const path = result ? kakaoRouteToPath(result) : null;
-      push(path?.length ? path : straight, path?.length ? 0.9 : 0.25);
+      // 임시 직선 제거
+      tempPolys.forEach(p => { p.setMap(null); const i=allDayPolylines.indexOf(p); if(i>=0) allDayPolylines.splice(i,1); });
+      push(path?.length >= 2 ? path : straight, path?.length >= 2 ? 0.9 : 0.25);
     }).catch(() => push(straight, 0.25));
     return;
   }
@@ -11161,8 +11183,10 @@ document.addEventListener('keydown', (e) => {
       </div>
 
       <!-- 지도 -->
-      <div class="mob-stab-page" id="mob-stab-map" style="padding:0;">
-        <div id="mob-map-view" style="flex:1;min-height:300px;"></div>
+      <div class="mob-stab-page" id="mob-stab-map" style="padding:0;flex-direction:column;">
+        <!-- 날짜 칩 (지도 탭용) -->
+        <div class="mob-day-chips" id="mob-map-day-chips" style="border-bottom:1px solid #ede9e2;"></div>
+        <div id="mob-map-view" style="flex:1;min-height:0;"></div>
       </div>
 
       <!-- 예약 -->
@@ -12121,27 +12145,19 @@ function mobRenderTimeline() {
   const days  = Object.keys(sched).map(Number).filter(d => !isNaN(d)).sort((a,b)=>a-b);
   const start = (mobCurrentTripData||{}).startDate || document.getElementById('trip-start')?.value || '';
 
-  // 데이터 없으면 startDate 기반으로 Day1~N 생성
   if (!days.length && start && (mobCurrentTripData||{}).endDate) {
     const end = (mobCurrentTripData||{}).endDate;
     const n   = Math.round((new Date(end)-new Date(start))/86400000)+1;
     for (let i=1;i<=n;i++) days.push(i);
   }
 
-  // 날짜 칩
-  const chipsEl = document.getElementById('mob-day-chips');
-  if (chipsEl) {
-    if (!days.length) {
-      chipsEl.innerHTML = '';
-    } else {
-      chipsEl.innerHTML = days.map((day,i) => {
-        const lbl = mobDayLabel(day, start);
-        return `<button class="mob-day-chip${i===0?' active':''}" onclick="mobSelectDay(${day},this)">${lbl}</button>`;
-      }).join('');
-    }
-  }
+  // mobCurrentDay 유지 — 없거나 해당 Day가 존재하지 않으면 첫 번째로
+  if (!days.includes(mobCurrentDay)) mobCurrentDay = days[0] || 1;
 
-  if (days.length) mobRenderDayTimeline(days[0]);
+  // 날짜 칩 렌더 (일정 탭용)
+  mobRenderDayChips('mob-day-chips', days, start);
+
+  if (days.length) mobRenderDayTimeline(mobCurrentDay);
   else {
     const list = document.getElementById('mob-timeline-list');
     if (list) list.innerHTML = `<div class="mob-empty-state" style="padding:40px 0;">
@@ -12150,6 +12166,20 @@ function mobRenderTimeline() {
       <div style="font-size:13px;color:#999;">아래 버튼으로 추가해보세요</div>
     </div>`;
   }
+}
+
+// 날짜 칩 공통 렌더 함수 (일정/지도 양쪽에서 사용)
+function mobRenderDayChips(containerId, days, start) {
+  const chipsEl = document.getElementById(containerId);
+  if (!chipsEl) return;
+  if (!days.length) { chipsEl.innerHTML = ''; return; }
+
+  chipsEl.innerHTML = days.map(day => {
+    const lbl    = mobDayLabel(day, start);
+    const active = day === mobCurrentDay ? ' active' : '';
+    const target = containerId === 'mob-day-chips' ? 'mobSelectDay' : 'mobSelectDayMap';
+    return `<button class="mob-day-chip${active}" onclick="${target}(${day},this)">${lbl}</button>`;
+  }).join('');
 }
 
 function mobDayLabel(day, startDate) {
@@ -12166,18 +12196,40 @@ function mobDayLabel(day, startDate) {
 }
 
 function mobSelectDay(day, el) {
-  mobCurrentDay = day;
+  mobCurrentDay  = day;
   window.currentDay = day;
-  document.querySelectorAll('.mob-day-chip').forEach(c => c.classList.remove('active'));
-  el?.classList.add('active');
+  // 일정 탭 칩 active 갱신
+  document.querySelectorAll('#mob-day-chips .mob-day-chip').forEach(c => c.classList.remove('active'));
+  // el이 일정 탭 칩이면 active
+  if (el && el.closest('#mob-day-chips')) el.classList.add('active');
+  else {
+    // el이 없거나 지도 탭 칩이면 일정 탭에서도 해당 day 찾아서 active
+    document.querySelectorAll('#mob-day-chips .mob-day-chip').forEach(c => {
+      if (c.textContent === mobDayLabel(day, (mobCurrentTripData||{}).startDate)) c.classList.add('active');
+    });
+  }
   mobRenderDayTimeline(day);
-  // 일정 탭 지도가 열려있으면 핀 갱신
+  // 지도 탭이 열려있으면 핀 갱신
   if (mobCurrentSchedTab === 'map') {
     window._mobSchedPinsDrawn = false;
-    if (mobSchedMapObj) {
-      mobDrawSchedPins();
-    }
+    if (mobSchedMapObj) mobDrawSchedPins();
   }
+}
+
+// 지도 탭에서 날짜 선택 (일정 탭 active도 같이 갱신)
+function mobSelectDayMap(day, el) {
+  mobCurrentDay  = day;
+  window.currentDay = day;
+  // 지도 탭 칩 갱신
+  document.querySelectorAll('#mob-map-day-chips .mob-day-chip').forEach(c => c.classList.remove('active'));
+  el?.classList.add('active');
+  // 일정 탭 칩도 갱신
+  document.querySelectorAll('#mob-day-chips .mob-day-chip').forEach(c => {
+    c.classList.toggle('active', c.textContent === mobDayLabel(day, (mobCurrentTripData||{}).startDate));
+  });
+  // 지도 핀 갱신
+  window._mobSchedPinsDrawn = false;
+  if (mobSchedMapObj) mobDrawSchedPins();
 }
 
 function mobRenderDayTimeline(day) {
@@ -12197,25 +12249,64 @@ function mobRenderDayTimeline(day) {
     return;
   }
 
-  list.innerHTML = items.map((item,i) => {
-    const color  = typeColor[item.type] || '#E07A3A';
-    const isLast = i === items.length-1;
-    const timeStr = item.time ? (typeof fmtTime==='function' ? fmtTime(item.time) : item.time) : '';
-    return `<div class="mob-timeline-item">
-      <div class="mob-timeline-time">${timeStr}</div>
-      <div class="mob-timeline-line">
-        <div class="mob-tl-dot" style="background:${color};box-shadow:0 0 0 3px ${color}30;"></div>
-        ${!isLast?'<div class="mob-tl-bar"></div>':''}
-      </div>
-      <div class="mob-timeline-card" style="border-left-color:${color};" onclick="mobShowItemDetail(${day},${i})">
-        <div class="mob-tl-card-type" style="color:${color};">${typeIcon[item.type]||'📌'} ${typeLabel[item.type]||''}</div>
-        <div class="mob-tl-card-name">${item.name}</div>
-        ${item.desc?`<div class="mob-tl-card-sub">${item.desc}</div>`:''}
-        ${item.memo?`<span class="mob-tl-card-badge">📝 메모</span>`:''}
-        ${item.lat?`<span class="mob-tl-card-badge" style="color:#3AAF7A;">📍 위치</span>`:''}
-      </div>
-    </div>`;
-  }).join('');
+  // ── PC와 동일한 구역 그룹핑 (5개 이상, PC groupItemsByZone 재사용) ──
+  const groups     = (typeof groupItemsByZone === 'function' && items.length >= 5)
+    ? groupItemsByZone(items) : null;
+  const useGroups  = groups && groups.length > 1 && groups.some(g => g.items.length >= 2);
+
+  if (useGroups) {
+    list.innerHTML = groups.map((group, gIdx) => {
+      const isMulti   = group.items.length >= 2;
+      const zoneName  = typeof getZoneName === 'function' ? getZoneName(group) : group.items[0]?.item?.name || '';
+      const emoji     = typeIcon[group.items[0]?.item?.type] || '📍';
+
+      const itemsHtml = group.items.map(({item, origIdx}, i) => {
+        const isLast  = gIdx === groups.length-1 && i === group.items.length-1;
+        return mobTimelineItemHtml(item, origIdx, day, i, isLast, typeIcon, typeLabel, typeColor);
+      }).join('');
+
+      if (isMulti) {
+        return `<div style="margin:6px 0;border:1.5px solid #e8e4dc;border-radius:14px;overflow:hidden;">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f5f3ee;cursor:pointer;"
+            onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none';this.querySelector('.mob-zone-arrow').style.transform=this.nextElementSibling.style.display==='none'?'rotate(-90deg)':'';">
+            <span style="font-size:16px;">${emoji}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:700;color:#2c2c2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${zoneName}</div>
+              <div style="font-size:11px;color:#aaa;">${group.items.length}곳</div>
+            </div>
+            <span class="mob-zone-arrow" style="color:#aaa;font-size:14px;transition:transform .2s;">▼</span>
+          </div>
+          <div>${itemsHtml}</div>
+        </div>`;
+      }
+      return itemsHtml;
+    }).join('');
+  } else {
+    list.innerHTML = items.map((item, idx) => {
+      const isLast = idx === items.length - 1;
+      return mobTimelineItemHtml(item, idx, day, idx, isLast, typeIcon, typeLabel, typeColor);
+    }).join('');
+  }
+}
+
+// 타임라인 아이템 HTML 생성 (그룹/비그룹 공용)
+function mobTimelineItemHtml(item, origIdx, day, localIdx, isLast, typeIcon, typeLabel, typeColor) {
+  const color   = typeColor[item.type] || '#E07A3A';
+  const timeStr = item.time ? (typeof fmtTime==='function' ? fmtTime(item.time) : item.time) : '';
+  return `<div class="mob-timeline-item">
+    <div class="mob-timeline-time">${timeStr}</div>
+    <div class="mob-timeline-line">
+      <div class="mob-tl-dot" style="background:${color};box-shadow:0 0 0 3px ${color}30;"></div>
+      ${!isLast?'<div class="mob-tl-bar"></div>':''}
+    </div>
+    <div class="mob-timeline-card" style="border-left-color:${color};" onclick="mobShowItemDetail(${day},${origIdx})">
+      <div class="mob-tl-card-type" style="color:${color};">${typeIcon[item.type]||'📌'} ${typeLabel[item.type]||''}</div>
+      <div class="mob-tl-card-name">${item.name}</div>
+      ${item.desc?`<div class="mob-tl-card-sub">${item.desc}</div>`:''}
+      ${item.memo?`<span class="mob-tl-card-badge">📝 메모</span>`:''}
+      ${item.lat?`<span class="mob-tl-card-badge" style="color:#3AAF7A;">📍 위치</span>`:''}
+    </div>
+  </div>`;
 }
 
 function mobShowItemDetail(day, idx) {
@@ -12882,8 +12973,11 @@ function mobInitSchedMap() {
 
   const sched   = window.scheduleData || {};
   const day     = mobCurrentDay || 1;
-  // 현재 Day 핀 우선, 없으면 전체
-  const dayLocs = (sched[day] || []).filter(i => i.lat && i.lng);
+  const allDays = Object.keys(sched).map(Number).filter(d=>!isNaN(d)).sort((a,b)=>a-b);
+  const start   = (mobCurrentTripData||{}).startDate || '';
+
+  // 지도 탭 날짜 칩 렌더
+  mobRenderDayChips('mob-map-day-chips', allDays, start);
   const allLocs = Object.values(sched).flat().filter(i => i.lat && i.lng);
   const refLocs = dayLocs.length ? dayLocs : allLocs;
   const center  = refLocs.length ? { lat:refLocs[0].lat, lng:refLocs[0].lng } : { lat:35.6762, lng:139.6503 };
