@@ -11817,6 +11817,11 @@ async function mobSelectTrip(tripId) {
       sv('trip-author', data.author);
       sv('trip-note',   data.note);
 
+      // ★ 핵심: isDomestic 전역 변수 동기화 (경로 그리기에 사용됨)
+      const domestic = data.isDomestic ?? (typeof detectDomestic === 'function' ? detectDomestic(data.title || '') : false);
+      if (typeof switchFlightSection === 'function') switchFlightSection(domestic);
+      else window.isDomestic = domestic; // switchFlightSection 없을 때 직접 설정
+
       // 오프라인 스냅샷 저장
       if (window.offlineSave) window.offlineSave(tripId, data).catch(()=>{});
     } else {
@@ -13755,7 +13760,7 @@ function mobShowAuthGate() {
     </button>
 
     <div style="font-size:11px;color:#bbb;text-align:center;line-height:1.8;margin-top:4px;">
-      일반 비밀번호 또는 관리자 코드로 입장<br>
+      일반 비밀번호 또는 관리자 코드(2689)로 입장<br>
       <span style="color:#E07A3A;font-weight:600;">관리자는 Firebase의 모든 여행을 볼 수 있어요</span>
     </div>
   `;
