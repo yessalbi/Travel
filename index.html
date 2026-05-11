@@ -2563,7 +2563,7 @@ html, body {
 .mob-add-sched-btn { margin: 8px 16px 16px; padding: 12px; border: 2px dashed #e0ddd6; background: #fff; border-radius: 12px; font-size: 14px; font-weight: 600; color: #E07A3A; cursor: pointer; text-align: center; flex-shrink: 0; }
 .mob-map-searchbar { position: absolute; top: 12px; left: 12px; right: 12px; background: #fff; border-radius: 24px; box-shadow: 0 2px 16px rgba(0,0,0,0.2); display: flex; align-items: center; padding: 0 8px 0 16px; height: 46px; z-index: 10; }
 .mob-map-input { flex: 1; border: none; outline: none; font-size: 14px; background: transparent; }
-.mob-map-cats { position: absolute; top: 70px; left: 0; right: 0; display: flex; gap: 6px; padding: 0 12px; overflow-x: auto; scrollbar-width: none; z-index: 10; }
+.mob-map-cats { position: absolute; top: 68px; left: 0; right: 0; display: flex; gap: 6px; padding: 0 12px; overflow-x: auto; scrollbar-width: none; z-index: 10; }
 .mob-map-cats::-webkit-scrollbar { display: none; }
 .mob-cat { flex-shrink: 0; background: #fff; border: none; border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 700; color: #555; box-shadow: 0 1px 6px rgba(0,0,0,0.15); cursor: pointer; transition: all .15s; }
 .mob-cat.active { background: #E07A3A; color: #fff; }
@@ -11012,52 +11012,58 @@ document.addEventListener('keydown', (e) => {
 
   <!-- 지도 탭 -->
   <div class="mob-page" id="mob-map">
-    <!-- 선택된 여행 제목 상단 고정 -->
-    <div id="mob-map-trip-title" style="display:none;position:absolute;top:0;left:0;right:0;z-index:10;background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);padding:10px 16px;font-size:13px;font-weight:700;color:#2c2c2a;border-bottom:1px solid #ede9e2;">
-      <span id="mob-map-trip-title-text"></span>
+    <!-- 통일된 헤더 -->
+    <div class="mob-header">
+      <div style="display:flex;flex-direction:column;">
+        <div class="mob-header-title">지도</div>
+        <div id="mob-map-trip-title-text" style="font-size:11px;color:#E07A3A;font-weight:600;margin-top:1px;display:none;"></div>
+      </div>
     </div>
-    <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
-    <!-- 지도 위 검색바 -->
-    <div class="mob-map-searchbar">
-      <input id="mob-map-search" placeholder="장소 검색..." class="mob-map-input">
-      <button onclick="mobMapSearch()" style="border:none;background:none;font-size:18px;padding:0 8px;cursor:pointer;">🔍</button>
-    </div>
-    <!-- 카테고리 필터 -->
-    <div class="mob-map-cats">
-      <button class="mob-cat active" onclick="mobMapCat(this,'all')">전체</button>
-      <button class="mob-cat" onclick="mobMapCat(this,'sight')">관광지</button>
-      <button class="mob-cat" onclick="mobMapCat(this,'food')">맛집</button>
-      <button class="mob-cat" onclick="mobMapCat(this,'cafe')">카페</button>
-      <button class="mob-cat" onclick="mobMapCat(this,'hotel')">숙소</button>
-      <button class="mob-cat" onclick="mobMapCat(this,'shop')">쇼핑</button>
-    </div>
-    <!-- 추천 장소 바텀시트 -->
-    <div class="mob-places-sheet" id="mob-places-sheet">
-      <div class="mob-sheet-handle"></div>
-      <div class="mob-sheet-title">추천 장소 <span id="mob-places-count" style="font-size:13px;color:#999;font-weight:400;"></span></div>
-      <div class="mob-places-list" id="mob-places-list"></div>
+    <!-- 실제 지도 영역 -->
+    <div style="position:relative;flex:1;overflow:hidden;">
+      <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
+      <!-- 검색바 -->
+      <div class="mob-map-searchbar">
+        <input id="mob-map-search" placeholder="장소 검색..." class="mob-map-input"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();mobMapSearch();}">
+        <button onclick="mobMapSearch()" style="border:none;background:none;font-size:18px;padding:0 8px;cursor:pointer;">🔍</button>
+      </div>
+      <!-- 카테고리 -->
+      <div class="mob-map-cats">
+        <button class="mob-cat active" onclick="mobMapCat(this,'all')">전체</button>
+        <button class="mob-cat" onclick="mobMapCat(this,'food')">맛집</button>
+        <button class="mob-cat" onclick="mobMapCat(this,'cafe')">카페</button>
+        <button class="mob-cat" onclick="mobMapCat(this,'convenience')">편의점</button>
+        <button class="mob-cat" onclick="mobMapCat(this,'hotel')">숙소</button>
+        <button class="mob-cat" onclick="mobMapCat(this,'shop')">쇼핑</button>
+      </div>
+      <!-- 장소 바텀시트 -->
+      <div class="mob-places-sheet" id="mob-places-sheet">
+        <div class="mob-sheet-handle"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 8px;">
+          <div class="mob-sheet-title" style="margin:0;" id="mob-places-sheet-title">추천 장소</div>
+          <span id="mob-places-count" style="font-size:12px;color:#999;"></span>
+        </div>
+        <div class="mob-places-list" id="mob-places-list"></div>
+      </div>
     </div>
   </div>
 
-  <!-- 저장 탭 (체크리스트/바우처) -->
+  <!-- 저장 탭 -->
   <div class="mob-page" id="mob-saved">
     <div class="mob-header">
       <div style="display:flex;flex-direction:column;">
-        <div class="mob-header-title">챙겨야할 것</div>
+        <div class="mob-header-title">저장</div>
         <div id="mob-saved-trip-title" style="font-size:11px;color:#E07A3A;font-weight:600;margin-top:1px;display:none;"></div>
       </div>
     </div>
     <div class="mob-scroll">
-      <!-- 진행률 -->
       <div class="mob-progress-card" id="mob-checklist-progress"></div>
-      <!-- 탭: 준비물/예약파일 -->
       <div class="mob-saved-tabs">
         <button class="mob-saved-tab active" onclick="mobSavedTab(this,'check')">준비물</button>
-        <button class="mob-saved-tab" onclick="mobSavedTab(this,'voucher')">예약/파일</button>
         <button class="mob-saved-tab" onclick="mobSavedTab(this,'places')">맛집&장소</button>
       </div>
       <div id="mob-saved-check" class="mob-saved-content active"></div>
-      <div id="mob-saved-voucher" class="mob-saved-content" style="display:none;"></div>
       <div id="mob-saved-places" class="mob-saved-content" style="display:none;"></div>
     </div>
   </div>
@@ -11360,38 +11366,18 @@ function mobTab(tab) {
   if (page) page.classList.add('active');
   if (btn)  btn.classList.add('active');
 
-  const tripTitle = (mobCurrentTripData?.title) || document.getElementById('trip-title')?.value || '';
+  const tripTitle = mobCurrentTripData?.title || document.getElementById('trip-title')?.value || '';
 
-  if (tab === 'map') {
-    mobInitFullMap();
-    // 지도 탭 여행 제목 표시
-    const mapTitleEl  = document.getElementById('mob-map-trip-title');
-    const mapTitleTxt = document.getElementById('mob-map-trip-title-text');
-    if (mapTitleEl) {
-      if (tripTitle) {
-        mapTitleEl.style.display = 'block';
-        if (mapTitleTxt) mapTitleTxt.textContent = '✈️ ' + tripTitle;
-        // 검색바·카테고리 위치 조정
-        const searchbar = document.querySelector('.mob-map-searchbar');
-        if (searchbar) searchbar.style.top = '50px';
-        const cats = document.querySelector('.mob-map-cats');
-        if (cats) cats.style.top = '106px';
-      } else {
-        mapTitleEl.style.display = 'none';
-      }
-    }
-  }
+  // 지도/저장 탭 여행 제목 동기화
+  const mapTitle   = document.getElementById('mob-map-trip-title-text');
+  const savedTitle = document.getElementById('mob-saved-trip-title');
+  if (mapTitle)   { mapTitle.textContent   = tripTitle ? '✈️ ' + tripTitle : ''; mapTitle.style.display   = tripTitle ? 'block' : 'none'; }
+  if (savedTitle) { savedTitle.textContent = tripTitle ? '✈️ ' + tripTitle : ''; savedTitle.style.display = tripTitle ? 'block' : 'none'; }
+
+  if (tab === 'map')      mobInitFullMap();
   if (tab === 'home')     mobRenderTripList();
   if (tab === 'schedule') mobRenderSchedule();
-  if (tab === 'saved') {
-    mobRenderSaved();
-    // 저장 탭 여행 제목 표시
-    const savedTitleEl = document.getElementById('mob-saved-trip-title');
-    if (savedTitleEl) {
-      if (tripTitle) { savedTitleEl.textContent = '✈️ ' + tripTitle; savedTitleEl.style.display = 'block'; }
-      else savedTitleEl.style.display = 'none';
-    }
-  }
+  if (tab === 'saved')    mobRenderSaved();
   if (tab === 'profile')  mobRenderProfile();
 }
 
@@ -12052,9 +12038,23 @@ function mobShowPinOnMap(lat, lng, name) {
   mobTab('map');
   setTimeout(() => {
     if (!mobMap) return;
-    mobMap.panTo({lat, lng});
+    mobMap.panTo({ lat, lng });
     mobMap.setZoom(16);
-    new google.maps.Marker({ position:{lat,lng}, map:mobMap, title:name });
+    if (window._mobSelectedMarker) window._mobSelectedMarker.setMap(null);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="52" viewBox="0 0 44 52">
+      <ellipse cx="22" cy="48" rx="9" ry="3" fill="rgba(0,0,0,0.2)"/>
+      <path d="M22 2C11.51 2 3 10.51 3 21c0 13 19 31 19 31s19-18 19-31C41 10.51 32.49 2 22 2Z" fill="#7C3AED" stroke="#fff" stroke-width="2.5"/>
+      <text x="22" y="27" text-anchor="middle" font-size="18" fill="#fff">⭐</text>
+    </svg>`;
+    window._mobSelectedMarker = new google.maps.Marker({
+      position: { lat, lng }, map: mobMap, title: name,
+      icon: { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize: new google.maps.Size(44,52), anchor: new google.maps.Point(22,52) },
+      zIndex: 9999,
+    });
+    const iw = new google.maps.InfoWindow({
+      content: `<div style="font-size:13px;font-weight:700;color:#7C3AED;">⭐ ${name}</div><div style="font-size:11px;color:#888;">저장된 장소</div>`,
+    });
+    iw.open(mobMap, window._mobSelectedMarker);
   }, 600);
 }
 
@@ -12704,47 +12704,65 @@ function mobDrawSchedPins() {
   if (!mobSchedMapObj || !window.google) return;
   const typeColor = {food:'#E8430A',cafe:'#AD6B2F',sight:'#1565C0',hotel:'#2E7D32',shop:'#7B1FA2',move:'#888'};
   const sched = window.scheduleData || {};
-
-  // 현재 선택된 Day 핀만 표시 (없으면 전체)
   const day   = mobCurrentDay || 1;
   const items = sched[day]?.length ? sched[day] : Object.values(sched).flat();
-  const locs  = items.filter(i=>i.lat&&i.lng);
-
+  const locs  = items.filter(i => i.lat && i.lng);
   if (!locs.length) return;
 
+  // 기존 마커/폴리라인 클리어
+  (window._mobSchedMarkers||[]).forEach(m => m.setMap(null));
+  (window._mobSchedPolylines||[]).forEach(p => p.setMap(null));
+  window._mobSchedMarkers  = [];
+  window._mobSchedPolylines = [];
+
   const bounds = new google.maps.LatLngBounds();
+
   locs.forEach((item, idx) => {
     const color = typeColor[item.type] || '#E07A3A';
     const svg   = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
       <path d="M16 1C8.27 1 2 7.27 2 15c0 9.25 14 24 14 24s14-14.75 14-24C30 7.27 23.73 1 16 1z" fill="${color}" stroke="#fff" stroke-width="2"/>
-      <circle cx="16" cy="15" r="6" fill="#fff"/>
+      <circle cx="16" cy="15" r="6.5" fill="#fff"/>
       <text x="16" y="19" text-anchor="middle" font-size="9" font-weight="700" fill="${color}">${idx+1}</text>
     </svg>`;
     const marker = new google.maps.Marker({
-      position: { lat:item.lat, lng:item.lng },
-      map: mobSchedMapObj,
-      title: item.name,
-      icon: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-        scaledSize: new google.maps.Size(32,40),
-        anchor: new google.maps.Point(16,40),
-      },
+      position:{lat:item.lat, lng:item.lng}, map:mobSchedMapObj, title:item.name, zIndex:800,
+      icon:{url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg),scaledSize:new google.maps.Size(32,40),anchor:new google.maps.Point(16,40)},
     });
-    bounds.extend({ lat:item.lat, lng:item.lng });
+    bounds.extend({lat:item.lat, lng:item.lng});
+    const iw = new google.maps.InfoWindow({
+      content:`<div style="font-size:13px;font-weight:600;">${item.name}</div>${item.time?`<div style="font-size:11px;color:#888;">${item.time}</div>`:''}`,
+    });
+    marker.addListener('click', () => iw.open(mobSchedMapObj, marker));
+    window._mobSchedMarkers.push(marker);
 
-    // 클릭 시 장소명 표시
-    const infoWin = new google.maps.InfoWindow({
-      content: `<div style="font-size:13px;font-weight:600;padding:4px 2px;">${item.name}</div>${item.time?`<div style="font-size:11px;color:#888;">${item.time}</div>`:''}`,
-    });
-    marker.addListener('click', () => infoWin.open(mobSchedMapObj, marker));
+    // 다음 핀과 점선 경로 연결
+    if (idx < locs.length - 1) {
+      const next = locs[idx + 1];
+      const mode = (window.transitModes || {})[`${day}_${idx}`] || 'driving';
+      const modeColor = { walking:'#3AAF7A', transit:'#1565C0', driving:'#888', bicycling:'#AD6B2F' }[mode] || '#888';
+
+      // 일단 직선 점선으로 표시 (fetchDirections는 복잡하므로 직선 폴백)
+      const poly = new google.maps.Polyline({
+        path: [{lat:item.lat, lng:item.lng}, {lat:next.lat, lng:next.lng}],
+        geodesic:true, strokeColor:modeColor, strokeOpacity:0,
+        icons:[{icon:{path:'M 0,-1 0,1',strokeOpacity:1,scale:3},offset:'0',repeat:'14px'}],
+        map:mobSchedMapObj, zIndex:100,
+      });
+      window._mobSchedPolylines.push(poly);
+
+      // 실제 경로 API 호출 (있으면 교체)
+      if (window.fetchDirections) {
+        try { window.fetchDirections({lat:item.lat,lng:item.lng,name:item.name},{lat:next.lat,lng:next.lng,name:next.name},mode,idx,'mob',mobSchedMapObj,window._mobSchedPolylines); } catch(e) {}
+      }
+    }
   });
 
-  if (locs.length >= 2) mobSchedMapObj.fitBounds(bounds, 40);
-  else { mobSchedMapObj.setCenter({lat:locs[0].lat, lng:locs[0].lng}); mobSchedMapObj.setZoom(15); }
+  if (locs.length >= 2) mobSchedMapObj.fitBounds(bounds, {top:20,right:20,bottom:20,left:20});
+  else { mobSchedMapObj.setCenter({lat:locs[0].lat,lng:locs[0].lng}); mobSchedMapObj.setZoom(15); }
 }
 
 function mobMapCat(el, cat) {
-  document.querySelectorAll('.mob-cat').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.mob-cat').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   mobCurrentCat = cat;
   mobLoadPlaces();
@@ -12754,46 +12772,54 @@ function mobMapSearch() {
   const q = document.getElementById('mob-map-search')?.value.trim();
   if (!q || !mobMap || !window.google) return;
   const svc = new google.maps.places.PlacesService(mobMap);
-  svc.textSearch({ query:q, location:mobMap.getCenter(), radius:5000 }, (results, status) => {
-    if (status===google.maps.places.PlacesServiceStatus.OK && results.length) {
-      mobRenderPlaces(results.slice(0,10));
-      if (results[0]?.geometry?.location) mobMap.panTo(results[0].geometry.location);
+  svc.textSearch({ query: q, location: mobMap.getCenter(), radius: 5000 }, (results, status) => {
+    if (status === google.maps.places.PlacesServiceStatus.OK && results.length) {
+      mobRenderPlaces(results.slice(0, 15), `"${q}" 검색 결과`);
+      mobMap.panTo(results[0].geometry.location);
     } else { mobShowToast('검색 결과가 없어요'); }
   });
 }
 
+const MOB_TYPE_MAP = { food:'restaurant', cafe:'cafe', hotel:'lodging', shop:'shopping_mall', convenience:'convenience_store' };
+
 function mobLoadPlaces() {
   if (!mobMap || !window.google) return;
-  const typeMap = {sight:'tourist_attraction',food:'restaurant',cafe:'cafe',hotel:'lodging',shop:'shopping_mall'};
-  const type    = typeMap[mobCurrentCat] || 'tourist_attraction';
-  const svc     = new google.maps.places.PlacesService(mobMap);
-  const req     = mobCurrentCat==='all'
-    ? { location:mobMap.getCenter(), rankBy:google.maps.places.RankBy.PROMINENCE, type:'tourist_attraction' }
-    : { location:mobMap.getCenter(), radius:3000, type };
-  svc.nearbySearch(req, (results, status) => {
-    if (status===google.maps.places.PlacesServiceStatus.OK) mobRenderPlaces(results.slice(0,10));
-  });
+  const svc = new google.maps.places.PlacesService(mobMap);
+  if (mobCurrentCat === 'all') {
+    svc.nearbySearch({ location:mobMap.getCenter(), rankBy:google.maps.places.RankBy.PROMINENCE, type:'tourist_attraction' },
+      (r,s) => { if (s===google.maps.places.PlacesServiceStatus.OK) mobRenderPlaces(r.slice(0,12),'추천 장소'); });
+  } else {
+    const titleMap = { food:'주변 맛집', cafe:'주변 카페', hotel:'주변 숙소', shop:'주변 쇼핑', convenience:'주변 편의점' };
+    svc.nearbySearch({ location:mobMap.getCenter(), radius:2000, type:MOB_TYPE_MAP[mobCurrentCat] },
+      (r,s) => { if (s===google.maps.places.PlacesServiceStatus.OK) mobRenderPlaces(r.slice(0,12), titleMap[mobCurrentCat]||'추천 장소'); });
+  }
 }
 
-function mobRenderPlaces(places) {
-  const el      = document.getElementById('mob-places-list');
+function mobRenderPlaces(places, title) {
+  const listEl  = document.getElementById('mob-places-list');
   const countEl = document.getElementById('mob-places-count');
-  if (!el) return;
-  if (countEl) countEl.textContent = `${places.length}곳`;
+  const titleEl = document.getElementById('mob-places-sheet-title');
+  if (!listEl) return;
   window._mobPlaces = places;
+  if (titleEl) titleEl.textContent = title || '추천 장소';
+  if (countEl) countEl.textContent = places.length + '곳';
 
-  el.innerHTML = places.map((p,i) => {
-    const photo  = p.photos?.[0]?.getUrl({maxWidth:80}) || '';
+  listEl.innerHTML = places.map((p, i) => {
+    const photo  = p.photos?.[0]?.getUrl({ maxWidth:80, maxHeight:80 }) || '';
     const rating = p.rating ? `⭐ ${p.rating}` : '';
-    const type   = (p.types||[]).slice(0,2).map(t=>t.replace(/_/g,' ')).join(', ');
-    return `<div class="mob-place-item" onclick="mobSelectPlace(${i})">
-      <div class="mob-place-thumb">${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;">`:'🏛️'}</div>
-      <div class="mob-place-info">
-        <div class="mob-place-name">${p.name}</div>
-        <div class="mob-place-sub">${type}</div>
-        ${rating?`<div class="mob-place-rating">${rating}</div>`:''}
+    const isOpen = p.opening_hours?.isOpen?.();
+    const openEl = isOpen !== undefined ? `<span style="font-size:10px;font-weight:700;color:${isOpen?'#3AAF7A':'#aaa'};">${isOpen?'영업중':'영업종료'}</span>` : '';
+    return `<div class="mob-place-item" onclick="mobSelectPlace(${i})" style="cursor:pointer;">
+      <div style="width:56px;height:56px;border-radius:10px;overflow:hidden;background:#f5f3ee;flex-shrink:0;">
+        ${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">`:'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;">🏛️</div>'}
       </div>
-      <button class="mob-place-add-btn" onclick="event.stopPropagation();mobAddPlaceToSchedule('${p.name.replace(/'/g,"\\'")}',${p.geometry?.location?.lat()||0},${p.geometry?.location?.lng()||0})">+ 추가</button>
+      <div style="flex:1;min-width:0;padding:0 4px;">
+        <div style="font-size:14px;font-weight:700;color:#2c2c2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:2px;">${rating?`<span style="font-size:11px;color:#888;">${rating}</span>`:''}${openEl}</div>
+        <div style="font-size:11px;color:#aaa;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(p.vicinity||'').split(',')[0]}</div>
+      </div>
+      <button onclick="event.stopPropagation();mobAddPlaceToSchedule('${p.name.replace(/'/g,"\\'")}',${p.geometry?.location?.lat()||0},${p.geometry?.location?.lng()||0})"
+        style="border:1.5px solid #E07A3A;background:none;color:#E07A3A;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;">+일정</button>
     </div>`;
   }).join('');
 }
@@ -12803,15 +12829,57 @@ function mobSelectPlace(idx) {
   if (!p || !mobMap) return;
   mobMap.panTo(p.geometry.location);
   mobMap.setZoom(16);
+  // 강조 마커
+  if (window._mobSelectedMarker) window._mobSelectedMarker.setMap(null);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48"><ellipse cx="20" cy="44" rx="8" ry="3" fill="rgba(0,0,0,0.22)"/><path d="M20 2C10.06 2 2 10.06 2 20c0 12 18 28 18 28s18-16 18-28C38 10.06 29.94 2 20 2Z" fill="#E07A3A" stroke="#fff" stroke-width="2.5"/><circle cx="20" cy="20" r="8" fill="#fff"/><text x="20" y="24" text-anchor="middle" font-size="10" font-weight="800" fill="#E07A3A">★</text></svg>`;
+  window._mobSelectedMarker = new google.maps.Marker({
+    position:p.geometry.location, map:mobMap, title:p.name, zIndex:9999,
+    icon:{url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg),scaledSize:new google.maps.Size(40,48),anchor:new google.maps.Point(20,48)},
+  });
+  // 상세 카드 표시
+  const listEl  = document.getElementById('mob-places-list');
+  const titleEl = document.getElementById('mob-places-sheet-title');
+  const countEl = document.getElementById('mob-places-count');
+  if (titleEl) titleEl.textContent = p.name;
+  if (countEl) countEl.textContent = '';
+  const photo  = p.photos?.[0]?.getUrl({maxWidth:400,maxHeight:200})||'';
+  const rating = p.rating ? `⭐ ${p.rating} (${p.user_ratings_total||0}명)` : '';
+  const isOpen = p.opening_hours?.isOpen?.();
+  const openTx = isOpen!==undefined ? (isOpen?'🟢 영업 중':'🔴 영업 종료') : '';
+  const addr   = p.vicinity||p.formatted_address||'';
+  const price  = p.price_level!==undefined ? ['무료','$','$$','$$$','$$$$'][p.price_level]||'' : '';
+  const types  = (p.types||[]).slice(0,2).map(t=>t.replace(/_/g,' ')).join(' · ');
+  listEl.innerHTML = `<div style="padding-bottom:20px;">
+    <button onclick="mobRestorePlaceList()" style="border:none;background:none;color:#E07A3A;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 10px;font-family:inherit;display:flex;align-items:center;gap:4px;">← 목록으로</button>
+    ${photo?`<div style="width:100%;height:150px;border-radius:12px;overflow:hidden;margin-bottom:12px;"><img src="${photo}" style="width:100%;height:100%;object-fit:cover;"></div>`:''}
+    <div style="font-size:18px;font-weight:800;color:#2c2c2a;margin-bottom:3px;">${p.name}</div>
+    <div style="font-size:12px;color:#aaa;margin-bottom:6px;">${types}${price?' · '+price:''}</div>
+    ${rating?`<div style="font-size:13px;color:#E07A3A;font-weight:600;margin-bottom:4px;">${rating}</div>`:''}
+    ${openTx?`<div style="font-size:13px;margin-bottom:4px;">${openTx}</div>`:''}
+    ${addr?`<div style="font-size:12px;color:#888;margin-bottom:12px;">📍 ${addr}</div>`:''}
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button onclick="mobAddPlaceToSchedule('${p.name.replace(/'/g,"\\'")}',${p.geometry.location.lat()},${p.geometry.location.lng()})"
+        style="flex:1;padding:12px;border:none;border-radius:12px;background:#E07A3A;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">+ 일정에 추가</button>
+      ${p.website?`<a href="${p.website}" target="_blank" style="flex:0;padding:12px 14px;border:1.5px solid #e0ddd6;border-radius:12px;background:#fff;text-decoration:none;display:flex;align-items:center;">🌐</a>`:''}
+      ${p.international_phone_number?`<a href="tel:${p.international_phone_number}" style="flex:0;padding:12px 14px;border:1.5px solid #e0ddd6;border-radius:12px;background:#fff;text-decoration:none;display:flex;align-items:center;">📞</a>`:''}
+    </div>
+    ${p.opening_hours?.weekday_text?.length?`<div style="background:#f5f3ee;border-radius:10px;padding:10px 12px;font-size:11px;color:#555;line-height:1.8;"><div style="font-weight:700;margin-bottom:4px;">영업 시간</div>${p.opening_hours.weekday_text.map(t=>`<div>${t}</div>`).join('')}</div>`:''}
+  </div>`;
+}
+
+function mobRestorePlaceList() {
+  if (window._mobSelectedMarker) { window._mobSelectedMarker.setMap(null); window._mobSelectedMarker=null; }
+  const titleEl=document.getElementById('mob-places-sheet-title');
+  if (titleEl) titleEl.textContent='추천 장소';
+  mobRenderPlaces(window._mobPlaces||[], '추천 장소');
 }
 
 async function mobAddPlaceToSchedule(name, lat, lng) {
   if (!mobCurrentTrip) { mobShowToast('먼저 여행을 선택해주세요'); return; }
-  const day  = mobCurrentDay || 1;
-  const item = { type:'sight', name, lat, lng, time:'', desc:'', memo:'' };
+  const day = mobCurrentDay || 1;
   if (!window.scheduleData) window.scheduleData = {};
   if (!window.scheduleData[day]) window.scheduleData[day] = [];
-  window.scheduleData[day].push(item);
+  window.scheduleData[day].push({ type:'sight', name, lat, lng, time:'', desc:'', memo:'' });
   try {
     await window.fbSaveTrip(mobCurrentTrip, { schedule:window.scheduleData, updatedAt:new Date().toISOString() });
     if (mobCurrentTripData) mobCurrentTripData.schedule = window.scheduleData;
@@ -12989,17 +13057,22 @@ function mobRenderPlacesSaved() {
   if (!el) return;
   const places = window.placesData || [];
   if (!places.length) {
-    el.innerHTML = `<div class="mob-empty-state"><div style="font-size:36px;">📍</div><div style="font-weight:700;margin:8px 0 4px;">저장된 장소가 없어요</div></div>`;
+    el.innerHTML = `<div class="mob-empty-state"><div style="font-size:36px;">📍</div><div style="font-weight:700;margin:8px 0 4px;">저장된 장소가 없어요</div><div style="font-size:12px;color:#999;">지도 탭에서 장소를 추가해보세요</div></div>`;
     return;
   }
   el.innerHTML = places.map(p => `
-    <div class="mob-place-item">
-      <div class="mob-place-thumb">${p.img?`<img src="${p.img}" style="width:100%;height:100%;object-fit:cover;">`:''}</div>
-      <div class="mob-place-info">
-        <div class="mob-place-name">${p.name||''}</div>
-        <div class="mob-place-sub">${p.desc||p.category||''}</div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f3ee;">
+      <div style="width:48px;height:48px;border-radius:10px;overflow:hidden;background:#f5f3ee;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;">
+        ${p.img?`<img src="${p.img}" style="width:100%;height:100%;object-fit:cover;">`:p.emoji||'📍'}
       </div>
-      ${p.lat?`<button class="mob-place-add-btn" style="border-color:#3A8FE0;color:#3A8FE0;" onclick="mobShowPinOnMap(${p.lat},${p.lng},'${(p.name||'').replace(/'/g,"\\'")}')">지도</button>`:''}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:#2c2c2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name||''}</div>
+        <div style="font-size:12px;color:#aaa;margin-top:2px;">${p.desc||p.category||''}</div>
+      </div>
+      ${p.lat?`<button onclick="mobShowPinOnMap(${p.lat},${p.lng},'${(p.name||'').replace(/'/g,"\\'")}') "
+        style="border:1.5px solid #7C3AED;background:none;color:#7C3AED;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;">
+        🗺️ 지도
+      </button>`:''}
     </div>`).join('');
 }
 
