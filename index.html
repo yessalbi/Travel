@@ -6068,86 +6068,37 @@ function isTripDomestic() {
   return false;
 }
 
-// 카카오 Directions API 요청 (올바른 엔드포인트)
-// 자동차: apis-navi.kakao.com/v1/directions (REST API 키로 CORS 허용)
-// 도보/대중교통: 카카오 공식 미지원 → OSRM 폴백 or 직선
+// 카카오 Directions API 요청
 async function kakaoRouteRequest(from, to, mode) {
   if (KAKAO_REST_KEY === 'YOUR_KAKAO_REST_API_KEY') return null;
 
+  const modeMap = { driving:'car', walking:'walk', transit:'transit', bicycling:'walk' };
+  const kakaoMode = modeMap[mode] || 'car';
+
   try {
-    if (mode === 'driving') {
-      // 카카오 자동차 경로 (클라이언트에서 CORS 허용됨)
-      const url = 'https://apis-navi.kakao.com/v1/directions'
-        + `?origin=${from.lng},${from.lat}`
-        + `&destination=${to.lng},${to.lat}`
-        + `&priority=RECOMMEND`
-        + `&car_fuel=GASOLINE&car_hipass=false&alternatives=false&road_details=false`;
-      const res = await fetch(url, {
-        headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
-      });
-      if (!res.ok) {
-        console.warn('[Kakao] driving API error:', res.status, await res.text().catch(()=>''));
-        return null;
-      }
-      const data = await res.json();
-      // result_code 0 = 정상
-      if (!data.routes?.length || data.routes[0].result_code !== 0) return null;
-      return { kakao: true, mode: 'car', data: data.routes[0] };
-    }
+    const baseUrl = `https://apis-navi.kakaomobility.com/v1/directions`
+      + `?origin=${from.lng},${from.lat}`
+      + `&destination=${to.lng},${to.lat}`
+      + `&priority=RECOMMEND`;
+    const carExtra = `&car_fuel=GASOLINE&car_hipass=false&alternatives=false&road_details=false`;
+    const url = (kakaoMode === 'car') ? baseUrl + carExtra : baseUrl;
 
-    if (mode === 'walking') {
-      // 카카오 공식 도보 API 없음 → OSRM(오픈소스) 폴백
-      return await osrmRouteRequest(from, to, 'foot');
-    }
-
-    if (mode === 'transit') {
-      // 카카오 대중교통 공식 클라이언트 API 없음 → OSRM 폴백
-      return await osrmRouteRequest(from, to, 'driving'); // 차량 경로로 근사
-    }
-
-    if (mode === 'bicycling') {
-      return await osrmRouteRequest(from, to, 'cycling');
-    }
-
-    return null;
+    const res = await fetch(url, {
+      headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` },
+    });
+    if (!res.ok) { console.warn('[Kakao] API error:', res.status); return null; }
+    const data = await res.json();
+    if (!data.routes?.length || data.routes[0].result_code !== 0) return null;
+    return { kakao: true, mode: kakaoMode, data: data.routes[0] };
   } catch(e) {
     console.warn('[Kakao Route] error:', e);
     return null;
   }
 }
 
-// OSRM 공개 API (도보/자전거 경로, 한국 지원)
-async function osrmRouteRequest(from, to, profile) {
-  // profile: 'foot' | 'cycling' | 'driving'
-  try {
-    const url = `https://router.project-osrm.org/route/v1/${profile}`
-      + `/${from.lng},${from.lat};${to.lng},${to.lat}`
-      + `?overview=full&geometries=geojson&steps=false`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.code !== 'Ok' || !data.routes?.length) return null;
-    const coords = data.routes[0].geometry?.coordinates || [];
-    if (!coords.length) return null;
-    return {
-      kakao: false, osrm: true, mode: profile,
-      path: coords.map(([lng, lat]) => ({ lat, lng })),
-      distance: data.routes[0].distance,
-      duration: data.routes[0].duration,
-    };
-  } catch(e) {
-    console.warn('[OSRM] error:', e);
-    return null;
-  }
-}
-
-// 카카오/OSRM 경로 응답 → { lat, lng }[] 좌표 배열
+// 카카오 경로 응답 → { lat, lng }[] 좌표 배열
 function kakaoRouteToPath(result) {
-  if (!result) return [];
-  // OSRM 결과
-  if (result.osrm) return result.path || [];
-  // 카카오 자동차 결과
-  if (!result.kakao) return [];
+  if (!result?.kakao) return [];
   const sections = result.data?.sections || [];
   const path = [];
   sections.forEach(sec => {
@@ -6162,22 +6113,16 @@ function kakaoRouteToPath(result) {
   return path;
 }
 
-// 거리/시간 텍스트
+// 카카오 경로 거리/시간 텍스트
 function kakaoRouteSummary(result) {
-  if (!result) return null;
-  let distM = 0, durSec = 0;
-  if (result.osrm) {
-    distM  = result.distance || 0;
-    durSec = result.duration || 0;
-  } else if (result.kakao) {
-    const summary = result.data?.summary;
-    if (!summary) return null;
-    distM  = summary.distance || 0;
-    durSec = summary.duration || 0;
-  } else return null;
-  const dist = distM >= 1000 ? `${(distM/1000).toFixed(1)}km` : `${Math.round(distM)}m`;
-  const min  = Math.round(durSec / 60);
-  const dur  = min >= 60 ? `${Math.floor(min/60)}시간${min%60?' '+min%60+'분':''}` : `${min}분`;
+  if (!result?.kakao) return null;
+  const summary = result.data?.summary;
+  if (!summary) return null;
+  const distM  = summary.distance || 0;
+  const durSec = summary.duration || 0;
+  const dist   = distM >= 1000 ? `${(distM/1000).toFixed(1)}km` : `${distM}m`;
+  const min    = Math.round(durSec / 60);
+  const dur    = min >= 60 ? `${Math.floor(min/60)}시간${min%60?' '+min%60+'분':''}` : `${min}분`;
   return { dist, dur };
 }
 
@@ -13810,7 +13755,7 @@ function mobShowAuthGate() {
     </button>
 
     <div style="font-size:11px;color:#bbb;text-align:center;line-height:1.8;margin-top:4px;">
-      일반 비밀번호 또는 관리자 코드(2689)로 입장<br>
+      일반 비밀번호 또는 관리자 코드로 입장<br>
       <span style="color:#E07A3A;font-weight:600;">관리자는 Firebase의 모든 여행을 볼 수 있어요</span>
     </div>
   `;
