@@ -2560,21 +2560,24 @@ html, body {
 }
 /* 서브탭바 */
 #mob-detail-tabs { flex-shrink: 0; display: flex; background: #fff; border-bottom: 1px solid #ede9e2; padding: 0 16px; }
-/* 서브탭 콘텐츠 */
+/* 서브탭 콘텐츠 (일정/지도/저장) */
 .mob-detail-page {
   display: none;
-  flex: 1; flex-direction: column;
+  flex-direction: column;
   overflow: hidden; min-height: 0;
+  flex: 1;
 }
-.mob-detail-page.active { display: flex; flex: 1; min-height: 0; }
-/* mob-dp-schedule 항상 flex (active일 때) */
-#mob-dp-schedule { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.mob-detail-page.active {
+  display: flex;
+  flex: 1; min-height: 0;
+}
+/* mob-dp-schedule — active일 때만 flex */
+#mob-dp-schedule.active { display: flex; flex-direction: column; }
 /* mob-dp-map */
-#mob-dp-map { position: relative; flex: 1; overflow: hidden; }
+#mob-dp-map.active { position: relative; }
 #mob-dp-map #mob-fullmap { position: absolute; inset: 0; }
 /* mob-dp-saved */
-#mob-dp-saved { flex: 1; overflow: hidden; }
-#mob-dp-saved .mob-scroll { flex: 1; }
+#mob-dp-saved.active .mob-scroll { flex: 1; }
 /* 서브서브탭 */
 .mob-stab-page { display: none; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }
 .mob-stab-page.active { display: flex; }
@@ -11723,10 +11726,13 @@ async function mobSelectTrip(tripId) {
   url.searchParams.set('trip', tripId);
   history.replaceState({}, '', url);
 
-  // 상세 레이어 즉시 오픈
+  // 상세 레이어 즉시 오픈 — 항상 개요 탭부터
   document.getElementById('mob-trip-layer').classList.add('open');
   document.getElementById('mob-trip-layer-title').textContent = '불러오는 중…';
   document.getElementById('mob-trip-layer-date').textContent = '';
+
+  // 탭 초기화: 항상 일정 탭 > 개요로 리셋
+  mobCurrentSchedTab = 'overview';
   mobDetailTab(document.getElementById('mob-dtab-schedule'), 'schedule');
 
   try {
