@@ -3101,8 +3101,8 @@ html, body {
     <div id="map"></div>
     <!-- 날짜 필터 칩 (지도 좌상단) -->
     <div id="map-day-filter" style="
-      position:absolute;top:12px;left:12px;z-index:10;
-      display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 80px);
+      position:absolute;top:12px;left:200px;z-index:10;
+      display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 220px);
     "></div>
     <!-- 오프라인 지도 대체 레이어 -->
     <div id="offline-map-layer" style="display:none;position:absolute;inset:0;z-index:5;">
@@ -13776,7 +13776,8 @@ async function mobTryAuth() {
     sessionStorage.setItem('authOk', '1');
     document.getElementById('mob-auth-gate')?.remove();
     mobShowToast('🔐 관리자 모드로 입장했어요');
-    mobWaitDbAndLoad();
+    // Firebase 준비 대기 후 로드
+    mobInit();
     return;
   }
 
@@ -13785,7 +13786,7 @@ async function mobTryAuth() {
     sessionStorage.removeItem('adminMode');
     sessionStorage.setItem('authOk', '1');
     document.getElementById('mob-auth-gate')?.remove();
-    mobWaitDbAndLoad();
+    mobInit();
     return;
   }
 
@@ -13833,7 +13834,7 @@ async function mobLoadTripList() {
     }
 
     window._mobTripList = trips;
-    mobRenderTripList();
+    mobRenderTripList(); // 내부에서 mobRenderInspire(4) 호출됨
 
     const urlTrip = new URLSearchParams(location.search).get('trip');
     if (urlTrip) await mobSelectTrip(urlTrip);
@@ -13848,7 +13849,7 @@ async function mobLoadTripList() {
         <button onclick="mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;font-family:inherit;">다시 시도</button>
       </div>`;
     window._mobTripList = [];
-    mobRenderInspire(4);
+    mobRenderInspire(4); // 에러 시에도 영감 카드는 표시
   }
 }
 
@@ -13862,37 +13863,40 @@ function mobInit() {
     mobToggleDarkMode();
   }
 
-  // 세션에 인증 정보 있으면 바로 로드
-  if (sessionStorage.getItem('authOk') === '1') {
-    mobIsAdmin = sessionStorage.getItem('adminMode') === '1';
-    mobWaitDbAndLoad();
+  // 항상 auth gate 확인 후 진입
+  // sessionStorage는 탭 닫히면 초기화 — 새 탭이면 무조건 게이트 표시
+  const sessionOk = sessionStorage.getItem('authOk') === '1';
+  if (!sessionOk) {
+    mobShowAuthGate();
     return;
   }
 
-  // 항상 로그인 게이트 표시 (PC auth와 무관하게 모바일은 독립 처리)
-  mobShowAuthGate();
-}
+  mobIsAdmin = sessionStorage.getItem('adminMode') === '1';
 
-// db 준비될 때까지 대기 후 로드
-// window.db가 아닌 window.fbGetAllTrips 존재 여부로 판단 (db는 클로저 변수)
-function mobWaitDbAndLoad(attempts) {
-  attempts = attempts || 0;
-  if (typeof window.fbGetAllTrips === 'function' && typeof window.fbGetTripMeta === 'function') {
-    mobLoadTripList();
-  } else if (attempts < 30) {
-    setTimeout(() => mobWaitDbAndLoad(attempts + 1), 200);
-  } else {
-    window._mobTripList = [];
-    mobRenderTripList();
-    mobShowToast('Firebase 연결 실패 — 오프라인 모드');
-  }
+  // Firebase가 완전히 준비될 때까지 대기 (최대 8초)
+  let waited = 0;
+  const waitReady = setInterval(() => {
+    waited += 100;
+    if (typeof window.fbGetAllTrips === 'function' && typeof window.fbGetTripMeta === 'function') {
+      clearInterval(waitReady);
+      mobLoadTripList();
+    } else if (waited >= 8000) {
+      clearInterval(waitReady);
+      // Firebase 미준비 — 여행 영감만 표시
+      window._mobTripList = [];
+      mobRenderTripList();
+      mobShowToast('Firebase 연결 중… 잠시 후 다시 시도해주세요');
+    }
+  }, 100);
 }
 </script>
 <script>
-// DOM 준비 후 모바일 초기화
+// 모바일 초기화 — DOMContentLoaded 후 실행
+// Firebase SDK는 동기 스크립트이므로 DOMContentLoaded 시점엔 이미 로드됨
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => setTimeout(mobInit, 1200));
+  document.addEventListener('DOMContentLoaded', mobInit);
 } else {
-  setTimeout(mobInit, 1200);
+  // 이미 로드된 경우 nextTick으로 실행
+  Promise.resolve().then(mobInit);
 }
 </script>
