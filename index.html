@@ -3101,8 +3101,8 @@ html, body {
     <div id="map"></div>
     <!-- 날짜 필터 칩 (지도 좌상단) -->
     <div id="map-day-filter" style="
-      position:absolute;top:12px;right:60px;z-index:10;
-      display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:60%;
+      position:absolute;top:12px;right:12px;z-index:10;
+      display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:70%;
     "></div>
     <!-- 오프라인 지도 대체 레이어 -->
     <div id="offline-map-layer" style="display:none;position:absolute;inset:0;z-index:5;">
@@ -9313,24 +9313,29 @@ function switchPanelTab(idx) {
   document.querySelectorAll('.panel-page').forEach((p,i) => p.classList.toggle('active', i===idx));
   sessionStorage.setItem('panelTab', idx);
   if (idx === 0 && map) {
-    mapDayFilter = 'all'; // 탭 전환 시 필터 초기화
+    mapDayFilter = 'all';
     clearDayRoutes();
     fitAllPins();
-    drawAllDayRoutes(); // 내부에서 renderMapDayFilter() 호출
+    drawAllDayRoutes();
     markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(map); });
+    // 날짜칩 표시
+    const df = document.getElementById('map-day-filter');
+    if (df) df.style.display = 'flex';
   }
   if (idx === 1 && map) {
     clearAllDayRoutes();
     clearDayRoutes();
     drawDayRoutes();
-    // 맛집&장소 마커 숨기기
     markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(null); });
+    // 날짜칩 숨기기 (일별 일정엔 불필요)
+    const df = document.getElementById('map-day-filter');
+    if (df) df.style.display = 'none';
   }
   if (idx === 2 && map) {
-    // 챙겨야할 것 탭 — 마커 숨기기
     markers.forEach(m => { if (m._placeIdx !== undefined) m.setMap(null); });
-    // 스마트 체크리스트 추천
     renderSmartSuggestions();
+    const df = document.getElementById('map-day-filter');
+    if (df) df.style.display = 'none';
   }
 }
 
@@ -13130,8 +13135,6 @@ async function mobDrawRouteSegment(from, to, day, idx, dayCol) {
     }
     drawPolylines(path);
   } catch(e) { drawPolylines(straight); }
-}
-  } catch(e) { /* 직선 점선 유지 */ }
 }
 
 function mobMapCat(el, cat) {
