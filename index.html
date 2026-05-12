@@ -2730,7 +2730,7 @@ select.mob-inp { padding:10px 8px;cursor:pointer; }
   -webkit-tap-highlight-color: transparent;
 }
 .mob-trip-card:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-.mob-trip-name { font-size: 15px; font-weight: 700; color: #1a1a18; letter-spacing: -0.2px; }
+.mob-trip-name { font-size: 15px; font-weight: 700; color: #1a1a18; letter-spacing: -0.2px; font-family: 'Playfair Display', serif; }
 .mob-trip-date { font-size: 12px; color: #aaa; margin-top: 2px; }
 /* 서브탭 (일정/지도/저장) */
 .mob-detail-tab {
@@ -13220,8 +13220,23 @@ function mobRenderPlaces(places, title) {
 function mobSelectPlace(idx) {
   const p = (window._mobPlaces||[])[idx];
   if (!p || !mobMap) return;
-  mobMap.panTo(p.geometry.location);
+
+  // 바텀시트가 화면 55% 차지 → 장소가 보이는 영역(위 45%) 중앙에 오도록 offset
   mobMap.setZoom(16);
+  mobMap.panTo(p.geometry.location);
+
+  // panTo 완료 후 바텀시트 높이의 절반만큼 위로 이동
+  google.maps.event.addListenerOnce(mobMap, 'idle', () => {
+    const mapEl = document.getElementById('mob-fullmap');
+    const sheetEl = document.getElementById('mob-places-sheet');
+    if (mapEl && sheetEl) {
+      const sheetH = sheetEl.offsetHeight;
+      const mapH   = mapEl.offsetHeight;
+      // 바텀시트에 가려진 영역의 절반 픽셀만큼 위로 이동
+      const offsetPx = -(sheetH - mapH * 0.3);
+      mobMap.panBy(0, offsetPx);
+    }
+  });
   // 강조 마커
   if (window._mobSelectedMarker) window._mobSelectedMarker.setMap(null);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48"><ellipse cx="20" cy="44" rx="8" ry="3" fill="rgba(0,0,0,0.22)"/><path d="M20 2C10.06 2 2 10.06 2 20c0 12 18 28 18 28s18-16 18-28C38 10.06 29.94 2 20 2Z" fill="#E07A3A" stroke="#fff" stroke-width="2.5"/><circle cx="20" cy="20" r="8" fill="#fff"/><text x="20" y="24" text-anchor="middle" font-size="10" font-weight="800" fill="#E07A3A">★</text></svg>`;
