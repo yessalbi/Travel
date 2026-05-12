@@ -13244,66 +13244,149 @@ function mobSelectPlace(idx) {
   const p = (window._mobPlaces||[])[idx];
   if (!p || !mobMap) return;
 
-  mobMap.setZoom(16);
-
-  // 바텀시트 높이 측정 → 보이는 영역 중앙으로 원스텝 이동
-  const sheetEl = document.getElementById('mob-places-sheet');
-  const sheetH  = sheetEl ? sheetEl.offsetHeight : 0;
-
-  // projection으로 한 번에 계산
-  // 핀 위치를 보이는 영역(지도 전체 - 바텀시트) 중앙에 오도록 y offset 적용
-  const moveToVisibleCenter = () => {
-    const proj = mobMap.getProjection();
-    if (!proj || !sheetH) { mobMap.panTo(p.geometry.location); return; }
-    const scale   = Math.pow(2, mobMap.getZoom());
-    const worldPt = proj.fromLatLngToPoint(p.geometry.location);
-    // 아래로 sheetH/2 만큼 내린 지점을 지도 중앙으로 설정 → 핀이 보이는 영역 중앙에 위치
-    const targetPt  = new google.maps.Point(worldPt.x, worldPt.y + (sheetH / 2) / scale);
-    const targetLng = proj.fromPointToLatLng(targetPt);
-    mobMap.panTo(targetLng);
-  };
-
-  // setZoom 후 projection 준비되면 실행
-  google.maps.event.addListenerOnce(mobMap, 'tilesloaded', moveToVisibleCenter);
-  // 강조 마커
+  // 강조 마커 즉시 표시
   if (window._mobSelectedMarker) window._mobSelectedMarker.setMap(null);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48"><ellipse cx="20" cy="44" rx="8" ry="3" fill="rgba(0,0,0,0.22)"/><path d="M20 2C10.06 2 2 10.06 2 20c0 12 18 28 18 28s18-16 18-28C38 10.06 29.94 2 20 2Z" fill="#E07A3A" stroke="#fff" stroke-width="2.5"/><circle cx="20" cy="20" r="8" fill="#fff"/><text x="20" y="24" text-anchor="middle" font-size="10" font-weight="800" fill="#E07A3A">★</text></svg>`;
   window._mobSelectedMarker = new google.maps.Marker({
     position:p.geometry.location, map:mobMap, title:p.name, zIndex:9999,
     icon:{url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg),scaledSize:new google.maps.Size(40,48),anchor:new google.maps.Point(20,48)},
   });
-  // 상세 카드 표시
-  const listEl  = document.getElementById('mob-places-list');
+
+  // 지도 이동
+  const doMove = () => {
+    const sheetEl = document.getElementById('mob-places-sheet');
+    const sheetH  = sheetEl ? sheetEl.offsetHeight : 0;
+    const proj    = mobMap.getProjection();
+    if (proj && sheetH) {
+      const scale   = Math.pow(2, mobMap.getZoom());
+      const worldPt = proj.fromLatLngToPoint(p.geometry.location);
+      const targetPt = new google.maps.Point(worldPt.x, worldPt.y + (sheetH / 2) / scale);
+      mobMap.panTo(proj.fromPointToLatLng(targetPt));
+    } else {
+      mobMap.panTo(p.geometry.location);
+    }
+  };
+
+  if (mobMap.getZoom() === 16) {
+    doMove();
+  } else {
+    mobMap.setZoom(16);
+    google.maps.event.addListenerOnce(mobMap, 'idle', doMove);
+  }
+
+  // 시트 열기 + 로딩 표시
+  const sheet   = document.getElementById('mob-places-sheet');
   const titleEl = document.getElementById('mob-places-sheet-title');
   const countEl = document.getElementById('mob-places-count');
+  const backBtn = document.getElementById('mob-places-back-btn');
+  const listEl  = document.getElementById('mob-places-list');
   if (titleEl) titleEl.textContent = p.name;
   if (countEl) countEl.textContent = '';
-  const backBtn = document.getElementById('mob-places-back-btn');
   if (backBtn) backBtn.style.display = 'inline-flex';
-  const sheet = document.getElementById('mob-places-sheet');
-  if (sheet) { sheet.classList.remove('collapsed'); sheet.style.maxHeight = ''; }
-  const photo  = p.photos?.[0]?.getUrl({maxWidth:400,maxHeight:200})||'';
-  const rating = p.rating ? `⭐ ${p.rating} (${p.user_ratings_total||0}명)` : '';
-  const isOpen = p.opening_hours?.isOpen?.();
-  const openTx = isOpen!==undefined ? (isOpen?'🟢 영업 중':'🔴 영업 종료') : '';
-  const addr   = p.vicinity||p.formatted_address||'';
-  const price  = p.price_level!==undefined ? ['무료','$','$$','$$$','$$$$'][p.price_level]||'' : '';
-  const types  = (p.types||[]).slice(0,2).map(t=>t.replace(/_/g,' ')).join(' · ');
-  listEl.innerHTML = `<div style="padding-bottom:20px;">
-    <button onclick="mobRestorePlaceList()" style="border:none;background:none;color:#E07A3A;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 10px;font-family:inherit;display:none;">← 목록으로</button>
-    ${photo?`<div style="width:100%;height:150px;border-radius:12px;overflow:hidden;margin-bottom:12px;"><img src="${photo}" style="width:100%;height:100%;object-fit:cover;"></div>`:''}
-    <div style="font-size:18px;font-weight:800;color:#2c2c2a;margin-bottom:3px;">${p.name}</div>
-    <div style="font-size:12px;color:#aaa;margin-bottom:6px;">${types}${price?' · '+price:''}</div>
-    ${rating?`<div style="font-size:13px;color:#E07A3A;font-weight:600;margin-bottom:4px;">${rating}</div>`:''}
-    ${openTx?`<div style="font-size:13px;margin-bottom:4px;">${openTx}</div>`:''}
-    ${addr?`<div style="font-size:12px;color:#888;margin-bottom:12px;">📍 ${addr}</div>`:''}
-    <div style="display:flex;gap:8px;margin-bottom:10px;">
-      <button onclick="mobAddPlaceToSchedule('${p.name.replace(/'/g,"\\'")}',${p.geometry.location.lat()},${p.geometry.location.lng()})"
-        style="flex:1;padding:12px;border:none;border-radius:12px;background:#E07A3A;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">+ 일정에 추가</button>
-      ${p.website?`<a href="${p.website}" target="_blank" style="flex:0;padding:12px 14px;border:1.5px solid #e0ddd6;border-radius:12px;background:#fff;text-decoration:none;display:flex;align-items:center;">🌐</a>`:''}
-      ${p.international_phone_number?`<a href="tel:${p.international_phone_number}" style="flex:0;padding:12px 14px;border:1.5px solid #e0ddd6;border-radius:12px;background:#fff;text-decoration:none;display:flex;align-items:center;">📞</a>`:''}
+  if (sheet)   { sheet.classList.remove('collapsed'); sheet.style.maxHeight = ''; }
+  if (listEl)  listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#bbb;font-size:13px;">불러오는 중…</div>`;
+
+  // Places 상세 정보 fetch (리뷰, 사진 포함)
+  const svc = new google.maps.places.PlacesService(mobMap);
+  svc.getDetails({
+    placeId: p.place_id,
+    fields: ['name','rating','user_ratings_total','reviews','photos',
+             'formatted_address','vicinity','formatted_phone_number',
+             'international_phone_number','opening_hours','website',
+             'price_level','types','geometry','place_id'],
+  }, (detail, status) => {
+    const d = (status === google.maps.places.PlacesServiceStatus.OK && detail) ? detail : p;
+    mobRenderPlaceDetail(d, listEl);
+  });
+}
+
+function mobRenderPlaceDetail(d, listEl) {
+  const addr   = d.vicinity || d.formatted_address || '';
+  const lat    = d.geometry.location.lat();
+  const lng    = d.geometry.location.lng();
+  const price  = d.price_level !== undefined ? ['무료','$','$$','$$$','$$$$'][d.price_level] || '' : '';
+  const types  = (d.types||[]).slice(0,2).map(t => t.replace(/_/g,' ')).join(' · ');
+  const isOpen = d.opening_hours?.isOpen?.();
+  const openTx = isOpen !== undefined
+    ? (isOpen ? '<span style="color:#3AAF7A;font-weight:700;">영업 중</span>'
+               : '<span style="color:#E53935;font-weight:700;">영업 종료</span>') : '';
+  const phone   = d.international_phone_number || d.formatted_phone_number || '';
+  const gmapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.name)}&query_place_id=${d.place_id||''}`;
+  const photos  = d.photos ? d.photos.slice(0,8).map(ph => ph.getUrl({maxWidth:400,maxHeight:300})) : [];
+  const reviews = d.reviews ? d.reviews.slice(0,5) : [];
+
+  const addrSafe = addr.replace(/'/g,"\\'");
+  const nameSafe = d.name.replace(/'/g,"\\'");
+
+  listEl.innerHTML = `<div style="padding-bottom:32px;">
+
+    ${photos.length ? `
+    <div style="overflow-x:auto;display:flex;gap:8px;margin:-2px -12px 14px;padding:2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+      <style>#mob-places-list .photo-scroll::-webkit-scrollbar{display:none}</style>
+      ${photos.map((url,i) => `<img src="${url}" loading="${i?'lazy':'eager'}"
+        style="flex-shrink:0;width:${photos.length===1?'100%':'200px'};height:140px;border-radius:12px;object-fit:cover;">`).join('')}
+    </div>` : ''}
+
+    <div style="font-size:19px;font-weight:800;color:#1a1a18;letter-spacing:-0.4px;margin-bottom:2px;">${d.name}</div>
+    <div style="font-size:12px;color:#aaa;margin-bottom:8px;">${types}${price?' · '+price:''}</div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+      ${d.rating ? `<span style="font-size:13px;color:#E07A3A;font-weight:700;">⭐ ${d.rating} <span style="color:#bbb;font-weight:400;font-size:12px;">(${d.user_ratings_total||0}명)</span></span>` : ''}
+      ${openTx ? `<span style="font-size:12px;">${openTx}</span>` : ''}
     </div>
-    ${p.opening_hours?.weekday_text?.length?`<div style="background:#f5f3ee;border-radius:10px;padding:10px 12px;font-size:11px;color:#555;line-height:1.8;"><div style="font-weight:700;margin-bottom:4px;">영업 시간</div>${p.opening_hours.weekday_text.map(t=>`<div>${t}</div>`).join('')}</div>`:''}
+
+    ${addr ? `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;">
+      <span style="font-size:12px;color:#666;flex:1;line-height:1.5;">📍 ${addr}</span>
+      <button onclick="navigator.clipboard.writeText('${addrSafe}').then(()=>mobShowToast('주소 복사됨 ✓'))"
+        style="flex-shrink:0;border:1px solid #e0ddd6;background:#fff;border-radius:6px;padding:3px 8px;font-size:11px;color:#888;cursor:pointer;font-family:inherit;white-space:nowrap;">복사</button>
+    </div>` : ''}
+
+    ${phone ? `<div style="font-size:12px;color:#666;margin-bottom:10px;">📞 ${phone}</div>` : ''}
+
+    ${d.opening_hours?.weekday_text?.length ? `
+    <details style="margin-bottom:12px;">
+      <summary style="font-size:12px;color:#666;cursor:pointer;list-style:none;display:flex;align-items:center;gap:4px;padding:4px 0;">
+        🕐 영업시간 <span style="color:#bbb;font-size:10px;margin-left:2px;">▾</span>
+      </summary>
+      <div style="margin-top:6px;background:#f5f3ee;border-radius:8px;padding:8px 10px;">
+        ${d.opening_hours.weekday_text.map(t=>`<div style="font-size:11px;color:#555;line-height:1.8;">${t}</div>`).join('')}
+      </div>
+    </details>` : ''}
+
+    <!-- 버튼 -->
+    <div style="display:flex;gap:7px;margin-bottom:14px;">
+      <button onclick="mobAddPlaceToSchedule('${nameSafe}',${lat},${lng})"
+        style="flex:2;padding:13px 8px;border:none;border-radius:12px;background:#E07A3A;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">＋ 일정 추가</button>
+      <a href="${gmapUrl}" target="_blank"
+        style="flex:1.2;padding:10px 4px;border:1.5px solid #e0ddd6;border-radius:12px;background:#fff;color:#555;font-size:11px;font-weight:600;text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;">
+        🗺️<span style="font-size:10px;color:#888;">구글지도</span></a>
+      ${phone ? `<a href="tel:${phone}"
+        style="flex:0.7;padding:13px 8px;border:1.5px solid #e0ddd6;border-radius:12px;background:#fff;color:#555;font-size:18px;text-decoration:none;display:flex;align-items:center;justify-content:center;">📞</a>` : ''}
+      ${d.website ? `<a href="${d.website}" target="_blank"
+        style="flex:0.7;padding:13px 8px;border:1.5px solid #e0ddd6;border-radius:12px;background:#fff;color:#555;font-size:18px;text-decoration:none;display:flex;align-items:center;justify-content:center;">🌐</a>` : ''}
+    </div>
+
+    <!-- 리뷰 -->
+    ${reviews.length ? `
+    <div style="font-size:13px;font-weight:700;color:#1a1a18;margin-bottom:10px;">
+      구글 리뷰
+      <span style="font-weight:400;color:#bbb;font-size:12px;margin-left:4px;">${d.user_ratings_total||0}개 중 ${reviews.length}개</span>
+    </div>
+    ${reviews.map(r => `
+      <div style="background:#f5f3ee;border-radius:12px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">
+          <img src="${r.profile_photo_url||''}" width="24" height="24"
+            style="border-radius:50%;object-fit:cover;flex-shrink:0;background:#e0ddd6;"
+            onerror="this.style.display='none'">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:700;color:#1a1a18;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.author_name||''}</div>
+            <div style="font-size:10px;color:#bbb;">${r.relative_time_description||''}</div>
+          </div>
+          <div style="font-size:12px;color:#E07A3A;font-weight:700;flex-shrink:0;">⭐ ${r.rating||''}</div>
+        </div>
+        <div style="font-size:12px;color:#555;line-height:1.6;">${r.text||''}</div>
+      </div>`).join('')}` : ''}
+
   </div>`;
 }
 
