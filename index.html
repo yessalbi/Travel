@@ -11381,25 +11381,16 @@ document.addEventListener('keydown', (e) => {
           <button class="mob-cat" onclick="mobMapCat(this,'shop')">쇼핑</button>
         </div>
         <div class="mob-places-sheet" id="mob-places-sheet">
-          <!-- 드래그 핸들 — 터치로 시트 접기/펼치기 -->
-          <div class="mob-sheet-handle" id="mob-places-handle" style="cursor:grab;padding:12px 0 6px;touch-action:none;"></div>
+          <div class="mob-sheet-handle" id="mob-places-handle" style="cursor:grab;touch-action:none;"></div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 10px;">
             <div style="display:flex;align-items:center;gap:8px;">
-              <!-- 목록으로 버튼 (상세 카드일 때만 표시) -->
               <button id="mob-places-back-btn" onclick="mobRestorePlaceList()"
                 style="display:none;border:none;background:none;color:#E07A3A;font-size:13px;font-weight:600;cursor:pointer;padding:0;font-family:inherit;-webkit-tap-highlight-color:transparent;">
                 ← 목록
               </button>
               <div class="mob-sheet-title" style="margin:0;" id="mob-places-sheet-title">추천 장소</div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span id="mob-places-count" style="font-size:12px;color:#999;"></span>
-              <!-- 시트 닫기/열기 버튼 -->
-              <button id="mob-places-toggle-btn" onclick="mobTogglePlacesSheet()"
-                style="border:none;background:#f5f3ee;color:#999;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;">
-                ▾
-              </button>
-            </div>
+            <span id="mob-places-count" style="font-size:12px;color:#999;"></span>
           </div>
           <div class="mob-places-list" id="mob-places-list"></div>
         </div>
@@ -13277,14 +13268,10 @@ function mobSelectPlace(idx) {
   const countEl = document.getElementById('mob-places-count');
   if (titleEl) titleEl.textContent = p.name;
   if (countEl) countEl.textContent = '';
-  // 목록 버튼 표시
   const backBtn = document.getElementById('mob-places-back-btn');
   if (backBtn) backBtn.style.display = 'inline-flex';
-  // 시트 펼치기
   const sheet = document.getElementById('mob-places-sheet');
   if (sheet) { sheet.classList.remove('collapsed'); sheet.style.maxHeight = ''; }
-  const toggleBtn = document.getElementById('mob-places-toggle-btn');
-  if (toggleBtn) toggleBtn.textContent = '▾';
   const photo  = p.photos?.[0]?.getUrl({maxWidth:400,maxHeight:200})||'';
   const rating = p.rating ? `⭐ ${p.rating} (${p.user_ratings_total||0}명)` : '';
   const isOpen = p.opening_hours?.isOpen?.();
@@ -13293,7 +13280,7 @@ function mobSelectPlace(idx) {
   const price  = p.price_level!==undefined ? ['무료','$','$$','$$$','$$$$'][p.price_level]||'' : '';
   const types  = (p.types||[]).slice(0,2).map(t=>t.replace(/_/g,' ')).join(' · ');
   listEl.innerHTML = `<div style="padding-bottom:20px;">
-    <button onclick="mobRestorePlaceList()" style="border:none;background:none;color:#E07A3A;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 10px;font-family:inherit;display:flex;align-items:center;gap:4px;">← 목록으로</button>
+    <button onclick="mobRestorePlaceList()" style="border:none;background:none;color:#E07A3A;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 10px;font-family:inherit;display:none;">← 목록으로</button>
     ${photo?`<div style="width:100%;height:150px;border-radius:12px;overflow:hidden;margin-bottom:12px;"><img src="${photo}" style="width:100%;height:100%;object-fit:cover;"></div>`:''}
     <div style="font-size:18px;font-weight:800;color:#2c2c2a;margin-bottom:3px;">${p.name}</div>
     <div style="font-size:12px;color:#aaa;margin-bottom:6px;">${types}${price?' · '+price:''}</div>
@@ -13310,15 +13297,6 @@ function mobSelectPlace(idx) {
   </div>`;
 }
 
-function mobTogglePlacesSheet() {
-  const sheet = document.getElementById('mob-places-sheet');
-  if (!sheet) return;
-  sheet.classList.toggle('collapsed');
-  const btn = document.getElementById('mob-places-toggle-btn');
-  if (btn) btn.textContent = sheet.classList.contains('collapsed') ? '▴' : '▾';
-}
-
-// 장소 시트 드래그로 접기/펼치기
 function mobInitPlacesSheetDrag() {
   const handle = document.getElementById('mob-places-handle');
   const sheet  = document.getElementById('mob-places-sheet');
@@ -13339,39 +13317,30 @@ function mobInitPlacesSheetDrag() {
     sheet.style.maxHeight = newH + 'px';
   }, { passive: true });
 
-  handle.addEventListener('touchend', e => {
+  handle.addEventListener('touchend', () => {
     sheet.style.transition = '';
     const currentH = sheet.offsetHeight;
-    const threshold = window.innerHeight * 0.18;
-    if (currentH < threshold) {
-      // 접기
+    // 50% 이하면 접힘, 이상이면 펼침
+    if (currentH < window.innerHeight * 0.5) {
       sheet.classList.add('collapsed');
       sheet.style.maxHeight = '';
-      const btn = document.getElementById('mob-places-toggle-btn');
-      if (btn) btn.textContent = '▴';
     } else {
-      // 펼치기
       sheet.classList.remove('collapsed');
       sheet.style.maxHeight = '';
-      const btn = document.getElementById('mob-places-toggle-btn');
-      if (btn) btn.textContent = '▾';
     }
   }, { passive: true });
 }
 
 function mobRestorePlaceList() {
   if (window._mobSelectedMarker) { window._mobSelectedMarker.setMap(null); window._mobSelectedMarker = null; }
-  const titleEl  = document.getElementById('mob-places-sheet-title');
-  const backBtn  = document.getElementById('mob-places-back-btn');
-  const countEl  = document.getElementById('mob-places-count');
-  const sheet    = document.getElementById('mob-places-sheet');
+  const titleEl = document.getElementById('mob-places-sheet-title');
+  const backBtn = document.getElementById('mob-places-back-btn');
+  const countEl = document.getElementById('mob-places-count');
+  const sheet   = document.getElementById('mob-places-sheet');
   if (titleEl) titleEl.textContent = '추천 장소';
   if (backBtn) backBtn.style.display = 'none';
-  if (countEl) countEl.textContent  = (window._mobPlaces||[]).length + '곳';
-  // 시트 펼치기
+  if (countEl) countEl.textContent = (window._mobPlaces||[]).length + '곳';
   if (sheet) { sheet.classList.remove('collapsed'); sheet.style.maxHeight = ''; }
-  const btn = document.getElementById('mob-places-toggle-btn');
-  if (btn) btn.textContent = '▾';
   mobRenderPlaces(window._mobPlaces || [], '추천 장소');
 }
 
