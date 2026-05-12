@@ -98,6 +98,50 @@
     await db.collection("trips").doc(tripId).collection("places").doc(placeId).update(data);
   };
 
+  // ── 유저 관리 ──────────────────────────────────────────────
+  window.simpleHash = async (str) => {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);
+  };
+  window.nameToId = (name) => name.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_가-힣]/g,'').slice(0,30) || 'user';
+
+  window.fbGetUser = async (userId) => {
+    const snap = await db.collection('users').doc(userId).get();
+    return snap.exists ? { id: userId, ...snap.data() } : null;
+  };
+  window.fbCreateUser = async (name, pw) => {
+    const userId = window.nameToId(name);
+    const pwHash = await window.simpleHash(pw);
+    const existing = await window.fbGetUser(userId);
+    if (existing) return { error: '이미 있는 이름이에요. 다른 이름을 사용하거나 로그인해주세요.' };
+    await db.collection('users').doc(userId).set({
+      name: name.trim(), pwHash, tripIds: [], createdAt: new Date().toISOString(),
+    });
+    return { userId, name: name.trim() };
+  };
+  window.fbLoginUser = async (name, pw) => {
+    const userId = window.nameToId(name);
+    const pwHash = await window.simpleHash(pw);
+    const user   = await window.fbGetUser(userId);
+    if (!user) return { error: '등록되지 않은 이름이에요. 처음이시면 회원가입을 눌러주세요.' };
+    if (user.pwHash !== pwHash) return { error: '비밀번호가 맞지 않아요 🔒' };
+    return { userId, name: user.name, tripIds: user.tripIds || [] };
+  };
+  window.fbAddTripToUser = async (userId, tripId) => {
+    const user = await window.fbGetUser(userId);
+    if (!user) return;
+    const ids = user.tripIds || [];
+    if (!ids.includes(tripId)) {
+      await db.collection('users').doc(userId).update({ tripIds: [tripId, ...ids] });
+    }
+  };
+  window.fbGetUserTrips = async (userId) => {
+    const user = await window.fbGetUser(userId);
+    if (!user?.tripIds?.length) return [];
+    const metas = await Promise.all(user.tripIds.map(id => window.fbGetTripMeta(id).catch(()=>null)));
+    return metas.filter(Boolean);
+  };
+
   // 여러 trip 정보 한번에 불러오기
   window.fbGetTripMeta = async (tripId) => {
     const snap = await db.collection("trips").doc(tripId).get();
@@ -11690,6 +11734,11 @@ async function mobCreateTripConfirm() {
   try {
     await window.fbSaveTrip(newId, payload);
     if (typeof addTripToList === 'function') addTripToList(newId);
+    // Firebase 유저 tripIds에도 추가
+    const userId = localStorage.getItem('mobUserId');
+    if (userId && typeof window.fbAddTripToUser === 'function') {
+      window.fbAddTripToUser(userId, newId).catch(()=>{});
+    }
     mobCloseSheet('mob-newtrip-sheet');
     mobShowToast('새 여행이 만들어졌어요 ✓');
     // 목록 갱신 후 바로 선택
@@ -11817,9 +11866,45 @@ function mobSchedMore() {
 
 function mobShareTrip(tripId) {
   const url = location.origin + location.pathname + '?trip=' + tripId;
-  if (navigator.share) navigator.share({ title: '여행 계획', url }).catch(()=>{});
-  else if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => mobShowToast('링크가 복사됐어요 ✓'));
-  else mobShowToast('링크: ' + url);
+  // 공유 링크 + 사용자에게 tripId 부여하는 시트
+  mobOpenSheet('mob-share-sheet', `
+    <div class="mob-handle"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:14px;">🔗 여행 공유하기</div>
+    <div style="background:#f5f3ee;border-radius:12px;padding:12px;margin-bottom:14px;word-break:break-all;font-size:12px;color:#555;">${url}</div>
+    <button class="mob-primary-btn" onclick="
+      navigator.share ? navigator.share({title:'여행 계획',url:'${url}'}).catch(()=>{}) :
+      navigator.clipboard.writeText('${url}').then(()=>mobShowToast('링크 복사됨 ✓'));
+      mobCloseSheet('mob-share-sheet');
+    ">🔗 링크 공유</button>
+
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f0ede8;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">👤 특정 사람에게 직접 공유</div>
+      <div style="font-size:11px;color:#999;margin-bottom:4px;">상대방 이름 (가입한 이름과 동일)</div>
+      <input id="mob-share-target-name" type="text" placeholder="예: 홍길동" maxlength="20"
+        style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+        onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
+      <button class="mob-primary-btn" style="margin-top:8px;background:#3A8FE0;" onclick="mobShareToUser('${tripId}')">
+        공유하기
+      </button>
+    </div>
+    <button class="mob-cancel-btn" onclick="mobCloseSheet('mob-share-sheet')">닫기</button>
+  `);
+}
+
+async function mobShareToUser(tripId) {
+  const name = document.getElementById('mob-share-target-name')?.value.trim();
+  if (!name) { mobShowToast('이름을 입력해주세요'); return; }
+  if (typeof window.nameToId !== 'function' || typeof window.fbAddTripToUser !== 'function') {
+    mobShowToast('연결 중... 잠시 후 다시 시도'); return;
+  }
+  try {
+    const userId = window.nameToId(name);
+    const user   = await window.fbGetUser(userId);
+    if (!user) { mobShowToast(`"${name}"님이 아직 가입하지 않았어요`); return; }
+    await window.fbAddTripToUser(userId, tripId);
+    mobCloseSheet('mob-share-sheet');
+    mobShowToast(`✓ "${user.name}"님에게 공유됐어요!`);
+  } catch(e) { mobShowToast('공유 실패: ' + (e.message||'')); }
 }
 
 function mobSaveTripOffline(tripId) {
@@ -13257,48 +13342,35 @@ function mobShowNotifications() {
   `);
 }
 function mobRenderProfile() {
-  const d      = mobCurrentTripData || {};
-  const author = d.author || document.getElementById('trip-author')?.value
-    || (window._mobTripList||[]).find(t=>t.id===mobCurrentTrip)?.author || '여행자';
-  const id     = mobCurrentTrip || '';
+  const userId   = localStorage.getItem('mobUserId') || '';
+  const userName = localStorage.getItem('mobUserName') || '여행자';
+  const isAdmin  = mobIsAdmin || localStorage.getItem('mobAdminMode') === '1';
 
-  const nameEl = document.getElementById('mob-profile-name');
-  const idEl   = document.getElementById('mob-profile-id');
-  if (nameEl) nameEl.textContent = author;
-  if (idEl)   idEl.textContent   = id ? `Trip ID: ${id}` : '';
-
-  // 관리자일 때 빌드 배지 표시
-  const buildBadgeEl = document.getElementById('mob-build-badge');
-  if (buildBadgeEl) {
-    if (mobIsAdmin || localStorage.getItem('mobAdminMode') === '1') {
-      buildBadgeEl.style.display = 'block';
-      // PC build-badge에서 텍스트 가져오기
-      const pcBadge = document.getElementById('build-badge');
-      if (pcBadge?.textContent && pcBadge.textContent !== 'Build : ···') {
-        buildBadgeEl.textContent = pcBadge.textContent + '.ver';
-      } else {
-        // GitHub API 직접 호출
-        fetch('https://api.github.com/repos/yessalbi/Travel/commits/main',
-          { headers: { Accept: 'application/vnd.github.v3+json' } })
-          .then(r => r.json())
-          .then(d => {
-            const hash = d.sha?.slice(0,7);
-            if (hash) buildBadgeEl.textContent = `(${hash}).ver`;
-          }).catch(() => { buildBadgeEl.textContent = '(-----).ver'; });
-      }
-    } else {
-      buildBadgeEl.style.display = 'none';
-    }
-  }
+  const nameEl  = document.getElementById('mob-profile-name');
+  const idEl    = document.getElementById('mob-profile-id');
+  if (nameEl) nameEl.textContent = isAdmin ? '관리자' : userName;
+  if (idEl)   idEl.textContent   = isAdmin ? '전체 여행 관리 모드' : (userId ? `@${userId}` : '');
 
   const langLabel  = document.getElementById('mob-lang-label');
   const themeLabel = document.getElementById('mob-theme-label');
-  const offCount   = document.getElementById('mob-offline-count');
   if (langLabel)  langLabel.textContent  = (window.currentLang==='ja') ? '日本語' : '한국어';
   if (themeLabel) themeLabel.textContent = mobIsDarkMode ? '다크 모드' : '라이트 모드';
 
-  if (window.offlineList && offCount) {
-    window.offlineList().then(list => { offCount.textContent = list.length + '개 저장됨'; }).catch(()=>{});
+  // 관리자 배지 + 빌드 배지
+  const badge = document.getElementById('mob-admin-badge');
+  if (badge) badge.style.display = isAdmin ? 'block' : 'none';
+  const buildBadgeEl = document.getElementById('mob-build-badge');
+  if (buildBadgeEl && isAdmin) {
+    buildBadgeEl.style.display = 'block';
+    const pcBadge = document.getElementById('build-badge');
+    if (pcBadge?.textContent && pcBadge.textContent !== 'Build : ···') {
+      buildBadgeEl.textContent = pcBadge.textContent + '.ver';
+    } else {
+      fetch('https://api.github.com/repos/yessalbi/Travel/commits/main',
+        { headers:{ Accept:'application/vnd.github.v3+json' } })
+        .then(r=>r.json()).then(d=>{ const h=d.sha?.slice(0,7); if(h) buildBadgeEl.textContent=`(${h}).ver`; })
+        .catch(()=>{ buildBadgeEl.textContent='(-----).ver'; });
+    }
   }
 }
 
@@ -13391,13 +13463,15 @@ function mobLogout() {
   if (!confirm('로그아웃 할까요?')) return;
   localStorage.removeItem('mobAuthOk');
   localStorage.removeItem('mobAdminMode');
+  localStorage.removeItem('mobUserId');
+  localStorage.removeItem('mobUserName');
   mobIsAdmin = false;
   window.isAdminMode = false;
   window._mobTripList = [];
   window._mobInited = false;
   mobCurrentTrip = null;
   mobCurrentTripData = null;
-  mobTab('home');
+  mobCloseTrip();
   mobShowAuthGate();
 }
 
@@ -13512,82 +13586,140 @@ let   mobIsAdmin   = false;
 
 function mobShowAuthGate() {
   document.getElementById('mob-auth-gate')?.remove();
-
   const gate = document.createElement('div');
   gate.id = 'mob-auth-gate';
-  gate.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#FAFAF7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;box-sizing:border-box;';
+  gate.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#FAFAF7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:32px;box-sizing:border-box;';
   gate.innerHTML = `
-    <div style="font-family:'Playfair Display',serif;font-size:42px;font-weight:700;color:#1A1A18;letter-spacing:-1px;">
-      travel<span style="color:#E07A3A;">.</span>
+    <div style="font-family:'Playfair Display',serif;font-size:40px;font-weight:700;color:#1A1A18;letter-spacing:-1px;">travel<span style="color:#E07A3A;">.</span></div>
+    <div style="font-size:12px;color:#aaa;margin-top:-8px;letter-spacing:1px;">여행 계획 앱</div>
+    <div style="display:flex;background:#f0ede8;border-radius:12px;padding:3px;gap:2px;margin-top:4px;">
+      <button id="mob-auth-tab-login" onclick="mobAuthSwitchTab('login')" style="flex:1;padding:8px 14px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:#E07A3A;color:#fff;">로그인</button>
+      <button id="mob-auth-tab-register" onclick="mobAuthSwitchTab('register')" style="flex:1;padding:8px 14px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:#888;">처음이에요</button>
+      <button id="mob-auth-tab-admin" onclick="mobAuthSwitchTab('admin')" style="flex:1;padding:8px 14px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:#888;">관리자</button>
     </div>
-    <div style="font-size:12px;color:#aaa;margin-top:-10px;letter-spacing:2px;text-transform:uppercase;">여행 계획 앱</div>
-
-    <div style="width:100%;max-width:280px;margin-top:16px;">
-      <div style="font-size:13px;color:#666;margin-bottom:10px;text-align:center;font-weight:600;">비밀번호 4자리 입력</div>
-      <input id="mob-auth-input" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
-        style="width:100%;border:2.5px solid #E8E4DC;border-radius:16px;padding:16px 20px;font-size:30px;text-align:center;outline:none;letter-spacing:16px;background:#fff;color:#1A1A18;font-family:inherit;box-sizing:border-box;"
-        oninput="if(this.value.length===4)mobTryAuth()"
-        onkeydown="if(event.key==='Enter')mobTryAuth()" />
+    <div style="width:100%;max-width:300px;display:flex;flex-direction:column;gap:8px;">
+      <div id="mob-auth-user-form">
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">이름</div>
+        <input id="mob-auth-name" type="text" placeholder="예: 홍길동" maxlength="20"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:8px;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"
+          onkeydown="if(event.key==='Enter')document.getElementById('mob-auth-pw').focus()" />
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">비밀번호 4자리</div>
+        <input id="mob-auth-pw" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:22px;text-align:center;letter-spacing:10px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"
+          oninput="if(this.value.length===4&&window._mobAuthTab!=='admin')mobTryAuth()"
+          onkeydown="if(event.key==='Enter')mobTryAuth()" />
+      </div>
+      <div id="mob-auth-admin-form" style="display:none;">
+        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">관리자 코드</div>
+        <input id="mob-auth-admin-pw" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
+          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:14px;font-size:22px;text-align:center;letter-spacing:10px;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"
+          oninput="if(this.value.length===4)mobTryAuth()" onkeydown="if(event.key==='Enter')mobTryAuth()" />
+      </div>
     </div>
-
-    <div id="mob-auth-error" style="font-size:12px;color:#E53935;min-height:16px;text-align:center;"></div>
-
-    <button onclick="mobTryAuth()"
-      style="width:100%;max-width:280px;padding:15px;border-radius:14px;border:none;background:#E07A3A;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;">
-      입장하기
-    </button>
-
-    <div style="font-size:11px;color:#bbb;text-align:center;line-height:1.8;margin-top:4px;">
-      일반 비밀번호 또는 관리자 코드(2689)로 입장<br>
-      <span style="color:#E07A3A;font-weight:600;">관리자는 Firebase의 모든 여행을 볼 수 있어요</span>
-    </div>
+    <div id="mob-auth-error" style="font-size:12px;color:#E53935;min-height:16px;text-align:center;max-width:300px;"></div>
+    <button onclick="mobTryAuth()" id="mob-auth-submit-btn"
+      style="width:100%;max-width:300px;padding:14px;border-radius:14px;border:none;background:#E07A3A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">입장하기</button>
+    <div style="font-size:11px;color:#ccc;text-align:center;">처음 오셨으면 '처음이에요'를 눌러 등록하세요</div>
   `;
+  (document.getElementById('mob-app')||document.body).appendChild(gate);
+  window._mobAuthTab = 'login';
+  setTimeout(() => document.getElementById('mob-auth-name')?.focus(), 150);
+}
 
-  const mobApp = document.getElementById('mob-app');
-  (mobApp || document.body).appendChild(gate);
-  setTimeout(() => document.getElementById('mob-auth-input')?.focus(), 150);
+function mobAuthSwitchTab(tab) {
+  window._mobAuthTab = tab;
+  ['login','register','admin'].forEach(t => {
+    const b = document.getElementById('mob-auth-tab-'+t);
+    if (b) { b.style.background = t===tab?'#E07A3A':'none'; b.style.color = t===tab?'#fff':'#888'; }
+  });
+  document.getElementById('mob-auth-user-form').style.display  = tab==='admin' ? 'none' : 'block';
+  document.getElementById('mob-auth-admin-form').style.display = tab==='admin' ? 'block' : 'none';
+  const btn = document.getElementById('mob-auth-submit-btn');
+  if (btn) btn.textContent = tab==='register' ? '가입하기' : '입장하기';
+  document.getElementById('mob-auth-error').textContent = '';
+  setTimeout(() => (document.getElementById(tab==='admin'?'mob-auth-admin-pw':'mob-auth-name'))?.focus(), 100);
 }
 
 async function mobTryAuth() {
-  const input = document.getElementById('mob-auth-input');
   const errEl = document.getElementById('mob-auth-error');
-  const pw    = (input?.value || '').trim();
+  const tab   = window._mobAuthTab || 'login';
+  const showErr = (msg) => {
+    if (errEl) errEl.textContent = msg;
+    setTimeout(() => { if(errEl) errEl.textContent=''; }, 2500);
+  };
 
-  if (!pw) return;
-
-  if (pw === MOB_ADMIN_PW) {
-    mobIsAdmin = true;
-    window.isAdminMode = true;
-    localStorage.setItem('mobAdminMode', '1');
-    localStorage.setItem('mobAuthOk', '1');
-    document.getElementById('mob-auth-gate')?.remove();
-    mobShowToast('🔐 관리자 모드로 입장했어요');
-    // Firebase 준비 대기 후 로드
-    mobInit();
-    return;
+  // 관리자 탭
+  if (tab === 'admin') {
+    const pw = document.getElementById('mob-auth-admin-pw')?.value.trim();
+    if (!pw) return;
+    if (pw === MOB_ADMIN_PW) {
+      mobIsAdmin = true; window.isAdminMode = true;
+      localStorage.setItem('mobAdminMode','1'); localStorage.setItem('mobAuthOk','1');
+      localStorage.removeItem('mobUserId'); localStorage.removeItem('mobUserName');
+      document.getElementById('mob-auth-gate')?.remove();
+      mobShowToast('🔐 관리자 모드');
+      mobInit(); return;
+    }
+    showErr('관리자 코드가 맞지 않아요'); return;
   }
 
-  if (pw === MOB_AUTH_PW) {
-    mobIsAdmin = false;
-    localStorage.removeItem('mobAdminMode');
-    localStorage.setItem('mobAuthOk', '1');
-    document.getElementById('mob-auth-gate')?.remove();
-    mobInit();
-    return;
+  // 이름+비밀번호
+  const name = document.getElementById('mob-auth-name')?.value.trim();
+  const pw   = document.getElementById('mob-auth-pw')?.value.trim();
+  if (!name) { showErr('이름을 입력해주세요'); document.getElementById('mob-auth-name')?.focus(); return; }
+  if (!pw || pw.length < 4) { showErr('비밀번호 4자리를 입력해주세요'); return; }
+
+  // Firebase 준비 확인
+  if (typeof window.fbLoginUser !== 'function') {
+    showErr('연결 중... 잠시 후 다시 시도해주세요'); return;
   }
 
-  // 틀림
-  if (errEl) errEl.textContent = '비밀번호가 맞지 않아요 🔒';
-  if (input) {
-    input.value = '';
-    input.style.borderColor = '#E53935';
-    input.focus();
+  const submitBtn = document.getElementById('mob-auth-submit-btn');
+  if (submitBtn) { submitBtn.textContent='확인 중…'; submitBtn.disabled=true; }
+
+  try {
+    if (tab === 'register') {
+      // 회원가입
+      const result = await window.fbCreateUser(name, pw);
+      if (result.error) { showErr(result.error); return; }
+      localStorage.setItem('mobAuthOk','1');
+      localStorage.setItem('mobUserId', result.userId);
+      localStorage.setItem('mobUserName', result.name);
+      localStorage.removeItem('mobAdminMode');
+      mobIsAdmin = false;
+      document.getElementById('mob-auth-gate')?.remove();
+      mobShowToast(`👋 환영해요, ${result.name}님!`);
+      mobInit();
+    } else {
+      // 로그인
+      const result = await window.fbLoginUser(name, pw);
+      if (result.error) { showErr(result.error); return; }
+      localStorage.setItem('mobAuthOk','1');
+      localStorage.setItem('mobUserId', result.userId);
+      localStorage.setItem('mobUserName', result.name);
+      localStorage.removeItem('mobAdminMode');
+      mobIsAdmin = false;
+      // 로그인 유저의 tripIds → localStorage tripList 동기화
+      if (result.tripIds?.length) {
+        const existing = JSON.parse(localStorage.getItem('tripList')||'[]');
+        const merged   = [...new Set([...result.tripIds, ...existing])];
+        localStorage.setItem('tripList', JSON.stringify(merged));
+      }
+      document.getElementById('mob-auth-gate')?.remove();
+      mobShowToast(`👋 반가워요, ${result.name}님!`);
+      mobInit();
+    }
+  } catch(e) {
+    showErr('오류가 발생했어요: ' + (e.message||''));
+    console.error('[mobTryAuth]', e);
+  } finally {
+    if (submitBtn) { submitBtn.textContent = tab==='register'?'가입하기':'입장하기'; submitBtn.disabled=false; }
   }
-  setTimeout(() => {
-    if (input) input.style.borderColor = '#E8E4DC';
-    if (errEl) errEl.textContent = '';
-  }, 1800);
 }
+
 
 async function mobLoadTripList() {
   const container = document.getElementById('mob-trip-list');
@@ -13617,16 +13749,29 @@ async function mobLoadTripList() {
       mobIsAdmin = true;
       trips = await withTimeout(window.fbGetAllTrips(), 10000);
     } else {
-      const myList = typeof getTripList === 'function' ? getTripList() : [];
-      if (myList.length) {
-        const metas = await withTimeout(
-          Promise.all(myList.map(id => window.fbGetTripMeta(id).catch(() => null))),
-          10000
-        );
-        metas.forEach(meta => { if (meta?.title !== undefined) trips.push(meta); });
-      }
-      if (!trips.length) {
-        trips = await withTimeout(window.fbGetAllTrips(), 10000);
+      const userId = localStorage.getItem('mobUserId');
+      if (userId && typeof window.fbGetUserTrips === 'function') {
+        // Firebase 유저 trips 로드 (공유받은 것 포함)
+        trips = await withTimeout(window.fbGetUserTrips(userId), 10000);
+        // 로컬 tripList와 병합 (오프라인 추가분 반영)
+        const localIds = JSON.parse(localStorage.getItem('tripList')||'[]');
+        const remoteIds = trips.map(t=>t.id);
+        const extra = localIds.filter(id => !remoteIds.includes(id));
+        if (extra.length) {
+          const extraMetas = await Promise.all(extra.map(id=>window.fbGetTripMeta(id).catch(()=>null)));
+          extraMetas.forEach(m => { if(m) trips.push(m); });
+        }
+      } else {
+        // 폴백: localStorage tripList
+        const myList = typeof getTripList === 'function' ? getTripList() : [];
+        if (myList.length) {
+          const metas = await withTimeout(
+            Promise.all(myList.map(id => window.fbGetTripMeta(id).catch(() => null))),
+            10000
+          );
+          metas.forEach(meta => { if (meta?.title !== undefined) trips.push(meta); });
+        }
+        if (!trips.length) trips = await withTimeout(window.fbGetAllTrips(), 10000);
       }
     }
 
