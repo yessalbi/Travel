@@ -14265,10 +14265,12 @@ async function mobLoadTripList() {
     if (localStorage.getItem('mobRefreshState')) {
       await mobRestoreRefreshState();
     } else {
-      // 앱 새로 실행 시 URL의 trip 파라미터 무시하고 홈으로
-      // (새로고침 버튼으로 저장된 상태가 없으면 항상 홈에서 시작)
       const url = new URL(location.href);
-      if (url.searchParams.has('trip')) {
+      // PC 모드거나 PC 모드 전환 후 리로드된 경우 — trip 파라미터 유지 (PC가 처리)
+      const isPCMode = localStorage.getItem('mobPCMode') === '1'
+                    || window.innerWidth > 768;
+      if (!isPCMode && url.searchParams.has('trip')) {
+        // 모바일 앱 새로 실행 시 홈에서 시작
         url.searchParams.delete('trip');
         history.replaceState({}, '', url);
       }
@@ -14303,6 +14305,35 @@ async function mobLoadTripList() {
 }
 function mobInit() {
   if (window.innerWidth > 768) return;
+
+  // PC 모드 복원 (여행 클릭으로 리로드된 경우)
+  if (localStorage.getItem('mobPCMode') === '1') {
+    // mob-app 숨기고 PC 표시 — enterTrip이 처리하므로 여기선 CSS만
+    let ov = document.getElementById('mob-pc-override');
+    if (!ov) { ov = document.createElement('style'); ov.id = 'mob-pc-override'; document.head.appendChild(ov); }
+    ov.textContent = `
+      @media (max-width:768px) { #mob-app { display:none!important; } #main,#header,#trip-list-screen{display:flex!important;} }
+      #mob-app { display: none !important; }
+    `;
+    const mobAppEl = document.getElementById('mob-app');
+    if (mobAppEl) { mobAppEl.style.setProperty('display','none','important'); mobAppEl.hidden = true; }
+    // PC 복귀 버튼이 없으면 다시 추가
+    if (!document.getElementById('mob-return-btn')) {
+      const btn = document.createElement('button');
+      btn.id = 'mob-return-btn';
+      btn.textContent = '← 모바일 앱으로';
+      btn.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:99999;background:#E07A3A;color:#fff;border:none;border-radius:24px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.3);font-family:inherit;white-space:nowrap;';
+      btn.onclick = () => {
+        localStorage.removeItem('mobPCMode');
+        document.getElementById('mob-pc-override')?.remove();
+        const el = document.getElementById('mob-app');
+        if (el) { el.style.removeProperty('display'); el.hidden = false; }
+        btn.remove();
+      };
+      document.body.appendChild(btn);
+    }
+    return; // 모바일 초기화 중단 — PC가 처리
+  }
 
   // 다크모드 복원
   if (localStorage.getItem('mobDarkMode') === '1') {
