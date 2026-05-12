@@ -8401,10 +8401,10 @@ function clearRoute() {
 
 // ── 일별 색연필 경로 ──────────────────────────────────────────
 const MODE_COLORS = {
-  driving:   { stroke: '#E8430A', shadow: '#FFB199', weight: 4  },  // 빨간주황 - 굵은 실선
-  transit:   { stroke: '#1565C0', shadow: '#90CAF9', weight: 3  },  // 진파랑   - 실선
-  walking:   { stroke: '#2E7D32', shadow: null,      weight: 2  },  // 진초록   - 점선
-  bicycling: { stroke: '#F57F17', shadow: '#FFF176', weight: 3  },  // 진노랑   - 파선
+  driving:   { stroke: '#E8430A', shadow: null, weight: 3 },  // 그림자 제거, 얇게
+  transit:   { stroke: '#1565C0', shadow: null, weight: 3 },
+  walking:   { stroke: '#2E7D32', shadow: null, weight: 2 },
+  bicycling: { stroke: '#F57F17', shadow: null, weight: 2 },
 };
 
 // 인천공항 좌표 (반경 3km 이내면 필터)
@@ -8510,20 +8510,13 @@ function _stepPath(step) {
   return null;
 }
 
-// 실선 경로 (렌트카/도보/자전거)
 function _polylineSolid(path, cfg, mode, opacity) {
   if (!path || path.length < 2) return;
-  if (cfg.shadow) {
-    dayPolylines.push(new google.maps.Polyline({
-      path, geodesic: true,
-      strokeColor: cfg.shadow, strokeOpacity: 0.6,
-      strokeWeight: cfg.weight + 4, map, zIndex: 1,
-    }));
-  }
+  // shadow 제거 — 얇은 경로 통일 (weight 3)
   dayPolylines.push(new google.maps.Polyline({
     path, geodesic: true,
     strokeColor: cfg.stroke, strokeOpacity: opacity,
-    strokeWeight: cfg.weight, map, zIndex: 2,
+    strokeWeight: 3, map, zIndex: 2,
   }));
   // 렌트카 화살표
   if (mode === 'driving') {
@@ -8696,39 +8689,22 @@ function drawSegmentRoute(from, to, mode, dayCol) {
   _drawSegmentGoogle(from, to, mode, cfg, straight);
 }
 
-// 카카오 경로 그리기
+// 카카오 경로 그리기 — 직선 없이 바로 카카오 API 호출
 async function _drawSegmentKakao(from, to, mode, cfg, straight) {
-  // KAKAO_REST_KEY 미설정 시 경고
   if (KAKAO_REST_KEY === 'YOUR_KAKAO_REST_API_KEY') {
-    console.warn('[Kakao] REST API 키가 설정되지 않았습니다');
-    _polylineDashed(straight, cfg.stroke || '#E07A3A', 0.4);
+    _polylineDashed(straight, cfg.stroke || '#888', 0.35);
     return;
   }
-
-  // 직선 점선 먼저 표시 (참조 유지)
-  const tempPolylines = [];
-  const makeTempDashed = () => {
-    if (!dayPolylines) return;
-    const before = dayPolylines.length;
-    _polylineDashed(straight, cfg.stroke || '#888', 0.35);
-    for (let i = before; i < dayPolylines.length; i++) tempPolylines.push(dayPolylines[i]);
-  };
-  makeTempDashed();
-
   const result = await kakaoRouteRequest(from, to, mode);
   const path   = result ? kakaoRouteToPath(result) : null;
 
-  // 직선 점선 제거
-  tempPolylines.forEach(p => { p.setMap(null); const i=dayPolylines.indexOf(p); if(i>=0) dayPolylines.splice(i,1); });
-
   if (path && path.length >= 2) {
     if (mode === 'walking' || mode === 'bicycling') {
-      _polylineDashed(path, cfg.stroke || '#3AAF7A', 0.85);
+      _polylineDashed(path, cfg.stroke, 0.85);
     } else {
-      _polylineSolid(path, cfg, mode, 0.9);
+      _polylineSolid(path, cfg, mode, 0.85);
     }
   } else {
-    // 카카오 실패 시 직선 유지
     _polylineDashed(straight, cfg.stroke || '#888', 0.35);
     console.warn('[Kakao] 경로 없음, 직선 폴백');
   }
@@ -9510,14 +9486,11 @@ function drawAllDaySegment(from, to, mode, col) {
   function push(routePath, opacity) {
     if (!routePath || routePath.length < 2) return;
     if (col.shadow) {
-      allDayPolylines.push(new google.maps.Polyline({
-        path:routePath, geodesic:true,
-        strokeColor:'#fff', strokeOpacity:0.75, strokeWeight:6, map, zIndex:1,
-      }));
+      // shadow 제거 — 얇은 경로 통일
     }
     const pl = new google.maps.Polyline({
       path:routePath, geodesic:true,
-      strokeColor:col.stroke, strokeOpacity:opacity, strokeWeight:4, map, zIndex:2,
+      strokeColor:col.stroke, strokeOpacity:opacity, strokeWeight:3, map, zIndex:2,
     });
     pl.set('_origOpacity', opacity);
     _attachRouteHover(pl, col._day, col);
@@ -9526,20 +9499,10 @@ function drawAllDaySegment(from, to, mode, col) {
 
   // ── 국내 → 카카오 ──────────────────────────────────────────
   if (isTripDomestic() && isDomesticCoord(from.lat, from.lng)) {
-    if (KAKAO_REST_KEY === 'YOUR_KAKAO_REST_API_KEY') {
-      push(straight, 0.25);
-      return;
-    }
-    // 직선 임시 표시 후 실제 경로로 교체
-    const tempBefore = allDayPolylines.length;
-    push(straight, 0.2);
-    const tempPolys = allDayPolylines.slice(tempBefore);
-
+    if (KAKAO_REST_KEY === 'YOUR_KAKAO_REST_API_KEY') { push(straight, 0.25); return; }
     kakaoRouteRequest(from, to, mode).then(result => {
       const path = result ? kakaoRouteToPath(result) : null;
-      // 임시 직선 제거
-      tempPolys.forEach(p => { p.setMap(null); const i=allDayPolylines.indexOf(p); if(i>=0) allDayPolylines.splice(i,1); });
-      push(path?.length >= 2 ? path : straight, path?.length >= 2 ? 0.9 : 0.25);
+      push(path?.length >= 2 ? path : straight, path?.length >= 2 ? 0.85 : 0.25);
     }).catch(() => push(straight, 0.25));
     return;
   }
@@ -13110,18 +13073,17 @@ function mobDrawSchedPins() {
 
 async function mobDrawRouteSegment(from, to, day, idx, dayCol) {
   const mode     = (window.transitModes || {})[typeof transitKey === 'function' ? transitKey(day,idx) : `${day}_${idx}`] || 'driving';
-  // DAY_COLORS 기반 색상 (PC와 통일)
   const color    = dayCol?.stroke || '#FF3D00';
   const straight = [{ lat:from.lat, lng:from.lng }, { lat:to.lat, lng:to.lng }];
   const isDashed = mode === 'walking' || mode === 'bicycling';
 
   const drawPolylines = (path) => {
-    // 흰 외곽선
-    (window._mobSchedPolylines||[]).push(new google.maps.Polyline({
-      path, strokeColor:'#fff', strokeOpacity: isDashed?0:0.85,
-      strokeWeight: isDashed?0:6, zIndex:59, map:mobSchedMapObj,
-    }));
-    // 색 경로
+    if (!path?.length) return;
+    if (!isDashed) {
+      (window._mobSchedPolylines||[]).push(new google.maps.Polyline({
+        path, strokeColor:'#fff', strokeOpacity:0.85, strokeWeight:6, zIndex:59, map:mobSchedMapObj,
+      }));
+    }
     (window._mobSchedPolylines||[]).push(new google.maps.Polyline(isDashed ? {
       path, strokeOpacity:0, zIndex:60, map:mobSchedMapObj,
       icons:[{ icon:{ path:'M 0,-1 0,1', strokeOpacity:1, scale:3, strokeColor:color }, offset:'0', repeat:'10px' }],
@@ -13130,39 +13092,26 @@ async function mobDrawRouteSegment(from, to, day, idx, dayCol) {
     }));
   };
 
-  // 임시 점선
-  const tempO = new google.maps.Polyline({ path:straight, strokeColor:'#fff', strokeOpacity:0.7, strokeWeight:5, zIndex:49, map:mobSchedMapObj });
-  const tempP = new google.maps.Polyline({ path:straight, strokeOpacity:0, zIndex:50, map:mobSchedMapObj,
-    icons:[{ icon:{ path:'M 0,-1 0,1', strokeOpacity:0.5, scale:2.5, strokeColor:color }, offset:'0', repeat:'10px' }] });
-  (window._mobSchedPolylines = window._mobSchedPolylines||[]).push(tempO, tempP);
-
-  const removeTemp = () => {
-    [tempO, tempP].forEach(p => {
-      p.setMap(null);
-      const i=(window._mobSchedPolylines||[]).indexOf(p); if(i>=0) window._mobSchedPolylines.splice(i,1);
-    });
-  };
-
-  // ── 국내 → 카카오 ──────────────────────────────────────────
-  if (typeof isTripDomestic==='function' && isTripDomestic() && typeof isDomesticCoord==='function' && isDomesticCoord(from.lat,from.lng)) {
+  // ── 국내 → 카카오 (직선 없이 바로 호출) ─────────────────────
+  if (typeof isTripDomestic==='function' && isTripDomestic() &&
+      typeof isDomesticCoord==='function' && isDomesticCoord(from.lat, from.lng)) {
     const result = await kakaoRouteRequest(from, to, mode);
     const path   = result ? kakaoRouteToPath(result) : null;
-    removeTemp();
     drawPolylines(path?.length ? path : straight);
     return;
   }
 
   // ── 해외 → Google Routes API ──────────────────────────────
-  if (!window.routesAPIRequest) return;
+  if (!window.routesAPIRequest) { drawPolylines(straight); return; }
   try {
     const rmMode = { driving:'DRIVE', walking:'WALK', transit:'TRANSIT', bicycling:'BICYCLE' }[mode] || 'DRIVE';
     const dep    = rmMode==='TRANSIT' ? (typeof _routeDepTime==='function' ? _routeDepTime(from.lng) : null) : null;
     const route  = await routesAPIRequest(from, to, rmMode, dep);
-    if (!route) return;
+    if (!route) { drawPolylines(straight); return; }
     const enc  = route.polyline?.encodedPolyline;
     const path = enc && typeof decodePolyline==='function' ? decodePolyline(enc) : null;
-    if (!path?.length) return;
-    removeTemp();
+    if (!path?.length) { drawPolylines(straight); return; }
+
     if (mode === 'transit') {
       const TCOL = { BUS:'#FF6D00', SUBWAY:'#1565C0', TRAM:'#6A1B9A', RAIL:'#2E7D32', HEAVY_RAIL:'#1B5E20', HIGH_SPEED_TRAIN:'#C62828', OTHER:'#1565C0' };
       const steps = route.legs?.[0]?.steps || [];
@@ -13179,7 +13128,7 @@ async function mobDrawRouteSegment(from, to, day, idx, dayCol) {
       }
     }
     drawPolylines(path);
-  } catch(e) { /* 직선 유지 */ }
+  } catch(e) { drawPolylines(straight); }
 }
   } catch(e) { /* 직선 점선 유지 */ }
 }
@@ -13857,29 +13806,29 @@ async function mobLoadTripList() {
   const container = document.getElementById('mob-trip-list');
   if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;font-size:13px;">불러오는 중…</div>';
 
+  // 10초 타임아웃 — Firestore 응답 없으면 오프라인 모드
+  const withTimeout = (promise, ms) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+
   try {
     let trips = [];
 
     if (mobIsAdmin || sessionStorage.getItem('adminMode') === '1') {
       mobIsAdmin = true;
-      trips = await window.fbGetAllTrips();
+      trips = await withTimeout(window.fbGetAllTrips(), 10000);
     } else {
-      // localStorage trip ID 목록
       const myList = typeof getTripList === 'function' ? getTripList() : [];
-
       if (myList.length) {
-        const metas = await Promise.all(
-          myList.map(id => window.fbGetTripMeta(id).catch(() => null))
+        const metas = await withTimeout(
+          Promise.all(myList.map(id => window.fbGetTripMeta(id).catch(() => null))),
+          10000
         );
         metas.forEach(meta => { if (meta?.title !== undefined) trips.push(meta); });
       }
-
-      // localStorage에 없으면 전체 DB에서 로드 (다른 기기 접속 등)
       if (!trips.length) {
-        const snap = await window.fbGetAllTrips();
-        snap.forEach(t => {
-          if (!trips.find(x => x.id === t.id)) trips.push(t);
-        });
+        trips = await withTimeout(window.fbGetAllTrips(), 10000);
       }
     }
 
@@ -13890,12 +13839,13 @@ async function mobLoadTripList() {
     if (urlTrip) await mobSelectTrip(urlTrip);
 
   } catch(e) {
-    console.error('mobLoadTripList 오류:', e);
+    console.warn('mobLoadTripList 오류:', e);
+    const isTimeout = e.message === 'timeout';
     if (container) container.innerHTML = `
       <div style="text-align:center;padding:20px;color:#E53935;font-size:13px;">
-        불러오기 실패<br>
-        <small style="color:#aaa;font-size:11px;">${e.message||String(e)}</small><br>
-        <button onclick="mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;">다시 시도</button>
+        ${isTimeout ? '⏱ 연결 시간 초과' : '불러오기 실패'}<br>
+        <small style="color:#aaa;font-size:11px;">${isTimeout ? '네트워크를 확인해주세요' : (e.message||'')}</small><br>
+        <button onclick="mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;font-family:inherit;">다시 시도</button>
       </div>`;
     window._mobTripList = [];
     mobRenderInspire(4);
