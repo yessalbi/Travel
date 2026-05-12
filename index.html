@@ -2420,8 +2420,7 @@ html, body {
 .mob-filter-tabs { display: flex; align-items: center; gap: 4px; padding: 8px 0 12px; flex-wrap: nowrap; }
 .mob-filter { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #e0ddd6; background: #fff; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; font-family: inherit; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
 .mob-filter.active { background: #E07A3A; color: #fff; border-color: #E07A3A; }
-/* 여행 상세 레이어 열림 상태 */
-#mob-trip-layer.open { transform: translateX(0) !important; }
+/* 여행 상세 레이어 열림 상태 — #mob-app #mob-trip-layer.open 으로 통합됨 */
 @media (min-width: 769px) {
   #mob-app { display: none !important; }
 }
@@ -2485,28 +2484,65 @@ html, body {
 .mob-sched-tabs::-webkit-scrollbar { display: none; }
 .mob-stab { flex-shrink: 0; padding: 11px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: #999; border-bottom: 2px solid transparent; cursor: pointer; transition: all .15s; }
 .mob-stab.active { color: #E07A3A; border-bottom-color: #E07A3A; }
-/* mob-home-layer, mob-trip-layer: mob-app 내부에서만 display:flex */
-#mob-home-layer { display:none; flex-direction:column; position:absolute; inset:0; background:#f5f3ee; z-index:1; }
-#mob-app #mob-home-layer { display:flex; }
-/* mob-trip-layer */
-#mob-trip-layer { display:none; flex-direction:column; }
-#mob-app #mob-trip-layer { display:flex; }
-#mob-trip-layer > div:last-child { flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
-/* 서브탭 콘텐츠 (일정/지도/저장) — mob-app 스코프 */
-#mob-app .mob-detail-page { display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0; }
-#mob-app .mob-detail-page.active { display:flex; }
-/* 서브서브탭 (개요/타임라인/예약/경비/지도) */
-.mob-stab-page { display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0; }
-.mob-stab-page.active { display:flex; }
-/* 스크롤 컨테이너 */
-.mob-stab-page > .mob-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+/* ═══ mob-trip-layer 완전 flex 체인 ═══ */
+/* PC: 완전 숨김 */
+#mob-trip-layer {
+  display: none;
+}
+/* 모바일: mob-app 내부에서만 표시 */
+#mob-app #mob-trip-layer {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  background: #f5f3ee;
+  z-index: 2;
+  transform: translateX(100%);
+  transition: transform .32s cubic-bezier(.4,0,.2,1);
+  will-change: transform;
+}
+#mob-app #mob-trip-layer.open { transform: translateX(0); }
+/* 슬라이드 없이 즉시 표시 (새로고침 복원용) */
+#mob-app #mob-trip-layer.no-anim { transition: none !important; }
+/* trip-layer 내부 구조 */
+#mob-trip-layer > .mob-header { flex-shrink: 0; }
+#mob-trip-layer > .mob-detail-wrap {
+  flex: 1; overflow: hidden;
+  display: flex; flex-direction: column; min-height: 0;
+}
+/* 서브탭바 */
+#mob-detail-tabs { flex-shrink: 0; display: flex; background: #fff; border-bottom: 1px solid #ede9e2; padding: 0 16px; }
+/* 서브탭 콘텐츠 */
+.mob-detail-page {
+  display: none;
+  flex: 1; flex-direction: column;
+  overflow: hidden; min-height: 0;
+}
+.mob-detail-page.active { display: flex; }
+/* mob-dp-schedule 항상 flex (active일 때) */
+#mob-dp-schedule { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+/* mob-dp-map */
+#mob-dp-map { position: relative; flex: 1; overflow: hidden; }
+#mob-dp-map #mob-fullmap { position: absolute; inset: 0; }
+/* mob-dp-saved */
+#mob-dp-saved { flex: 1; overflow: hidden; }
+#mob-dp-saved .mob-scroll { flex: 1; }
+/* 서브서브탭 */
+.mob-stab-page { display: none; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }
+.mob-stab-page.active { display: flex; }
+.mob-stab-page > .mob-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 /* 지도 view */
-#mob-map-view { flex:1; min-height:0; width:100%; }
-/* 일정탭 내 지도 날짜칩 */
-#mob-stab-map #mob-map-day-chips { flex-shrink:0; border-bottom:1px solid #ede9e2; }
-/* mob-dp-schedule flex 체인 — 기본 display:flex (active 상태에서) */
-#mob-app #mob-dp-schedule { display:flex; flex-direction:column; flex:1; overflow:hidden; min-height:0; }
-#mob-map-view { flex: 1; width: 100%; min-height: 0; }
+#mob-map-view { flex: 1; min-height: 0; width: 100%; }
+#mob-stab-map { padding: 0; }
+#mob-stab-map #mob-map-day-chips { flex-shrink: 0; }
+/* mob-home-layer */
+#mob-home-layer {
+  display: none;
+  flex-direction: column;
+  position: absolute; inset: 0;
+  background: #f5f3ee; z-index: 1;
+}
+#mob-app #mob-home-layer { display: flex; }
 .mob-day-chips { display: flex; gap: 6px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #ede9e2; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
 .mob-day-chips::-webkit-scrollbar { display: none; }
 .mob-day-chip { flex-shrink: 0; border: 1.5px solid #e0ddd6; background: #fff; border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 600; color: #888; cursor: pointer; transition: all .15s; white-space: nowrap; }
@@ -2583,11 +2619,7 @@ textarea.mob-inp { resize:vertical; }
 select.mob-inp { padding:10px 8px;cursor:pointer; }
 .mob-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;}
 .mob-cancel-btn{width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;}
-/* mob-dp-map 내부 지도 절대 위치 */
-#mob-dp-map { position:relative; }
-#mob-dp-map #mob-fullmap { position:absolute; inset:0; }
-/* mob-dp-saved 스크롤 */
-#mob-dp-saved .mob-scroll { flex:1; }
+/* mob-dp-map, mob-dp-saved — 위 CSS 블록에 통합됨 */
 </style>
 </head>
 <body>
@@ -11048,13 +11080,7 @@ document.addEventListener('keydown', (e) => {
   </div>
 
   <!-- ══ 여행 상세 레이어 (일정/지도/저장) ════════════════════ -->
-  <div id="mob-trip-layer" style="
-    position:absolute;inset:0;display:flex;flex-direction:column;
-    background:#f5f3ee;z-index:2;
-    transform:translateX(100%);
-    transition:transform .32s cubic-bezier(.4,0,.2,1);
-    will-change:transform;
-  ">
+  <div id="mob-trip-layer">
     <!-- 상단 고정 헤더 -->
     <div class="mob-header" id="mob-trip-layer-header" style="flex-shrink:0;">
       <button onclick="mobCloseTrip()" style="border:none;background:none;font-size:22px;cursor:pointer;padding:4px 8px 4px 0;color:#2c2c2a;-webkit-tap-highlight-color:transparent;">←</button>
@@ -11066,7 +11092,7 @@ document.addEventListener('keydown', (e) => {
     </div>
 
     <!-- 상세 탭 콘텐츠 영역 -->
-    <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;">
+    <div class="mob-detail-wrap">
 
       <!-- 서브탭 바 -->
       <div id="mob-detail-tabs" style="
@@ -11413,12 +11439,18 @@ async function mobRestoreRefreshState() {
   try {
     const s = JSON.parse(raw);
     if (s.tripId && s.layerOpen) {
+      // 슬라이드 애니메이션 없이 즉시 복원
+      const layer = document.getElementById('mob-trip-layer');
+      layer.classList.add('no-anim');
       await mobSelectTrip(s.tripId);
+      // 한 프레임 후 애니메이션 다시 활성화
+      requestAnimationFrame(() => requestAnimationFrame(() => layer.classList.remove('no-anim')));
+
       if (s.detailTab) {
         const el = document.getElementById('mob-dtab-' + s.detailTab);
         if (el) mobDetailTab(el, s.detailTab);
       }
-      if (s.schedTab) {
+      if (s.schedTab && s.detailTab === 'schedule') {
         mobCurrentSchedTab = s.schedTab;
         const el = document.querySelector(`.mob-stab[onclick*="'${s.schedTab}'"]`);
         if (el) mobSchedTab(el, s.schedTab);
