@@ -2505,7 +2505,7 @@ html, body {
 .mob-filter.active { background: #E07A3A; border-color: #E07A3A; color: #fff; }
 .mob-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 15px; font-weight: 700; color: #2c2c2a; }
 .mob-text-btn { border: none; background: none; color: #E07A3A; font-size: 13px; font-weight: 600; cursor: pointer; }
-.mob-trip-card { background: #fff; border-radius: 14px; padding: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); cursor: pointer; transition: transform .12s; -webkit-tap-highlight-color: transparent; }
+.mob-trip-card { background: #fff; border-radius: 14px; padding: 14px 14px 14px 12px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); cursor: pointer; transition: transform .12s; -webkit-tap-highlight-color: transparent; border-left: 3.5px solid #ede9e2; }
 .mob-trip-card:active { transform: scale(0.98); }
 .mob-trip-icon { width: 44px; height: 44px; border-radius: 12px; background: #fff3ec; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
 .mob-trip-info { flex: 1; min-width: 0; }
@@ -11784,14 +11784,24 @@ function mobRenderTripList() {
       ? Math.round((new Date(trip.endDate)-new Date(trip.startDate))/86400000)
       : null;
     const isAdmin = mobIsAdmin || localStorage.getItem('mobAdminMode') === '1';
-    return `<div class="mob-trip-card" onclick="mobSelectTrip('${trip.id}')">
-      <div class="mob-trip-icon">${mobTripIcon(trip)}</div>
+
+    // PC와 동일한 color 매핑
+    const colorMap = {
+      red:'#E8430A', blue:'#1565C0', green:'#2E7D32',
+      purple:'#6A1B9A', amber:'#F57F17', pink:'#AD1457', teal:'#00695C',
+    };
+    const cardColor  = trip.color ? (colorMap[trip.color] || '') : '';
+    const borderStyle = cardColor ? `border-left:3.5px solid ${cardColor};` : 'border-left:3.5px solid #ede9e2;';
+    const iconBg     = cardColor ? `background:${cardColor}18;` : 'background:#f5f3ee;';
+
+    return `<div class="mob-trip-card" onclick="mobSelectTrip('${trip.id}')" style="${borderStyle}">
+      <div class="mob-trip-icon" style="${iconBg}">${mobTripIcon(trip)}</div>
       <div class="mob-trip-info">
         <div class="mob-trip-name">${trip.title || '(제목 없음)'}</div>
         <div class="mob-trip-date">${mobTripDateStr(trip)}</div>
         ${nights !== null ? `<div class="mob-trip-detail">${nights}박${nights+1}일</div>` : ''}
       </div>
-      ${label ? `<span class="mob-trip-badge ${status}" style="background:${color}20;color:${color};">${label}</span>` : ''}
+      ${label ? `<span class="mob-trip-badge ${status}" style="background:${color}18;color:${color};">${label}</span>` : ''}
       ${isAdmin ? `<button class="mob-trip-del-btn" onclick="event.stopPropagation();mobAdminDeleteTrip('${trip.id}','${(trip.title||'(제목 없음)').replace(/'/g,"\\'")}')">🗑️</button>` : ''}
     </div>`;
   }).join('');
@@ -11808,13 +11818,11 @@ function mobGetTripStatus(trip) {
 }
 
 function mobTripIcon(trip) {
-  const t = (trip.title || '').toLowerCase();
-  if (t.includes('일본')||t.includes('japan')||t.includes('도쿄')||t.includes('오사카')) return '🗾';
-  if (t.includes('제주')) return '🌺';
-  if (t.includes('유럽')||t.includes('europe')) return '🏰';
-  if (t.includes('동남아')||t.includes('태국')||t.includes('베트남')) return '🌴';
-  if (t.includes('미국')||t.includes('usa')) return '🗽';
-  if (t.includes('국내')||t.includes('서울')||t.includes('부산')) return '🇰🇷';
+  // PC의 getTitleEmoji 재사용 — 동일한 이모지 매핑
+  if (typeof getTitleEmoji === 'function') {
+    const e = getTitleEmoji(trip.title || '').trim();
+    if (e) return e;
+  }
   return '✈️';
 }
 
