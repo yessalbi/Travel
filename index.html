@@ -2472,11 +2472,15 @@ html, body {
   #trip-list-screen, #main, #header, #btn-admin,
   #delete-confirm-overlay, #trip-setup-overlay,
   #admin-pw-overlay { display: none !important; }
-  #mob-app { display: flex !important; }
 }
 #mob-app {
   position: fixed; inset: 0; flex-direction: column;
   background: #f5f3ee; font-family: inherit; z-index: 9999; overflow: hidden;
+  /* PC 보안: JS 없이도 PC에서 절대 표시 안 됨 */
+  display: none;
+}
+@media (max-width: 768px) {
+  html body #mob-app { display: flex !important; }
 }
 .mob-page {
   display: none; flex-direction: column; flex: 1; overflow: hidden;
@@ -2562,7 +2566,7 @@ html, body {
   flex: 1; flex-direction: column;
   overflow: hidden; min-height: 0;
 }
-.mob-detail-page.active { display: flex; }
+.mob-detail-page.active { display: flex; flex: 1; min-height: 0; }
 /* mob-dp-schedule 항상 flex (active일 때) */
 #mob-dp-schedule { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 /* mob-dp-map */
@@ -11178,7 +11182,7 @@ document.addEventListener('keydown', (e) => {
       </div>
 
       <!-- 지도 탭 콘텐츠 -->
-      <div class="mob-detail-page" id="mob-dp-map" style="position:relative;">
+      <div class="mob-detail-page" id="mob-dp-map">
         <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
         <div class="mob-map-searchbar">
           <input id="mob-map-search" placeholder="장소 검색..." class="mob-map-input"
