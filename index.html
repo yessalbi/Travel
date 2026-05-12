@@ -2671,6 +2671,184 @@ select.mob-inp { padding:10px 8px;cursor:pointer; }
 .mob-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;}
 .mob-cancel-btn{width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;}
 /* mob-dp-map, mob-dp-saved — 위 CSS 블록에 통합됨 */
+
+/* ═══ 모바일 디자인 시스템 ═══════════════════════════════ */
+/* mob-app 전체에 PC와 동일한 폰트 적용 */
+#mob-app {
+  font-family: 'DM Sans', 'Noto Sans KR', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #2c2c2a;
+}
+/* 헤더 */
+.mob-header {
+  display: flex; align-items: center;
+  padding: 14px 16px 12px;
+  background: #fff;
+  border-bottom: 1px solid #ede9e2;
+  gap: 8px; flex-shrink: 0;
+  min-height: 56px;
+}
+.mob-logo {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 20px; font-weight: 800;
+  color: #2c2c2a; letter-spacing: -0.5px;
+}
+.mob-logo span { color: #E07A3A; }
+.mob-header-title {
+  font-size: 17px; font-weight: 700;
+  color: #2c2c2a; letter-spacing: -0.3px;
+}
+/* 탭바 */
+.mob-tabbar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 60px;
+  background: #fff;
+  border-top: 1px solid #ede9e2;
+  display: flex; align-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+  box-shadow: 0 -1px 0 rgba(0,0,0,0.04);
+}
+.mob-tab {
+  flex: 1; border: none; background: none;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 3px; cursor: pointer; padding: 8px 0;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+}
+.mob-tab-icon { font-size: 20px; line-height: 1; }
+.mob-tab-label { font-size: 10px; font-weight: 600; color: #bbb; }
+.mob-tab.active .mob-tab-label { color: #E07A3A; }
+/* 트립 카드 */
+.mob-trip-card {
+  background: #fff; border-radius: 16px;
+  padding: 14px 16px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.03);
+  cursor: pointer;
+  transition: transform .12s, box-shadow .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-trip-card:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.mob-trip-name { font-size: 15px; font-weight: 700; color: #1a1a18; letter-spacing: -0.2px; }
+.mob-trip-date { font-size: 12px; color: #aaa; margin-top: 2px; }
+/* 서브탭 (일정/지도/저장) */
+.mob-detail-tab {
+  flex: 1; border: none; background: none;
+  padding: 13px 0; font-size: 13px; font-weight: 600;
+  color: #bbb; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-family: inherit; transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.mob-detail-tab.active { color: #E07A3A; border-bottom-color: #E07A3A; }
+/* 서브서브탭 */
+.mob-stab-bar {
+  display: flex; background: #faf9f6;
+  border-bottom: 1px solid #ede9e2;
+  overflow-x: auto; scrollbar-width: none;
+  flex-shrink: 0;
+}
+.mob-stab-bar::-webkit-scrollbar { display: none; }
+.mob-stab {
+  flex-shrink: 0; padding: 10px 16px;
+  border: none; background: none;
+  font-size: 12px; font-weight: 600; color: #aaa;
+  border-bottom: 2px solid transparent;
+  cursor: pointer; font-family: inherit;
+  transition: all .12s;
+}
+.mob-stab.active { color: #E07A3A; border-bottom-color: #E07A3A; }
+/* 필터 칩 */
+.mob-filter-tabs {
+  display: flex; gap: 6px; padding: 0 0 14px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.mob-filter-tabs::-webkit-scrollbar { display: none; }
+.mob-filter {
+  flex-shrink: 0;
+  border: 1.5px solid #e8e4dc; background: #fff;
+  border-radius: 20px; padding: 6px 14px;
+  font-size: 13px; font-weight: 600; color: #999;
+  cursor: pointer; font-family: inherit;
+  transition: all .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-filter.active { background: #E07A3A; border-color: #E07A3A; color: #fff; }
+/* 섹션 헤더 */
+.mob-section-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 15px; font-weight: 700; color: #1a1a18;
+  letter-spacing: -0.2px;
+}
+.mob-text-btn {
+  border: none; background: none;
+  color: #E07A3A; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  padding: 0;
+}
+/* 스크롤 영역 */
+.mob-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 16px 16px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+/* 일정 추가 버튼 */
+.mob-add-sched-btn {
+  flex-shrink: 0; width: 100%; padding: 14px;
+  border: none; border-top: 1px solid #ede9e2;
+  background: #fff; font-size: 14px; font-weight: 700;
+  color: #E07A3A; cursor: pointer; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 날짜 칩 */
+.mob-day-chips {
+  display: flex; gap: 6px; padding: 10px 16px;
+  background: #fff; border-bottom: 1px solid #ede9e2;
+  overflow-x: auto; scrollbar-width: none; flex-shrink: 0;
+}
+.mob-day-chips::-webkit-scrollbar { display: none; }
+.mob-day-chip {
+  flex-shrink: 0; border: 1.5px solid #e8e4dc; background: #fff;
+  border-radius: 20px; padding: 5px 13px;
+  font-size: 12px; font-weight: 600; color: #999;
+  cursor: pointer; font-family: inherit;
+  transition: all .12s; white-space: nowrap;
+}
+.mob-day-chip.active { background: #E07A3A; border-color: #E07A3A; color: #fff; }
+/* 프라이머리 버튼 */
+.mob-primary-btn {
+  width: 100%; padding: 14px; border: none;
+  border-radius: 12px; background: #E07A3A; color: #fff;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  font-family: inherit; letter-spacing: -0.2px;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity .1s;
+}
+.mob-primary-btn:active { opacity: 0.85; }
+/* 시트 바디 */
+.mob-sheet-body {
+  background: #fff; border-radius: 20px 20px 0 0;
+  padding: 16px 20px 32px;
+  max-height: 85vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* 인스파이어 카드 */
+.mob-inspire-card {
+  min-width: 180px; height: 100px; border-radius: 16px;
+  padding: 14px; flex-shrink: 0; cursor: pointer;
+  transition: transform .12s;
+}
+.mob-inspire-card:active { transform: scale(0.97); }
+.mob-inspire-title { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.4; }
+.mob-inspire-sub { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+/* 그리팅 */
+.mob-greeting { font-size: 22px; font-weight: 800; color: #1a1a18; margin-bottom: 16px; line-height: 1.4; letter-spacing: -0.5px; }
+.mob-greeting small { font-size: 13px; font-weight: 400; color: #999; letter-spacing: 0; }
+
 </style>
 </head>
 <body>
@@ -13559,41 +13737,71 @@ function mobShowAuthGate() {
   document.getElementById('mob-auth-gate')?.remove();
   const gate = document.createElement('div');
   gate.id = 'mob-auth-gate';
-  gate.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#FAFAF7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:32px;box-sizing:border-box;';
+  gate.style.cssText = `
+    position:fixed;inset:0;z-index:99999;
+    background:#FAFAF7;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:40px 28px;box-sizing:border-box;
+    font-family:'DM Sans','Noto Sans KR',sans-serif;
+  `;
   gate.innerHTML = `
-    <div style="font-family:'Playfair Display',serif;font-size:40px;font-weight:700;color:#1A1A18;letter-spacing:-1px;">travel<span style="color:#E07A3A;">.</span></div>
-    <div style="font-size:12px;color:#aaa;margin-top:-8px;letter-spacing:1px;">여행 계획 앱</div>
-    <div style="display:flex;background:#f0ede8;border-radius:12px;padding:3px;gap:2px;margin-top:4px;">
-      <button id="mob-auth-tab-login" onclick="mobAuthSwitchTab('login')" style="flex:1;padding:8px 14px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:#E07A3A;color:#fff;">로그인</button>
-      <button id="mob-auth-tab-register" onclick="mobAuthSwitchTab('register')" style="flex:1;padding:8px 14px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:#888;">처음이에요</button>
-      <button id="mob-auth-tab-admin" onclick="mobAuthSwitchTab('admin')" style="flex:1;padding:8px 14px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:#888;">관리자</button>
-    </div>
-    <div style="width:100%;max-width:300px;display:flex;flex-direction:column;gap:8px;">
-      <div id="mob-auth-user-form">
-        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">이름</div>
-        <input id="mob-auth-name" type="text" placeholder="예: 홍길동" maxlength="20"
-          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:8px;"
-          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"
-          onkeydown="if(event.key==='Enter')document.getElementById('mob-auth-pw').focus()" />
-        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">비밀번호 4자리</div>
-        <input id="mob-auth-pw" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
-          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:11px 14px;font-size:22px;text-align:center;letter-spacing:10px;font-family:inherit;outline:none;box-sizing:border-box;"
-          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"
-          oninput="if(this.value.length===4&&window._mobAuthTab!=='admin')mobTryAuth()"
-          onkeydown="if(event.key==='Enter')mobTryAuth()" />
+    <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:20px;">
+      <!-- 로고 -->
+      <div style="text-align:center;margin-bottom:4px;">
+        <div style="font-family:'DM Sans',sans-serif;font-size:36px;font-weight:800;color:#1A1A18;letter-spacing:-1.5px;line-height:1;">
+          travel<span style="color:#E07A3A;">.</span>
+        </div>
+        <div style="font-size:11px;color:#bbb;margin-top:6px;letter-spacing:2px;text-transform:uppercase;">여행 계획 앱</div>
       </div>
-      <div id="mob-auth-admin-form" style="display:none;">
-        <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:4px;">관리자 코드</div>
-        <input id="mob-auth-admin-pw" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
-          style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:14px;font-size:22px;text-align:center;letter-spacing:10px;font-family:inherit;outline:none;box-sizing:border-box;"
-          onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'"
-          oninput="if(this.value.length===4)mobTryAuth()" onkeydown="if(event.key==='Enter')mobTryAuth()" />
+
+      <!-- 탭 선택 -->
+      <div style="display:flex;background:#f0ede8;border-radius:12px;padding:3px;">
+        <button id="mob-auth-tab-login" onclick="mobAuthSwitchTab('login')"
+          style="flex:1;padding:9px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:#E07A3A;color:#fff;transition:all .15s;white-space:nowrap;">로그인</button>
+        <button id="mob-auth-tab-register" onclick="mobAuthSwitchTab('register')"
+          style="flex:1;padding:9px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:#999;transition:all .15s;white-space:nowrap;">첫 방문</button>
+        <button id="mob-auth-tab-admin" onclick="mobAuthSwitchTab('admin')"
+          style="flex:1;padding:9px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:#999;transition:all .15s;white-space:nowrap;">관리자</button>
+      </div>
+
+      <!-- 입력 폼 -->
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div id="mob-auth-user-form">
+          <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;letter-spacing:0.3px;">이름</div>
+          <input id="mob-auth-name" type="text" placeholder="홍길동" maxlength="20"
+            style="width:100%;border:1.5px solid #e8e4dc;border-radius:10px;padding:13px 14px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;color:#1a1a18;transition:border-color .12s;"
+            onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e8e4dc'"
+            onkeydown="if(event.key==='Enter')document.getElementById('mob-auth-pw').focus()" />
+          <div style="font-size:11px;color:#999;font-weight:600;margin:10px 0 5px;letter-spacing:0.3px;">비밀번호 4자리</div>
+          <input id="mob-auth-pw" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
+            style="width:100%;border:1.5px solid #e8e4dc;border-radius:10px;padding:13px 14px;font-size:24px;text-align:center;letter-spacing:12px;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;transition:border-color .12s;"
+            onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e8e4dc'"
+            oninput="if(this.value.length===4&&window._mobAuthTab!=='admin')mobTryAuth()"
+            onkeydown="if(event.key==='Enter')mobTryAuth()" />
+        </div>
+        <div id="mob-auth-admin-form" style="display:none;">
+          <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:5px;letter-spacing:0.3px;">관리자 코드</div>
+          <input id="mob-auth-admin-pw" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
+            style="width:100%;border:1.5px solid #e8e4dc;border-radius:10px;padding:13px 14px;font-size:24px;text-align:center;letter-spacing:12px;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;transition:border-color .12s;"
+            onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e8e4dc'"
+            oninput="if(this.value.length===4)mobTryAuth()" onkeydown="if(event.key==='Enter')mobTryAuth()" />
+          <div style="font-size:11px;color:#ccc;margin-top:8px;text-align:center;">모든 여행을 관리할 수 있어요</div>
+        </div>
+      </div>
+
+      <!-- 에러 -->
+      <div id="mob-auth-error" style="font-size:12px;color:#E53935;text-align:center;min-height:16px;margin:-8px 0;"></div>
+
+      <!-- 제출 버튼 -->
+      <button onclick="mobTryAuth()" id="mob-auth-submit-btn"
+        style="width:100%;padding:15px;border-radius:12px;border:none;background:#E07A3A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-0.2px;transition:opacity .1s;">
+        입장하기
+      </button>
+
+      <div style="font-size:11px;color:#ccc;text-align:center;line-height:1.6;">
+        처음 오셨으면 <b style="color:#bbb;">첫 방문</b> 탭에서 이름과 비밀번호를 등록하세요
       </div>
     </div>
-    <div id="mob-auth-error" style="font-size:12px;color:#E53935;min-height:16px;text-align:center;max-width:300px;"></div>
-    <button onclick="mobTryAuth()" id="mob-auth-submit-btn"
-      style="width:100%;max-width:300px;padding:14px;border-radius:14px;border:none;background:#E07A3A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">입장하기</button>
-    <div style="font-size:11px;color:#ccc;text-align:center;">처음 오셨으면 '처음이에요'를 눌러 등록하세요</div>
   `;
   (document.getElementById('mob-app')||document.body).appendChild(gate);
   window._mobAuthTab = 'login';
@@ -13752,8 +13960,13 @@ async function mobLoadTripList() {
     if (localStorage.getItem('mobRefreshState')) {
       await mobRestoreRefreshState();
     } else {
-      const urlTrip = new URLSearchParams(location.search).get('trip');
-      if (urlTrip) await mobSelectTrip(urlTrip);
+      // 앱 새로 실행 시 URL의 trip 파라미터 무시하고 홈으로
+      // (새로고침 버튼으로 저장된 상태가 없으면 항상 홈에서 시작)
+      const url = new URL(location.href);
+      if (url.searchParams.has('trip')) {
+        url.searchParams.delete('trip');
+        history.replaceState({}, '', url);
+      }
     }
 
   } catch(e) {
