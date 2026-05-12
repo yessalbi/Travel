@@ -2485,8 +2485,12 @@ html, body {
 .mob-sched-tabs::-webkit-scrollbar { display: none; }
 .mob-stab { flex-shrink: 0; padding: 11px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: #999; border-bottom: 2px solid transparent; cursor: pointer; transition: all .15s; }
 .mob-stab.active { color: #E07A3A; border-bottom-color: #E07A3A; }
-/* 여행 상세 레이어 내부 flex 체인 */
-#mob-trip-layer { display:flex; flex-direction:column; }
+/* mob-home-layer, mob-trip-layer: mob-app 내부에서만 display:flex */
+#mob-home-layer { display:none; flex-direction:column; position:absolute; inset:0; background:#f5f3ee; z-index:1; }
+#mob-app #mob-home-layer { display:flex; }
+/* mob-trip-layer */
+#mob-trip-layer { display:none; flex-direction:column; }
+#mob-app #mob-trip-layer { display:flex; }
 #mob-trip-layer > div:last-child { flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
 /* 서브탭 콘텐츠 (일정/지도/저장) */
 .mob-detail-page { display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0; }
