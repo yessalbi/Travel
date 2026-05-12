@@ -2480,7 +2480,7 @@ html, body {
   display: none;
 }
 @media (max-width: 768px) {
-  html body #mob-app { display: flex !important; }
+  #mob-app { display: flex !important; }
 }
 .mob-page {
   display: none; flex-direction: column; flex: 1; overflow: hidden;
@@ -13862,13 +13862,16 @@ function mobToggleDarkMode() {
 function mobGoToPC() {
   localStorage.setItem('mobPCMode', '1');
 
-  // mob-app 완전 숨기기 — 미디어 쿼리 없이 직접 적용
   let ov = document.getElementById('mob-pc-override');
   if (!ov) { ov = document.createElement('style'); ov.id = 'mob-pc-override'; document.head.appendChild(ov); }
+  // 뒤에 선언될수록 우선순위가 높음 — media query 안의 규칙보다 뒤에 오면 이김
   ov.textContent = `
+    @media (max-width: 768px) {
+      #mob-app { display: none !important; }
+      #main, #header, #trip-list-screen { display: flex !important; }
+      #mob-global-refresh { display: none !important; }
+    }
     #mob-app { display: none !important; }
-    #main, #header, #trip-list-screen { display: flex !important; }
-    #mob-global-refresh { display: none !important; }
   `;
 
   // "모바일 앱으로" 복귀 버튼
@@ -13880,6 +13883,12 @@ function mobGoToPC() {
     btn.onclick = () => {
       localStorage.removeItem('mobPCMode');
       document.getElementById('mob-pc-override')?.remove();
+      // mob-app 다시 표시
+      const mobAppEl = document.getElementById('mob-app');
+      if (mobAppEl) {
+        mobAppEl.style.removeProperty('display');
+        mobAppEl.hidden = false;
+      }
       btn.remove();
     };
     document.body.appendChild(btn);
@@ -13887,6 +13896,19 @@ function mobGoToPC() {
 
   try { if (typeof showTripListScreen === 'function') showTripListScreen(); }
   catch(e) { console.warn('[PC init]', e); }
+
+  // CSS로 안 될 경우 JS로 직접 숨김 (보험)
+  const mobAppEl = document.getElementById('mob-app');
+  if (mobAppEl) {
+    mobAppEl.style.setProperty('display', 'none', 'important');
+    mobAppEl.hidden = true;
+  }
+  const mainEl   = document.getElementById('main');
+  const headerEl = document.getElementById('header');
+  const listEl   = document.getElementById('trip-list-screen');
+  if (mainEl)   mainEl.style.removeProperty('display');
+  if (headerEl) headerEl.style.removeProperty('display');
+  if (listEl)   listEl.style.removeProperty('display');
 }
 
 async function mobAdminRefresh() { mobSmartRefresh(); }
