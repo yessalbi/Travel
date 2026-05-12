@@ -2502,7 +2502,31 @@ html, body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ═══════════════ 모바일 전용 UI ═══════════════ */
+/* ═══ 2-Layer 아키텍처 CSS ═══ */
+/* 서브탭 (일정/지도/저장) */
+.mob-detail-tab {
+  flex: 1; border: none; background: none;
+  padding: 12px 0; font-size: 13px; font-weight: 600;
+  color: #aaa; cursor: pointer; border-bottom: 2px solid transparent;
+  font-family: inherit; transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-detail-tab.active { color: #E07A3A; border-bottom-color: #E07A3A; }
+
+/* 상세 페이지 */
+.mob-detail-page { flex: 1; overflow: hidden; }
+.mob-detail-page.active { display: flex !important; flex-direction: column; }
+
+/* 홈 탭바 — 2개만 */
+#mob-home-tabbar .mob-tab { flex: 1; }
+
+/* 필터 구분선 정렬 */
+.mob-filter-tabs { display: flex; align-items: center; gap: 4px; padding: 8px 0 12px; flex-wrap: nowrap; }
+.mob-filter { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #e0ddd6; background: #fff; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; font-family: inherit; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+.mob-filter.active { background: #E07A3A; color: #fff; border-color: #E07A3A; }
+
+/* 여행 상세 레이어 열림 상태 */
+#mob-trip-layer.open { transform: translateX(0) !important; }
 @media (max-width: 768px) {
   #trip-list-screen, #main, #header, #btn-admin,
   #delete-confirm-overlay, #trip-setup-overlay,
@@ -11124,6 +11148,204 @@ document.addEventListener('keydown', (e) => {
 ═══════════════════════════════════════════════════════════ -->
 <div id="mob-app" style="display:none;">
 
+  <!-- ══ 홈 레이어 (여행 목록 + 프로필) ══════════════════════ -->
+  <div id="mob-home-layer" style="position:absolute;inset:0;display:flex;flex-direction:column;background:#f5f3ee;z-index:1;">
+
+    <!-- 홈 페이지 -->
+    <div class="mob-page active" id="mob-home" style="flex:1;overflow:hidden;">
+      <div class="mob-header">
+        <div class="mob-logo">travel<span>.</span></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+          <button id="mob-admin-refresh-btn" onclick="mobAdminRefresh()" style="display:none;border:none;background:none;font-size:18px;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent;">🔄</button>
+          <div id="mob-admin-badge" style="display:none;font-size:11px;background:#E07A3A;color:#fff;padding:3px 8px;border-radius:10px;font-weight:700;">관리자</div>
+          <button class="mob-icon-btn" onclick="mobShowNotifications()">🔔</button>
+        </div>
+      </div>
+      <div class="mob-scroll">
+        <div class="mob-greeting" id="mob-greeting">안녕하세요! ✈️<br><small>다음 여행을 계획해볼까요?</small></div>
+
+        <!-- 여행 필터 -->
+        <div class="mob-filter-tabs">
+          <button class="mob-filter active" onclick="mobFilterTrips(this,'all')">전체</button>
+          <div style="width:1px;height:16px;background:#e0ddd6;margin:0 2px;align-self:center;"></div>
+          <button class="mob-filter" onclick="mobFilterTrips(this,'upcoming')">예정</button>
+          <button class="mob-filter" onclick="mobFilterTrips(this,'ongoing')">여행 중</button>
+          <button class="mob-filter" onclick="mobFilterTrips(this,'done')">완료</button>
+        </div>
+
+        <!-- 내 여행 목록 -->
+        <div class="mob-section-header">
+          <span>내 여행 계획</span>
+          <button class="mob-text-btn" onclick="mobNewTrip()">＋ 새 여행</button>
+        </div>
+        <div id="mob-trip-list"></div>
+
+        <!-- 여행 영감 -->
+        <div class="mob-section-header" style="margin-top:8px;">
+          <span>여행 영감</span>
+          <button class="mob-text-btn" onclick="mobInspireMore()">더보기 ›</button>
+        </div>
+        <div class="mob-inspire-list" id="mob-inspire-list"></div>
+      </div>
+    </div>
+
+    <!-- 프로필 페이지 -->
+    <div class="mob-page" id="mob-profile" style="flex:1;overflow:hidden;">
+      <div class="mob-header">
+        <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
+          <div class="mob-header-title">프로필</div>
+        </div>
+        <button class="mob-icon-btn" onclick="mobShowOfflineTrips()">📦</button>
+      </div>
+      <div class="mob-scroll">
+        <div class="mob-profile-card">
+          <div class="mob-profile-avatar">👤</div>
+          <div>
+            <div id="mob-profile-name" style="font-weight:700;font-size:16px;">여행자</div>
+            <div id="mob-profile-id" style="font-size:12px;color:#999;margin-top:2px;"></div>
+            <div id="mob-build-badge" style="display:none;font-size:10px;color:#aaa;margin-top:4px;letter-spacing:0.3px;"></div>
+          </div>
+        </div>
+        <div class="mob-menu-list">
+          <div class="mob-menu-item" onclick="mobToggleLang()">
+            <span>🌐 언어 설정</span>
+            <span id="mob-lang-label" style="color:#E07A3A;font-weight:600;">한국어</span>
+          </div>
+          <div class="mob-menu-item" onclick="mobToggleDarkMode()">
+            <span>🌙 테마 설정</span>
+            <span id="mob-theme-label" style="color:#999;">라이트 모드</span>
+          </div>
+          <div class="mob-menu-item" onclick="mobShowOfflineTrips()">
+            <span>📦 오프라인 저장 목록</span>
+            <span id="mob-offline-count" style="color:#999;">-</span>
+          </div>
+          <div class="mob-menu-item" onclick="window.open('https://www.ftc.go.kr/','_blank')">
+            <span>ℹ️ 이용약관</span><span style="color:#999;">›</span>
+          </div>
+          <div class="mob-menu-item" onclick="window.open('https://www.privacy.go.kr/','_blank')">
+            <span>🔒 개인정보 처리방침</span><span style="color:#999;">›</span>
+          </div>
+          <div class="mob-menu-item" onclick="mobGoToPC()" style="color:#E07A3A;">
+            <span>🖥️ PC 버전으로 보기</span><span>›</span>
+          </div>
+          <div class="mob-menu-item" onclick="mobLogout()" style="color:#E53935;">
+            <span>🚪 로그아웃</span><span>›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 홈 탭바 (홈 + 프로필만) -->
+    <nav class="mob-tabbar" id="mob-home-tabbar">
+      <button class="mob-tab active" onclick="mobHomeTab('home')" id="mob-tab-home">
+        <span class="mob-tab-icon">🏠</span>
+        <span class="mob-tab-label">홈</span>
+      </button>
+      <button class="mob-tab" onclick="mobHomeTab('profile')" id="mob-tab-profile">
+        <span class="mob-tab-icon">👤</span>
+        <span class="mob-tab-label">프로필</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ══ 여행 상세 레이어 (일정/지도/저장) ════════════════════ -->
+  <div id="mob-trip-layer" style="
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    background:#f5f3ee;z-index:2;
+    transform:translateX(100%);
+    transition:transform .32s cubic-bezier(.4,0,.2,1);
+    will-change:transform;
+  ">
+    <!-- 상단 고정 헤더 -->
+    <div class="mob-header" id="mob-trip-layer-header" style="flex-shrink:0;">
+      <button onclick="mobCloseTrip()" style="border:none;background:none;font-size:22px;cursor:pointer;padding:4px 8px 4px 0;color:#2c2c2a;-webkit-tap-highlight-color:transparent;">←</button>
+      <div style="flex:1;min-width:0;overflow:hidden;">
+        <div id="mob-trip-layer-title" style="font-size:16px;font-weight:700;color:#2c2c2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        <div id="mob-trip-layer-date" style="font-size:11px;color:#aaa;margin-top:1px;"></div>
+      </div>
+      <button class="mob-icon-btn" onclick="mobSchedMore()">⋯</button>
+    </div>
+
+    <!-- 상세 탭 콘텐츠 영역 -->
+    <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;">
+
+      <!-- 서브탭 바 -->
+      <div id="mob-detail-tabs" style="
+        display:flex;background:#fff;border-bottom:1px solid #ede9e2;
+        padding:0 16px;gap:0;flex-shrink:0;
+      ">
+        <button class="mob-detail-tab active" onclick="mobDetailTab(this,'schedule')" id="mob-dtab-schedule">📅 일정</button>
+        <button class="mob-detail-tab" onclick="mobDetailTab(this,'map')" id="mob-dtab-map">🗺️ 지도</button>
+        <button class="mob-detail-tab" onclick="mobDetailTab(this,'saved')" id="mob-dtab-saved">🔖 저장</button>
+      </div>
+
+      <!-- 일정 탭 콘텐츠 -->
+      <div class="mob-detail-page active" id="mob-dp-schedule" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+        <!-- 일정 서브탭 (개요/타임라인/예약/경비) -->
+        <div class="mob-stab-bar">
+          <button class="mob-stab active" onclick="mobSchedTab(this,'overview')">개요</button>
+          <button class="mob-stab" onclick="mobSchedTab(this,'timeline')">타임라인</button>
+          <button class="mob-stab" onclick="mobSchedTab(this,'booking')">예약</button>
+          <button class="mob-stab" onclick="mobSchedTab(this,'budget')">경비</button>
+          <button class="mob-stab" onclick="mobSchedTab(this,'map')">지도</button>
+        </div>
+        <div class="mob-stab-page active" id="mob-stab-overview"><div class="mob-scroll" id="mob-overview-content"></div></div>
+        <div class="mob-stab-page" id="mob-stab-timeline" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+          <div class="mob-day-chips" id="mob-day-chips"></div>
+          <div class="mob-scroll" id="mob-timeline-list" style="flex:1;"></div>
+          <button class="mob-add-sched-btn" onclick="mobAddSchedule()">＋ 일정 추가</button>
+        </div>
+        <div class="mob-stab-page" id="mob-stab-booking"><div class="mob-scroll" id="mob-booking-content"></div></div>
+        <div class="mob-stab-page" id="mob-stab-budget"><div class="mob-scroll" id="mob-budget-content"></div></div>
+        <div class="mob-stab-page" id="mob-stab-map" style="padding:0;flex-direction:column;">
+          <div class="mob-day-chips" id="mob-map-day-chips" style="border-bottom:1px solid #ede9e2;"></div>
+          <div id="mob-map-view" style="flex:1;min-height:0;"></div>
+        </div>
+      </div>
+
+      <!-- 지도 탭 콘텐츠 -->
+      <div class="mob-detail-page" id="mob-dp-map" style="flex:1;display:none;position:relative;overflow:hidden;">
+        <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
+        <div class="mob-map-searchbar">
+          <input id="mob-map-search" placeholder="장소 검색..." class="mob-map-input"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();mobMapSearch();}">
+          <button onclick="mobMapSearch()" style="border:none;background:none;font-size:18px;padding:0 8px;cursor:pointer;">🔍</button>
+        </div>
+        <div class="mob-map-cats">
+          <button class="mob-cat active" onclick="mobMapCat(this,'all')">전체</button>
+          <button class="mob-cat" onclick="mobMapCat(this,'food')">맛집</button>
+          <button class="mob-cat" onclick="mobMapCat(this,'cafe')">카페</button>
+          <button class="mob-cat" onclick="mobMapCat(this,'convenience')">편의점</button>
+          <button class="mob-cat" onclick="mobMapCat(this,'hotel')">숙소</button>
+          <button class="mob-cat" onclick="mobMapCat(this,'shop')">쇼핑</button>
+        </div>
+        <div class="mob-places-sheet" id="mob-places-sheet">
+          <div class="mob-sheet-handle"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 8px;">
+            <div class="mob-sheet-title" style="margin:0;" id="mob-places-sheet-title">추천 장소</div>
+            <span id="mob-places-count" style="font-size:12px;color:#999;"></span>
+          </div>
+          <div class="mob-places-list" id="mob-places-list"></div>
+        </div>
+      </div>
+
+      <!-- 저장 탭 콘텐츠 -->
+      <div class="mob-detail-page" id="mob-dp-saved" style="flex:1;display:none;overflow:hidden;">
+        <div class="mob-scroll">
+          <div class="mob-progress-card" id="mob-checklist-progress"></div>
+          <div class="mob-saved-tabs">
+            <button class="mob-saved-tab active" onclick="mobSavedTab(this,'check')">준비물</button>
+            <button class="mob-saved-tab" onclick="mobSavedTab(this,'places')">맛집&장소</button>
+          </div>
+          <div id="mob-saved-check" class="mob-saved-content active"></div>
+          <div id="mob-saved-places" class="mob-saved-content" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
   <!-- 홈 탭 -->
   <div class="mob-page active" id="mob-home">
     <div class="mob-header">
@@ -11163,203 +11385,6 @@ document.addEventListener('keydown', (e) => {
     </div>
   </div>
 
-  <!-- 일정 탭 -->
-  <div class="mob-page" id="mob-schedule">
-    <div class="mob-header">
-      <button class="mob-back-btn" id="mob-sched-back" onclick="mobGoHome()" style="display:none;">←</button>
-      <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
-        <div class="mob-header-title">일정</div>
-        <div id="mob-sched-trip-title" style="font-size:11px;color:#E07A3A;font-weight:600;margin-top:1px;display:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
-      </div>
-      <button class="mob-icon-btn" onclick="mobSchedMore()">⋯</button>
-    </div>
-
-    <!-- 여행 선택됐을 때 -->
-    <div id="mob-sched-detail" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
-      <!-- 여행 요약 -->
-      <div class="mob-trip-summary" id="mob-trip-summary"></div>
-      <!-- 탭 (개요/일정/지도/예약/경비) -->
-      <div class="mob-sched-tabs">
-        <button class="mob-stab active" onclick="mobSchedTab(this,'overview')">개요</button>
-        <button class="mob-stab" onclick="mobSchedTab(this,'timeline')">일정</button>
-        <button class="mob-stab" onclick="mobSchedTab(this,'map')">지도</button>
-        <button class="mob-stab" onclick="mobSchedTab(this,'booking')">예약</button>
-        <button class="mob-stab" onclick="mobSchedTab(this,'budget')">경비</button>
-      </div>
-
-      <!-- 개요 -->
-      <div class="mob-stab-page active" id="mob-stab-overview">
-        <div class="mob-scroll" id="mob-overview-content"></div>
-      </div>
-
-      <!-- 일정 타임라인 -->
-      <div class="mob-stab-page" id="mob-stab-timeline">
-        <!-- 날짜 칩 -->
-        <div class="mob-day-chips" id="mob-day-chips"></div>
-        <!-- 타임라인 -->
-        <div class="mob-scroll" id="mob-timeline-list"></div>
-        <!-- + 일정 추가 -->
-        <button class="mob-add-sched-btn" onclick="mobAddSchedule()">＋ 일정 추가</button>
-      </div>
-
-      <!-- 지도 -->
-      <div class="mob-stab-page" id="mob-stab-map" style="padding:0;flex-direction:column;">
-        <!-- 날짜 칩 (지도 탭용) -->
-        <div class="mob-day-chips" id="mob-map-day-chips" style="border-bottom:1px solid #ede9e2;"></div>
-        <div id="mob-map-view" style="flex:1;min-height:0;"></div>
-      </div>
-
-      <!-- 예약 -->
-      <div class="mob-stab-page" id="mob-stab-booking">
-        <div class="mob-scroll" id="mob-booking-content"></div>
-      </div>
-
-      <!-- 경비 -->
-      <div class="mob-stab-page" id="mob-stab-budget">
-        <div class="mob-scroll" id="mob-budget-content"></div>
-      </div>
-    </div>
-
-    <!-- 여행 미선택 상태 -->
-    <div id="mob-sched-empty" style="flex:1;display:flex;align-items:center;justify-content:center;">
-      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:24px;">
-        <div style="font-size:56px;">📅</div>
-        <div style="font-weight:700;font-size:17px;color:#2c2c2a;">여행을 선택해주세요</div>
-        <div style="font-size:13px;color:#999;line-height:1.6;">홈에서 여행을 선택하면<br>일정을 볼 수 있어요</div>
-        <button class="mob-primary-btn" style="margin-top:8px;max-width:200px;" onclick="mobGoHome()">홈으로 가기</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 지도 탭 -->
-  <div class="mob-page" id="mob-map">
-    <div class="mob-header">
-      <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
-        <div class="mob-header-title">지도</div>
-        <div id="mob-map-trip-title-text" style="font-size:11px;color:#E07A3A;font-weight:600;margin-top:1px;display:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
-      </div>
-    </div>
-    <!-- 실제 지도 영역 -->
-    <div style="position:relative;flex:1;overflow:hidden;">
-      <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
-      <!-- 검색바 -->
-      <div class="mob-map-searchbar">
-        <input id="mob-map-search" placeholder="장소 검색..." class="mob-map-input"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();mobMapSearch();}">
-        <button onclick="mobMapSearch()" style="border:none;background:none;font-size:18px;padding:0 8px;cursor:pointer;">🔍</button>
-      </div>
-      <!-- 카테고리 -->
-      <div class="mob-map-cats">
-        <button class="mob-cat active" onclick="mobMapCat(this,'all')">전체</button>
-        <button class="mob-cat" onclick="mobMapCat(this,'food')">맛집</button>
-        <button class="mob-cat" onclick="mobMapCat(this,'cafe')">카페</button>
-        <button class="mob-cat" onclick="mobMapCat(this,'convenience')">편의점</button>
-        <button class="mob-cat" onclick="mobMapCat(this,'hotel')">숙소</button>
-        <button class="mob-cat" onclick="mobMapCat(this,'shop')">쇼핑</button>
-      </div>
-      <!-- 장소 바텀시트 -->
-      <div class="mob-places-sheet" id="mob-places-sheet">
-        <div class="mob-sheet-handle"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 8px;">
-          <div class="mob-sheet-title" style="margin:0;" id="mob-places-sheet-title">추천 장소</div>
-          <span id="mob-places-count" style="font-size:12px;color:#999;"></span>
-        </div>
-        <div class="mob-places-list" id="mob-places-list"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 저장 탭 -->
-  <div class="mob-page" id="mob-saved">
-    <div class="mob-header">
-      <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
-        <div class="mob-header-title">저장</div>
-        <div id="mob-saved-trip-title" style="font-size:11px;color:#E07A3A;font-weight:600;margin-top:1px;display:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
-      </div>
-    </div>
-    <div class="mob-scroll">
-      <div class="mob-progress-card" id="mob-checklist-progress"></div>
-      <div class="mob-saved-tabs">
-        <button class="mob-saved-tab active" onclick="mobSavedTab(this,'check')">준비물</button>
-        <button class="mob-saved-tab" onclick="mobSavedTab(this,'places')">맛집&장소</button>
-      </div>
-      <div id="mob-saved-check" class="mob-saved-content active"></div>
-      <div id="mob-saved-places" class="mob-saved-content" style="display:none;"></div>
-    </div>
-  </div>
-
-  <!-- 프로필 탭 -->
-  <div class="mob-page" id="mob-profile">
-    <div class="mob-header">
-      <div class="mob-header-title">프로필</div>
-      <button class="mob-icon-btn" onclick="mobShowOfflineTrips()">📦</button>
-    </div>
-    <div class="mob-scroll">
-      <div class="mob-profile-card">
-        <div class="mob-profile-avatar">👤</div>
-        <div>
-          <div id="mob-profile-name" style="font-weight:700;font-size:16px;">여행자</div>
-          <div id="mob-profile-id" style="font-size:12px;color:#999;margin-top:2px;"></div>
-          <div id="mob-build-badge" style="display:none;font-size:10px;color:#aaa;margin-top:4px;letter-spacing:0.3px;"></div>
-        </div>
-      </div>
-      <div class="mob-menu-list">
-        <div class="mob-menu-item" onclick="mobToggleLang()">
-          <span>🌐 언어 설정</span>
-          <span id="mob-lang-label" style="color:#E07A3A;font-weight:600;">한국어</span>
-        </div>
-        <div class="mob-menu-item" onclick="mobToggleDarkMode()">
-          <span>🌙 테마 설정</span>
-          <span id="mob-theme-label" style="color:#999;">라이트 모드</span>
-        </div>
-        <div class="mob-menu-item" onclick="mobShowOfflineTrips()">
-          <span>📦 오프라인 저장 목록</span>
-          <span id="mob-offline-count" style="color:#999;">-</span>
-        </div>
-        <div class="mob-menu-item" onclick="window.open('https://www.ftc.go.kr/','_blank')">
-          <span>ℹ️ 이용약관</span>
-          <span style="color:#999;">›</span>
-        </div>
-        <div class="mob-menu-item" onclick="window.open('https://www.privacy.go.kr/','_blank')">
-          <span>🔒 개인정보 처리방침</span>
-          <span style="color:#999;">›</span>
-        </div>
-        <div class="mob-menu-item" onclick="mobGoToPC()" style="color:#E07A3A;">
-          <span>🖥️ PC 버전으로 보기</span>
-          <span>›</span>
-        </div>
-        <div class="mob-menu-item" onclick="mobLogout()" style="color:#E53935;">
-          <span>🚪 로그아웃</span>
-          <span>›</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 하단 탭바 -->
-  <nav class="mob-tabbar">
-    <button class="mob-tab active" onclick="mobTab('home')" id="mob-tab-home">
-      <span class="mob-tab-icon">🏠</span>
-      <span class="mob-tab-label">홈</span>
-    </button>
-    <button class="mob-tab" onclick="mobTab('schedule')" id="mob-tab-schedule">
-      <span class="mob-tab-icon">📅</span>
-      <span class="mob-tab-label">일정</span>
-    </button>
-    <button class="mob-tab" onclick="mobTab('map')" id="mob-tab-map">
-      <span class="mob-tab-icon">🗺️</span>
-      <span class="mob-tab-label">지도</span>
-    </button>
-    <button class="mob-tab" onclick="mobTab('saved')" id="mob-tab-saved">
-      <span class="mob-tab-icon">🔖</span>
-      <span class="mob-tab-label">저장</span>
-    </button>
-    <button class="mob-tab" onclick="mobTab('profile')" id="mob-tab-profile">
-      <span class="mob-tab-icon">👤</span>
-      <span class="mob-tab-label">프로필</span>
-    </button>
-  </nav>
-</div>
 
 
 <!-- ═══════════════════════════════════════════════════════
@@ -11577,42 +11602,84 @@ function mobOpenSheet(id, html) {
 }
 function mobCloseSheet(id) { document.getElementById(id)?.remove(); }
 
-// ── 탭 전환 ──────────────────────────────────────────────────
-function mobTab(tab) {
-  document.querySelectorAll('.mob-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.mob-tab').forEach(t => t.classList.remove('active'));
-  const page = document.getElementById('mob-' + tab);
-  const btn  = document.getElementById('mob-tab-' + tab);
-  if (page) page.classList.add('active');
-  if (btn)  btn.classList.add('active');
-
-  // 여행 제목 — 모든 탭에 동일하게 적용
-  const tripTitle = mobCurrentTripData?.title || document.getElementById('trip-title')?.value || '';
-  const titleText = tripTitle ? '✈️ ' + tripTitle : '';
-  [
-    'mob-sched-trip-title',
-    'mob-map-trip-title-text',
-    'mob-saved-trip-title',
-  ].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent   = titleText;
-    el.style.display = tripTitle ? 'block' : 'none';
-  });
-
-  // 관리자 배지 / 새로고침 버튼
-  const isAdmin = mobIsAdmin || localStorage.getItem('mobAdminMode') === '1';
-  const badge   = document.getElementById('mob-admin-badge');
-  const refresh = document.getElementById('mob-admin-refresh-btn');
-  if (badge)   badge.style.display   = isAdmin ? 'block' : 'none';
-  if (refresh) refresh.style.display = isAdmin ? 'inline-flex' : 'none';
-
-  if (tab === 'map')      mobInitFullMap();
-  if (tab === 'home')     mobRenderTripList();
-  if (tab === 'schedule') mobRenderSchedule();
-  if (tab === 'saved')    mobRenderSaved();
-  if (tab === 'profile')  mobRenderProfile();
+// ── 홈 레이어 탭 전환 (홈 ↔ 프로필) ─────────────────────────
+function mobHomeTab(tab) {
+  document.querySelectorAll('#mob-home-layer .mob-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#mob-home-tabbar .mob-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('mob-' + tab)?.classList.add('active');
+  document.getElementById('mob-tab-' + tab)?.classList.add('active');
+  if (tab === 'home')    mobRenderTripList();
+  if (tab === 'profile') mobRenderProfile();
 }
+
+// ── 여행 선택 → 상세 레이어 오픈 ─────────────────────────────
+function mobOpenTripLayer(tripId) {
+  const layer = document.getElementById('mob-trip-layer');
+  layer.classList.add('open');
+
+  // 헤더 여행 제목 업데이트
+  mobUpdateLayerHeader();
+
+  // 기본 탭 = 일정
+  mobDetailTab(document.getElementById('mob-dtab-schedule'), 'schedule');
+}
+
+function mobUpdateLayerHeader() {
+  const d = mobCurrentTripData || {};
+  const title  = d.title || document.getElementById('trip-title')?.value || '';
+  const start  = d.startDate || '';
+  const end    = d.endDate   || '';
+  const nights = start && end ? Math.round((new Date(end)-new Date(start))/86400000) : null;
+
+  document.getElementById('mob-trip-layer-title').textContent = title || '여행';
+  document.getElementById('mob-trip-layer-date').textContent =
+    start && end
+      ? start.replace(/-/g,'.') + ' ~ ' + end.replace(/-/g,'.') + (nights!==null ? ` · ${nights}박${nights+1}일` : '')
+      : '날짜 미설정';
+}
+
+// ── 여행 닫기 → 홈으로 ───────────────────────────────────────
+function mobCloseTrip() {
+  const layer = document.getElementById('mob-trip-layer');
+  layer.classList.remove('open');
+  // 홈 탭 활성화
+  mobHomeTab('home');
+}
+
+// ── 상세 레이어 서브탭 전환 (일정/지도/저장) ─────────────────
+function mobDetailTab(el, tab) {
+  document.querySelectorAll('.mob-detail-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mob-detail-page').forEach(p => { p.style.display='none'; p.classList.remove('active'); });
+  el?.classList.add('active');
+  const page = document.getElementById('mob-dp-' + tab);
+  if (page) { page.style.display='flex'; page.classList.add('active'); }
+
+  // 여행 제목 항상 표시
+  mobUpdateLayerHeader();
+
+  if (tab === 'schedule') mobRenderSchedule();
+  if (tab === 'map')      mobInitFullMap();
+  if (tab === 'saved')    mobRenderSaved();
+}
+
+// ── mobTab 호환 (구 코드 참조 대비) ──────────────────────────
+function mobTab(tab) {
+  // 홈/프로필은 홈 레이어에서
+  if (tab === 'home' || tab === 'profile') { mobHomeTab(tab); return; }
+  // 나머지는 여행 상세 레이어에서
+  if (!mobCurrentTrip) { mobShowToast('먼저 여행을 선택해주세요'); return; }
+  if (!document.getElementById('mob-trip-layer').classList.contains('open')) {
+    mobOpenTripLayer(mobCurrentTrip);
+  }
+  const tabMap = { schedule:'schedule', map:'map', saved:'saved' };
+  const target = tabMap[tab];
+  if (target) {
+    mobDetailTab(document.getElementById('mob-dtab-' + target), target);
+  }
+}
+
+// ── 홈으로 가기 (구 코드 참조 대비) ─────────────────────────
+function mobGoHome() { mobCloseTrip(); }
 
 // ── 홈: 여행 목록 ─────────────────────────────────────────────
 function mobRenderTripList() {
@@ -11804,31 +11871,20 @@ async function mobSelectTrip(tripId) {
   mobCurrentTripData= null;
   window.TRIP_ID    = tripId;
 
-  // URL 반영
   const url = new URL(location.href);
   url.searchParams.set('trip', tripId);
   history.replaceState({}, '', url);
 
-  // 일정 탭으로 먼저 전환 (즉각 반응)
-  document.querySelectorAll('.mob-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.mob-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('mob-schedule')?.classList.add('active');
-  document.getElementById('mob-tab-schedule')?.classList.add('active');
-
-  // 로딩 표시
-  const detail = document.getElementById('mob-sched-detail');
-  const empty  = document.getElementById('mob-sched-empty');
-  if (detail) detail.style.display = 'flex';
-  if (empty)  empty.style.display  = 'none';
-  const summaryEl = document.getElementById('mob-trip-summary');
-  if (summaryEl) summaryEl.innerHTML = `<div style="padding:12px 16px;color:#999;font-size:13px;">불러오는 중…</div>`;
+  // 상세 레이어 즉시 오픈
+  document.getElementById('mob-trip-layer').classList.add('open');
+  document.getElementById('mob-trip-layer-title').textContent = '불러오는 중…';
+  document.getElementById('mob-trip-layer-date').textContent = '';
+  mobDetailTab(document.getElementById('mob-dtab-schedule'), 'schedule');
 
   try {
     const data = await window.fbGetTrip(tripId);
     if (data) {
       mobCurrentTripData = data;
-
-      // 전역 데이터 동기화 (PC 함수들이 참조하는 전역 변수)
       if (data.schedule)          window.scheduleData    = data.schedule;
       if (data.expenseData)       window.expenseData     = data.expenseData;
       if (data.checklist)         window.checklistData   = data.checklist;
@@ -11839,39 +11895,21 @@ async function mobSelectTrip(tripId) {
       if (data.deletedVoucherIds) window.deletedVoucherIds = new Set(data.deletedVoucherIds);
       if (data.transitModes)      window.transitModes    = data.transitModes;
       if (data.placesSnapshot)    window.placesData      = data.placesSnapshot;
-      if (data.budgetTotal !== undefined) {
-        const bi = document.getElementById('budget-total-input');
-        if (bi) bi.value = data.budgetTotal;
-      }
-      if (data.budgetCurrency) {
-        const bs = document.getElementById('budget-currency-select');
-        if (bs) bs.value = data.budgetCurrency;
-        window.currentBudgetCurrency = data.budgetCurrency;
-      }
-      // totalDays 동기화
+      if (data.budgetTotal !== undefined) { const bi=document.getElementById('budget-total-input'); if(bi) bi.value=data.budgetTotal; }
+      if (data.budgetCurrency) { const bs=document.getElementById('budget-currency-select'); if(bs) bs.value=data.budgetCurrency; window.currentBudgetCurrency=data.budgetCurrency; }
       if (data.startDate && data.endDate) {
-        window.totalDays = Math.round((new Date(data.endDate)-new Date(data.startDate))/86400000) + 1;
+        window.totalDays = Math.round((new Date(data.endDate)-new Date(data.startDate))/86400000)+1;
         window.currentDay = 1;
       }
-
-      // PC hidden 필드 동기화 (autoSave/saveAll 호환)
-      const sv = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v || ''; };
-      sv('trip-title',  data.title);
-      sv('trip-start',  data.startDate);
-      sv('trip-end',    data.endDate);
-      sv('trip-author', data.author);
-      sv('trip-note',   data.note);
-
-      // ★ 핵심: isDomestic 전역 변수 동기화 (경로 그리기에 사용됨)
-      const domestic = data.isDomestic ?? (typeof detectDomestic === 'function' ? detectDomestic(data.title || '') : false);
-      if (typeof switchFlightSection === 'function') switchFlightSection(domestic);
-      else window.isDomestic = domestic; // switchFlightSection 없을 때 직접 설정
-
-      // 오프라인 스냅샷 저장
+      const sv=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v||'';};
+      sv('trip-title',data.title); sv('trip-start',data.startDate);
+      sv('trip-end',data.endDate); sv('trip-author',data.author); sv('trip-note',data.note);
+      const domestic = data.isDomestic ?? (typeof detectDomestic==='function' ? detectDomestic(data.title||'') : false);
+      if (typeof switchFlightSection==='function') switchFlightSection(domestic);
+      else window.isDomestic = domestic;
       if (window.offlineSave) window.offlineSave(tripId, data).catch(()=>{});
     } else {
-      // 오프라인 폴백
-      const snap = await (window.offlineLoad ? window.offlineLoad(tripId) : Promise.resolve(null));
+      const snap = await window.offlineLoad?.(tripId);
       if (snap?.data) {
         mobCurrentTripData = snap.data;
         if (snap.data.schedule)    window.scheduleData  = snap.data.schedule;
@@ -11881,69 +11919,19 @@ async function mobSelectTrip(tripId) {
       }
     }
   } catch(e) {
-    console.warn('mobSelectTrip 로드 오류:', e);
-    // 오프라인 폴백
-    try {
-      const snap = await window.offlineLoad?.(tripId);
-      if (snap?.data) { mobCurrentTripData = snap.data; Object.assign(window, { scheduleData: snap.data.schedule||{} }); }
-    } catch(_) {}
+    console.warn('mobSelectTrip 오류:', e);
+    try { const snap=await window.offlineLoad?.(tripId); if(snap?.data){mobCurrentTripData=snap.data;window.scheduleData=snap.data.schedule||{};} } catch(_){}
   }
 
-  // UI 렌더
+  mobUpdateLayerHeader();
   mobRenderSchedule();
 }
 
-// ── 일정 탭 ──────────────────────────────────────────────────
-function mobGoHome() {
-  mobCurrentTrip  = null;
-  mobCurrentTripData = null;
-  mobCurrentSchedTab = 'overview';
-  document.getElementById('mob-sched-detail').style.display = 'none';
-  document.getElementById('mob-sched-empty').style.display  = 'flex';
-  document.getElementById('mob-sched-back').style.display   = 'none';
-  mobTab('home');
-}
+// ── 홈으로 가기 ──────────────────────────────────────────────
+function mobGoHome() { mobCloseTrip(); }
 
 function mobRenderSchedule() {
-  if (!mobCurrentTrip) {
-    document.getElementById('mob-sched-detail').style.display = 'none';
-    document.getElementById('mob-sched-empty').style.display  = 'flex';
-    document.getElementById('mob-sched-back').style.display   = 'none';
-    return;
-  }
-  document.getElementById('mob-sched-detail').style.display = 'flex';
-  document.getElementById('mob-sched-empty').style.display  = 'none';
-  document.getElementById('mob-sched-back').style.display   = 'block';
-
-  const d      = mobCurrentTripData || {};
-  const title  = d.title  || document.getElementById('trip-title')?.value || '여행';
-  const start  = d.startDate || document.getElementById('trip-start')?.value || '';
-  const end    = d.endDate   || document.getElementById('trip-end')?.value   || '';
-  const nights = start && end ? Math.round((new Date(end)-new Date(start))/86400000) : null;
-  const dateStr= start && end ? start.replace(/-/g,'.')+' ~ '+end.replace(/-/g,'.') : '날짜 미설정';
-
-  const status = mobTripStatus(start, end);
-  const sColor = { '여행 중 ✈️':'#3AAF7A', '완료':'#aaa', '예정':'#3A8FE0' }[status] || '#E07A3A';
-
-  const summaryEl = document.getElementById('mob-trip-summary');
-  if (summaryEl) summaryEl.innerHTML = `
-    <div class="mob-trip-summary-name">${title}</div>
-    <div class="mob-trip-summary-date">${dateStr}${nights!==null?` · ${nights}박${nights+1}일`:''}</div>
-    <div class="mob-trip-summary-tags">
-      <span class="mob-summary-tag status" style="background:${sColor}18;color:${sColor};border:1px solid ${sColor}40;">${status}</span>
-    </div>`;
-
-  // 헤더 여행 제목 업데이트 (통일 양식)
-  const tripTitleEl = document.getElementById('mob-sched-trip-title');
-  if (tripTitleEl) {
-    tripTitleEl.textContent = title ? '✈️ ' + title : '';
-    tripTitleEl.style.display = title ? 'block' : 'none';
-  }
-  // mob-sched-title은 더 이상 여행 이름을 쓰지 않고 "일정"으로 고정
-  const schedTitleEl = document.getElementById('mob-sched-title');
-  if (schedTitleEl) schedTitleEl.textContent = '일정';
-
-  // 현재 탭 렌더
+  if (!mobCurrentTrip) return;
   const tab = mobCurrentSchedTab || 'overview';
   const activeBtn = document.querySelector(`.mob-stab[onclick*="'${tab}'"]`);
   document.querySelectorAll('.mob-stab').forEach(b => b.classList.remove('active'));
@@ -11951,12 +11939,11 @@ function mobRenderSchedule() {
   if (activeBtn) activeBtn.classList.add('active');
   else document.querySelector('.mob-stab')?.classList.add('active');
   document.getElementById('mob-stab-' + tab)?.classList.add('active');
-
   if (tab === 'overview') mobRenderOverview();
   if (tab === 'timeline') mobRenderTimeline();
   if (tab === 'booking')  mobRenderBooking();
   if (tab === 'budget')   mobRenderBudget();
-  if (tab === 'map')      mobInitSchedMap();
+  if (tab === 'map') { window._mobSchedPinsDrawn=false; mobInitSchedMap(); }
 }
 
 function mobTripStatus(start, end) {
