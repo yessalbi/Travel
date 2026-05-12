@@ -2618,7 +2618,7 @@ html, body {
 .mob-places-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.12); z-index: 10; max-height: 55%; display: flex; flex-direction: column; transition: max-height .3s cubic-bezier(.4,0,.2,1), transform .3s cubic-bezier(.4,0,.2,1); }
 .mob-places-sheet.collapsed { max-height: 56px; overflow: hidden; }
 .mob-places-sheet.collapsed #mob-places-toggle-btn { transform: rotate(180deg); }
-.mob-sheet-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 0 auto; flex-shrink: 0; }
+.mob-sheet-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 10px auto 0; flex-shrink: 0; }
 .mob-sheet-title { padding: 10px 16px 6px; font-size: 15px; font-weight: 700; color: #2c2c2a; flex-shrink: 0; }
 .mob-places-list { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
 .mob-place-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; cursor: pointer; transition: background .12s; }
@@ -11332,7 +11332,7 @@ document.addEventListener('keydown', (e) => {
       ">
         <button class="mob-detail-tab active" onclick="mobDetailTab(this,'schedule')" id="mob-dtab-schedule">📅 일정</button>
         <button class="mob-detail-tab" onclick="mobDetailTab(this,'map')" id="mob-dtab-map">🗺️ 지도</button>
-        <button class="mob-detail-tab" onclick="mobDetailTab(this,'saved')" id="mob-dtab-saved">🔖 저장</button>
+        <button class="mob-detail-tab" onclick="mobDetailTab(this,'saved')" id="mob-dtab-saved">🎒 준비물</button>
       </div>
 
       <!-- 일정 탭 콘텐츠 -->
@@ -11381,7 +11381,9 @@ document.addEventListener('keydown', (e) => {
           <button class="mob-cat" onclick="mobMapCat(this,'shop')">쇼핑</button>
         </div>
         <div class="mob-places-sheet" id="mob-places-sheet">
-          <div class="mob-sheet-handle" id="mob-places-handle" style="cursor:grab;touch-action:none;padding:14px 0 10px;"></div>
+          <div id="mob-places-handle" style="padding:12px 0 4px;touch-action:none;cursor:grab;">
+            <div class="mob-sheet-handle"></div>
+          </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <button id="mob-places-back-btn" onclick="mobRestorePlaceList()"
