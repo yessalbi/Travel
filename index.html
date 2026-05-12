@@ -13749,7 +13749,6 @@ function mobToggleLang() {
 function mobToggleDarkMode() {
   mobIsDarkMode = !mobIsDarkMode;
 
-  // style 태그로 CSS 변수 덮어쓰기 (inline style보다 안정적)
   let darkStyle = document.getElementById('mob-dark-style');
   if (!darkStyle) {
     darkStyle = document.createElement('style');
@@ -13759,23 +13758,95 @@ function mobToggleDarkMode() {
 
   if (mobIsDarkMode) {
     darkStyle.textContent = `
-      :root {
-        --cream:#1a1a1e!important; --white:#242428!important;
-        --stone:#2a2a2e!important; --sand:#3a3a3e!important;
-        --ink:#f0f0ee!important;   --ink2:#c8c8c4!important;
-        --ink3:#888880!important;  --accent:#f09060!important;
-      }
-      #mob-app, .mob-page, .mob-header, .mob-trip-card,
-      .mob-check-item, .mob-booking-card, .mob-overview-section,
-      .mob-menu-list, .mob-menu-item, .mob-tabbar, .mob-scroll,
-      .mob-progress-card { background-color: #1a1a1e!important; color: #f0f0ee!important; }
-      .mob-trip-card, .mob-check-item, .mob-booking-card,
-      .mob-overview-section, .mob-menu-list, .mob-profile-card { background:#242428!important; }
-      .mob-tabbar { background:#1a1a1e!important; border-top-color:#3a3a3e!important; }
-      .mob-header { background:#242428!important; border-bottom-color:#3a3a3e!important; }
-      .mob-logo, .mob-header-title, .mob-trip-name, .mob-tab-label { color:#f0f0ee!important; }
-      .mob-trip-date, .mob-place-sub, .mob-booking-sub { color:#888880!important; }
-      input, textarea, select { background:#2a2a2e!important; color:#f0f0ee!important; border-color:#3a3a3e!important; }
+      /* ── 다크 모드 전체 적용 ── */
+      #mob-app { background:#111113!important; color:#e8e8e6!important; }
+
+      /* 배경 레이어 */
+      #mob-home-layer, #mob-trip-layer { background:#111113!important; }
+      .mob-header { background:#1c1c1e!important; border-bottom-color:#2c2c2e!important; }
+      .mob-tabbar { background:#1c1c1e!important; border-top-color:#2c2c2e!important; }
+      .mob-scroll { background:#111113!important; }
+      .mob-detail-wrap { background:#111113!important; }
+      #mob-detail-tabs { background:#1c1c1e!important; border-bottom-color:#2c2c2e!important; }
+      .mob-stab-bar { background:#1c1c1e!important; border-bottom-color:#2c2c2e!important; }
+
+      /* 텍스트 */
+      .mob-logo, .mob-header-title, .mob-trip-name, .mob-greeting,
+      .mob-section-header, .mob-tl-card-name, .mob-tl-card-type,
+      .mob-check-label, #mob-profile-name, .mob-menu-item { color:#e8e8e6!important; }
+      .mob-trip-date, .mob-trip-detail, .mob-tab-label, .mob-stab,
+      .mob-tl-card-sub, .mob-tl-card-badge, #mob-profile-id { color:#888886!important; }
+      .mob-tab.active .mob-tab-label, .mob-stab.active,
+      .mob-detail-tab.active { color:#f09060!important; }
+      .mob-detail-tab.active { border-bottom-color:#f09060!important; }
+      .mob-stab.active { border-bottom-color:#f09060!important; }
+
+      /* 카드 */
+      .mob-trip-card { background:#1c1c1e!important; color:#e8e8e6!important; box-shadow:0 1px 4px rgba(0,0,0,0.4)!important; }
+      .mob-timeline-card { background:#1c1c1e!important; border-color:#2c2c2e!important; }
+      .mob-check-item { background:#1c1c1e!important; border-color:#2c2c2e!important; }
+      .mob-profile-card { background:#1c1c1e!important; }
+      .mob-menu-list { background:#1c1c1e!important; border-radius:16px; }
+      .mob-menu-item { background:#1c1c1e!important; border-bottom-color:#2c2c2e!important; }
+      .mob-progress-card { background:#1c1c1e!important; }
+      .mob-overview-section { background:#1c1c1e!important; }
+      .mob-tl-dot { border-color:#111113!important; }
+      .mob-tl-bar { background:#2c2c2e!important; }
+
+      /* 필터 칩 */
+      .mob-filter { background:#1c1c1e!important; border-color:#3a3a3c!important; color:#888886!important; }
+      .mob-filter.active { background:#f09060!important; border-color:#f09060!important; color:#fff!important; }
+
+      /* 날짜 칩 */
+      .mob-day-chip { background:#1c1c1e!important; border-color:#3a3a3c!important; color:#888886!important; }
+      .mob-day-chip.active { background:#f09060!important; border-color:#f09060!important; color:#fff!important; }
+      .mob-day-chips { background:#1c1c1e!important; border-bottom-color:#2c2c2e!important; }
+
+      /* 배지 */
+      .mob-trip-badge { opacity:0.9!important; }
+      .mob-tl-card-badge { background:#2c2c2e!important; color:#888886!important; }
+
+      /* 준비물 체크박스 */
+      .mob-check-box { background:#2c2c2e!important; border-color:#3a3a3c!important; }
+      .mob-check-box.done { background:#f09060!important; border-color:#f09060!important; }
+      .mob-check-label.done { color:#666664!important; }
+
+      /* 저장 탭 */
+      .mob-saved-tab { background:#1c1c1e!important; border-color:#3a3a3c!important; color:#888886!important; }
+      .mob-saved-tab.active { background:#f09060!important; border-color:#f09060!important; color:#fff!important; }
+      .mob-saved-content { background:#111113!important; }
+
+      /* 시트 */
+      .mob-sheet-body { background:#1c1c1e!important; }
+      .mob-sheet-title { color:#e8e8e6!important; }
+      .mob-places-sheet { background:#1c1c1e!important; }
+      .mob-place-item { border-bottom-color:#2c2c2e!important; }
+      .mob-place-name { color:#e8e8e6!important; }
+
+      /* 입력 */
+      input, textarea, select { background:#2c2c2e!important; color:#e8e8e6!important; border-color:#3a3a3c!important; }
+      input::placeholder, textarea::placeholder { color:#666664!important; }
+
+      /* 버튼 */
+      .mob-text-btn { color:#f09060!important; }
+      .mob-add-sched-btn { background:#1c1c1e!important; border-top-color:#2c2c2e!important; color:#f09060!important; }
+      .mob-cancel-btn { background:#1c1c1e!important; border-color:#3a3a3c!important; color:#888886!important; }
+      .mob-icon-btn { background:none!important; color:#e8e8e6!important; }
+
+      /* 로그인 게이트 */
+      #mob-auth-gate { background:#111113!important; }
+
+      /* 인스파이어 */
+      .mob-inspire-list { background:#111113!important; }
+
+      /* 검색바 */
+      .mob-map-searchbar { background:#1c1c1e!important; }
+      .mob-map-input { color:#e8e8e6!important; }
+      .mob-cat { background:#1c1c1e!important; border-color:#3a3a3c!important; color:#888886!important; }
+      .mob-cat.active { background:#f09060!important; border-color:#f09060!important; color:#fff!important; }
+
+      /* 빌드 배지 */
+      #mob-admin-badge { background:#f09060!important; }
     `;
     localStorage.setItem('mobDarkMode', '1');
   } else {
@@ -13791,13 +13862,14 @@ function mobToggleDarkMode() {
 function mobGoToPC() {
   localStorage.setItem('mobPCMode', '1');
 
-  // CSS로 mob-app 숨기고 PC UI 표시
+  // mob-app 완전 숨기기 — 미디어 쿼리 없이 직접 적용
   let ov = document.getElementById('mob-pc-override');
   if (!ov) { ov = document.createElement('style'); ov.id = 'mob-pc-override'; document.head.appendChild(ov); }
-  ov.textContent = `@media (max-width:768px){
-    #mob-app{display:none!important;}
-    #main,#header,#trip-list-screen{display:flex!important;}
-  }`;
+  ov.textContent = `
+    #mob-app { display: none !important; }
+    #main, #header, #trip-list-screen { display: flex !important; }
+    #mob-global-refresh { display: none !important; }
+  `;
 
   // "모바일 앱으로" 복귀 버튼
   if (!document.getElementById('mob-return-btn')) {
@@ -13813,7 +13885,6 @@ function mobGoToPC() {
     document.body.appendChild(btn);
   }
 
-  // PC 초기화 — 에러가 모바일 코드를 죽이지 않도록 try-catch
   try { if (typeof showTripListScreen === 'function') showTripListScreen(); }
   catch(e) { console.warn('[PC init]', e); }
 }
