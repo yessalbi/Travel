@@ -2422,6 +2422,9 @@ html, body {
 .mob-filter.active { background: #E07A3A; color: #fff; border-color: #E07A3A; }
 /* 여행 상세 레이어 열림 상태 */
 #mob-trip-layer.open { transform: translateX(0) !important; }
+@media (min-width: 769px) {
+  #mob-app { display: none !important; }
+}
 @media (max-width: 768px) {
   #trip-list-screen, #main, #header, #btn-admin,
   #delete-confirm-overlay, #trip-setup-overlay,
@@ -10936,7 +10939,16 @@ document.addEventListener('keydown', (e) => {
 </div>
 <div id="mob-app" style="display:none;">
 
-  <!-- ══ 홈 레이어 (여행 목록 + 프로필) ══════════════════════ -->
+  <!-- ══ 글로벌 새로고침 버튼 (모든 화면에서 표시) ══════════ -->
+  <button id="mob-global-refresh" onclick="mobSmartRefresh()"
+    style="position:fixed;top:12px;right:12px;z-index:19998;
+      width:36px;height:36px;border-radius:50%;border:none;
+      background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);
+      box-shadow:0 2px 10px rgba(0,0,0,0.15);
+      font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+      -webkit-tap-highlight-color:transparent;transition:transform .2s;">🔄</button>
+
+  <!-- ══ 홈 레이어 ══════════════════════════════════════════ -->
   <div id="mob-home-layer" style="position:absolute;inset:0;display:flex;flex-direction:column;background:#f5f3ee;z-index:1;">
 
     <!-- 홈 페이지 -->
@@ -10944,7 +10956,6 @@ document.addEventListener('keydown', (e) => {
       <div class="mob-header">
         <div class="mob-logo">travel<span>.</span></div>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-          <button id="mob-admin-refresh-btn" onclick="mobAdminRefresh()" style="display:none;border:none;background:none;font-size:18px;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent;">🔄</button>
           <div id="mob-admin-badge" style="display:none;font-size:11px;background:#E07A3A;color:#fff;padding:3px 8px;border-radius:10px;font-weight:700;">관리자</div>
           <button class="mob-icon-btn" onclick="mobShowNotifications()">🔔</button>
         </div>
@@ -11380,6 +11391,44 @@ function mobOpenSheet(id, html) {
   document.getElementById('mob-app').appendChild(sheet);
 }
 function mobCloseSheet(id) { document.getElementById(id)?.remove(); }
+// ── 글로벌 새로고침 ──────────────────────────────────────────
+function mobSmartRefresh() {
+  const btn = document.getElementById('mob-global-refresh');
+  if (btn) { btn.style.transform='rotate(360deg)'; btn.style.transition='transform .3s'; }
+  const state = {
+    tripId:    mobCurrentTrip || null,
+    layerOpen: document.getElementById('mob-trip-layer')?.classList.contains('open') || false,
+    detailTab: document.querySelector('.mob-detail-tab.active')?.id?.replace('mob-dtab-','') || 'schedule',
+    schedTab:  mobCurrentSchedTab || 'overview',
+    homeTab:   document.querySelector('#mob-home-tabbar .mob-tab.active')?.id?.replace('mob-tab-','') || 'home',
+  };
+  localStorage.setItem('mobRefreshState', JSON.stringify(state));
+  setTimeout(() => location.reload(), 320);
+}
+
+async function mobRestoreRefreshState() {
+  const raw = localStorage.getItem('mobRefreshState');
+  if (!raw) return;
+  localStorage.removeItem('mobRefreshState');
+  try {
+    const s = JSON.parse(raw);
+    if (s.tripId && s.layerOpen) {
+      await mobSelectTrip(s.tripId);
+      if (s.detailTab) {
+        const el = document.getElementById('mob-dtab-' + s.detailTab);
+        if (el) mobDetailTab(el, s.detailTab);
+      }
+      if (s.schedTab) {
+        mobCurrentSchedTab = s.schedTab;
+        const el = document.querySelector(`.mob-stab[onclick*="'${s.schedTab}'"]`);
+        if (el) mobSchedTab(el, s.schedTab);
+      }
+    } else if (s.homeTab) {
+      mobHomeTab(s.homeTab);
+    }
+  } catch(e) { console.warn('상태 복원 실패:', e); }
+}
+
 function mobHomeTab(tab) {
   document.querySelectorAll('#mob-home-layer .mob-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('#mob-home-tabbar .mob-tab').forEach(t => t.classList.remove('active'));
@@ -13304,13 +13353,7 @@ function mobGoToPC() {
   catch(e) { console.warn('[PC init]', e); }
 }
 
-async function mobAdminRefresh() {
-  const refresh = document.getElementById('mob-admin-refresh-btn');
-  if (refresh) { refresh.style.opacity='0.4'; refresh.style.pointerEvents='none'; }
-  await mobLoadTripList();
-  if (refresh) { refresh.style.opacity=''; refresh.style.pointerEvents=''; }
-  mobShowToast('새로고침 완료 ✓');
-}
+async function mobAdminRefresh() { mobSmartRefresh(); }
 
 function mobLogout() {
   if (!confirm('로그아웃 할까요?')) return;
@@ -13556,10 +13599,14 @@ async function mobLoadTripList() {
     }
 
     window._mobTripList = trips;
-    mobRenderTripList(); // 내부에서 mobRenderInspire(4) 호출됨
+    mobRenderTripList();
 
-    const urlTrip = new URLSearchParams(location.search).get('trip');
-    if (urlTrip) await mobSelectTrip(urlTrip);
+    if (localStorage.getItem('mobRefreshState')) {
+      await mobRestoreRefreshState();
+    } else {
+      const urlTrip = new URLSearchParams(location.search).get('trip');
+      if (urlTrip) await mobSelectTrip(urlTrip);
+    }
 
   } catch(e) {
     console.warn('mobLoadTripList 오류:', e);
