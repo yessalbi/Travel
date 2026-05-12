@@ -2618,7 +2618,7 @@ html, body {
 .mob-places-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.12); z-index: 10; max-height: 55%; display: flex; flex-direction: column; transition: max-height .3s cubic-bezier(.4,0,.2,1), transform .3s cubic-bezier(.4,0,.2,1); }
 .mob-places-sheet.collapsed { max-height: 56px; overflow: hidden; }
 .mob-places-sheet.collapsed #mob-places-toggle-btn { transform: rotate(180deg); }
-.mob-sheet-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 10px auto 0; flex-shrink: 0; }
+.mob-sheet-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 0 auto; flex-shrink: 0; }
 .mob-sheet-title { padding: 10px 16px 6px; font-size: 15px; font-weight: 700; color: #2c2c2a; flex-shrink: 0; }
 .mob-places-list { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
 .mob-place-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; cursor: pointer; transition: background .12s; }
@@ -11381,7 +11381,7 @@ document.addEventListener('keydown', (e) => {
           <button class="mob-cat" onclick="mobMapCat(this,'shop')">쇼핑</button>
         </div>
         <div class="mob-places-sheet" id="mob-places-sheet">
-          <div class="mob-sheet-handle" id="mob-places-handle" style="cursor:grab;touch-action:none;"></div>
+          <div class="mob-sheet-handle" id="mob-places-handle" style="cursor:grab;touch-action:none;padding:14px 0 10px;"></div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px 10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <button id="mob-places-back-btn" onclick="mobRestorePlaceList()"
@@ -13242,19 +13242,27 @@ function mobSelectPlace(idx) {
   const p = (window._mobPlaces||[])[idx];
   if (!p || !mobMap) return;
 
-  // 바텀시트가 화면 55% 차지 → 장소가 보이는 영역(위 45%) 중앙에 오도록 offset
   mobMap.setZoom(16);
-  mobMap.panTo(p.geometry.location);
 
-  // panTo 완료 후 바텀시트 높이의 절반만큼 위로 이동
-  google.maps.event.addListenerOnce(mobMap, 'idle', () => {
-    const mapEl   = document.getElementById('mob-fullmap');
-    const sheetEl = document.getElementById('mob-places-sheet');
-    if (!mapEl || !sheetEl) return;
-    const sheetH = sheetEl.offsetHeight;
-    // 바텀시트 높이의 절반만큼 지도를 아래로 이동 → 핀이 위쪽 빈 공간에 표시
-    mobMap.panBy(0, Math.round(sheetH / 2));
-  });
+  // 바텀시트 높이 측정 → 보이는 영역 중앙으로 원스텝 이동
+  const sheetEl = document.getElementById('mob-places-sheet');
+  const sheetH  = sheetEl ? sheetEl.offsetHeight : 0;
+
+  // projection으로 한 번에 계산
+  // 핀 위치를 보이는 영역(지도 전체 - 바텀시트) 중앙에 오도록 y offset 적용
+  const moveToVisibleCenter = () => {
+    const proj = mobMap.getProjection();
+    if (!proj || !sheetH) { mobMap.panTo(p.geometry.location); return; }
+    const scale   = Math.pow(2, mobMap.getZoom());
+    const worldPt = proj.fromLatLngToPoint(p.geometry.location);
+    // 아래로 sheetH/2 만큼 내린 지점을 지도 중앙으로 설정 → 핀이 보이는 영역 중앙에 위치
+    const targetPt  = new google.maps.Point(worldPt.x, worldPt.y + (sheetH / 2) / scale);
+    const targetLng = proj.fromPointToLatLng(targetPt);
+    mobMap.panTo(targetLng);
+  };
+
+  // setZoom 후 projection 준비되면 실행
+  google.maps.event.addListenerOnce(mobMap, 'tilesloaded', moveToVisibleCenter);
   // 강조 마커
   if (window._mobSelectedMarker) window._mobSelectedMarker.setMap(null);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48"><ellipse cx="20" cy="44" rx="8" ry="3" fill="rgba(0,0,0,0.22)"/><path d="M20 2C10.06 2 2 10.06 2 20c0 12 18 28 18 28s18-16 18-28C38 10.06 29.94 2 20 2Z" fill="#E07A3A" stroke="#fff" stroke-width="2.5"/><circle cx="20" cy="20" r="8" fill="#fff"/><text x="20" y="24" text-anchor="middle" font-size="10" font-weight="800" fill="#E07A3A">★</text></svg>`;
@@ -13298,29 +13306,61 @@ function mobSelectPlace(idx) {
 }
 
 function mobInitPlacesSheetDrag() {
-  const handle = document.getElementById('mob-places-handle');
-  const sheet  = document.getElementById('mob-places-sheet');
-  if (!handle || !sheet) return;
+  const sheet = document.getElementById('mob-places-sheet');
+  if (!sheet || sheet._dragInit) return;
+  sheet._dragInit = true;
 
-  let startY = 0;
-  let startH = 0;
+  let startY    = 0;
+  let startH    = 0;
+  let lastY     = 0;
+  let velocity  = 0; // 드래그 속도 (px/ms)
+  let lastTime  = 0;
 
-  handle.addEventListener('touchstart', e => {
-    startY = e.touches[0].clientY;
-    startH = sheet.offsetHeight;
+  // 핸들 + 헤더 영역 전체를 드래그 트리거로 사용 (터치 면적 확대)
+  const dragZone = sheet.querySelector('#mob-places-handle')?.parentElement || sheet;
+
+  const onStart = (e) => {
+    startY   = e.touches[0].clientY;
+    lastY    = startY;
+    startH   = sheet.offsetHeight;
+    velocity = 0;
+    lastTime = Date.now();
     sheet.style.transition = 'none';
-  }, { passive: true });
+  };
 
-  handle.addEventListener('touchmove', e => {
-    const dy = e.touches[0].clientY - startY;
+  const onMove = (e) => {
+    const now  = Date.now();
+    const y    = e.touches[0].clientY;
+    const dt   = now - lastTime || 1;
+    velocity   = (y - lastY) / dt; // 양수 = 아래로, 음수 = 위로
+    lastY      = y;
+    lastTime   = now;
+
+    const dy   = y - startY;
     const newH = Math.max(56, Math.min(window.innerHeight * 0.75, startH - dy));
     sheet.style.maxHeight = newH + 'px';
-  }, { passive: true });
+    e.preventDefault(); // 내부 스크롤 막기
+  };
 
-  handle.addEventListener('touchend', () => {
+  const onEnd = () => {
     sheet.style.transition = '';
     const currentH = sheet.offsetHeight;
-    // 50% 이하면 접힘, 이상이면 펼침
+    const expandH  = window.innerHeight * 0.55; // 펼쳐진 기본 높이
+
+    // 위로 살짝만 올려도 (속도 기준) 쭉 펼침
+    if (velocity < -0.3) {
+      // 빠르게 위로 → 펼침
+      sheet.classList.remove('collapsed');
+      sheet.style.maxHeight = '';
+      return;
+    }
+    // 아래로 살짝만 내려도 (속도 기준) 접힘
+    if (velocity > 0.3) {
+      sheet.classList.add('collapsed');
+      sheet.style.maxHeight = '';
+      return;
+    }
+    // 속도 느리면 위치 기준: 50% 이하면 접힘
     if (currentH < window.innerHeight * 0.5) {
       sheet.classList.add('collapsed');
       sheet.style.maxHeight = '';
@@ -13328,7 +13368,17 @@ function mobInitPlacesSheetDrag() {
       sheet.classList.remove('collapsed');
       sheet.style.maxHeight = '';
     }
-  }, { passive: true });
+  };
+
+  // 핸들 전체 영역에 이벤트 등록 (passive:false로 e.preventDefault 허용)
+  const header = sheet.querySelector('#mob-places-handle')?.closest('div') || sheet;
+  // 시트 전체의 핸들 div + 그 위 헤더 div 모두
+  [document.getElementById('mob-places-handle'), header].forEach(el => {
+    if (!el) return;
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove',  onMove,  { passive: false });
+    el.addEventListener('touchend',   onEnd,   { passive: true });
+  });
 }
 
 function mobRestorePlaceList() {
