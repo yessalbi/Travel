@@ -2414,9 +2414,6 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 .mob-detail-tab.active { color: #E07A3A; border-bottom-color: #E07A3A; }
-/* 상세 페이지 */
-.mob-detail-page { flex: 1; overflow: hidden; }
-.mob-detail-page.active { display: flex !important; flex-direction: column; }
 /* 홈 탭바 — 2개만 */
 #mob-home-tabbar .mob-tab { flex: 1; }
 /* 필터 구분선 정렬 */
@@ -2492,9 +2489,9 @@ html, body {
 #mob-trip-layer { display:none; flex-direction:column; }
 #mob-app #mob-trip-layer { display:flex; }
 #mob-trip-layer > div:last-child { flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
-/* 서브탭 콘텐츠 (일정/지도/저장) */
-.mob-detail-page { display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0; }
-.mob-detail-page.active { display:flex; }
+/* 서브탭 콘텐츠 (일정/지도/저장) — mob-app 스코프 */
+#mob-app .mob-detail-page { display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0; }
+#mob-app .mob-detail-page.active { display:flex; }
 /* 서브서브탭 (개요/타임라인/예약/경비/지도) */
 .mob-stab-page { display:none; flex:1; flex-direction:column; overflow:hidden; min-height:0; }
 .mob-stab-page.active { display:flex; }
@@ -2504,8 +2501,8 @@ html, body {
 #mob-map-view { flex:1; min-height:0; width:100%; }
 /* 일정탭 내 지도 날짜칩 */
 #mob-stab-map #mob-map-day-chips { flex-shrink:0; border-bottom:1px solid #ede9e2; }
-/* mob-dp-schedule flex 체인 */
-#mob-dp-schedule { display:flex; flex-direction:column; flex:1; overflow:hidden; min-height:0; }
+/* mob-dp-schedule flex 체인 — 기본 display:flex (active 상태에서) */
+#mob-app #mob-dp-schedule { display:flex; flex-direction:column; flex:1; overflow:hidden; min-height:0; }
 #mob-map-view { flex: 1; width: 100%; min-height: 0; }
 .mob-day-chips { display: flex; gap: 6px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #ede9e2; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
 .mob-day-chips::-webkit-scrollbar { display: none; }
@@ -2582,7 +2579,13 @@ html, body {
 textarea.mob-inp { resize:vertical; }
 select.mob-inp { padding:10px 8px;cursor:pointer; }
 .mob-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;}
-.mob-cancel-btn{width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;}</style>
+.mob-cancel-btn{width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;}
+/* mob-dp-map 내부 지도 절대 위치 */
+#mob-dp-map { position:relative; }
+#mob-dp-map #mob-fullmap { position:absolute; inset:0; }
+/* mob-dp-saved 스크롤 */
+#mob-dp-saved .mob-scroll { flex:1; }
+</style>
 </head>
 <body>
 
@@ -11094,7 +11097,7 @@ document.addEventListener('keydown', (e) => {
       </div>
 
       <!-- 지도 탭 콘텐츠 -->
-      <div class="mob-detail-page" id="mob-dp-map" style="flex:1;display:none;position:relative;overflow:hidden;">
+      <div class="mob-detail-page" id="mob-dp-map" style="position:relative;">
         <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
         <div class="mob-map-searchbar">
           <input id="mob-map-search" placeholder="장소 검색..." class="mob-map-input"
@@ -11120,7 +11123,7 @@ document.addEventListener('keydown', (e) => {
       </div>
 
       <!-- 저장 탭 콘텐츠 -->
-      <div class="mob-detail-page" id="mob-dp-saved" style="flex:1;display:none;overflow:hidden;">
+      <div class="mob-detail-page" id="mob-dp-saved">
         <div class="mob-scroll">
           <div class="mob-progress-card" id="mob-checklist-progress"></div>
           <div class="mob-saved-tabs">
