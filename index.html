@@ -3101,8 +3101,8 @@ html, body {
     <div id="map"></div>
     <!-- 날짜 필터 칩 (지도 좌상단) -->
     <div id="map-day-filter" style="
-      position:absolute;top:12px;left:200px;z-index:10;
-      display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 220px);
+      position:absolute;top:12px;right:60px;z-index:10;
+      display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:60%;
     "></div>
     <!-- 오프라인 지도 대체 레이어 -->
     <div id="offline-map-layer" style="display:none;position:absolute;inset:0;z-index:5;">
@@ -3460,13 +3460,13 @@ let currentPlaceForMaps = null;
 
 // ── URL 파라미터에서 trip ID ─────────────────────────────────
 // ── 관리자 모드 ───────────────────────────────────────────────
-let isAdminMode = sessionStorage.getItem('adminMode') === '1';
+let isAdminMode = localStorage.getItem('mobAdminMode') === '1';
 const ADMIN_PW = '2689';
 
 function toggleAdminMode() {
   if (isAdminMode) {
     isAdminMode = false;
-    sessionStorage.removeItem('adminMode');
+    localStorage.removeItem('mobAdminMode');
     document.getElementById('btn-admin').classList.remove('active');
     document.getElementById('tl-sub-text').textContent = (LANG_MAP[currentLang]||LANG_MAP.ko).myTrips||'나의 여행 계획';
     showTripListScreen();
@@ -3482,7 +3482,7 @@ function confirmAdminPw() {
   const _at = LANG_MAP[currentLang]||LANG_MAP.ko;
   if (val === ADMIN_PW) {
     isAdminMode = true;
-    sessionStorage.setItem('adminMode', '1');
+    localStorage.setItem('mobAdminMode', '1');
     document.getElementById('admin-pw-overlay').style.display = 'none';
     document.getElementById('admin-pw-input').value = '';
     document.getElementById('admin-pw-error').style.display = 'none';
@@ -4761,7 +4761,7 @@ async function tryAuth() {
     await firebase.auth().signInAnonymously();
     isAuthenticated = true;
     // 세션 동안 재입력 방지
-    sessionStorage.setItem('authOk', '1');
+    localStorage.setItem('mobAuthOk', '1');
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('loading').style.display = 'flex';
     await realInit();
@@ -4771,7 +4771,7 @@ async function tryAuth() {
     // 오프라인이면 로컬 데이터로 진행
     if (!navigator.onLine) {
       isAuthenticated = true;
-      sessionStorage.setItem('authOk', '1');
+      localStorage.setItem('mobAuthOk', '1');
       document.getElementById('auth-gate').style.display = 'none';
       document.getElementById('loading').style.display = 'flex';
       await realInit();
@@ -4783,7 +4783,7 @@ async function tryAuth() {
 async function init() {
   // 이미 Firebase Auth 세션이 있거나, 이번 세션에서 인증 통과했으면 바로 진행
   const user = firebase.auth().currentUser;
-  const sessionOk = sessionStorage.getItem('authOk') === '1';
+  const sessionOk = localStorage.getItem('mobAuthOk') === '1';
 
   if (user || sessionOk) {
     isAuthenticated = true;
@@ -4797,7 +4797,7 @@ async function init() {
     firebase.auth().onAuthStateChanged(async (u) => {
       if (u) {
         isAuthenticated = true;
-        sessionStorage.setItem('authOk', '1');
+        localStorage.setItem('mobAuthOk', '1');
         await realInit();
       } else {
         showAuthGate();
@@ -11595,7 +11595,7 @@ function mobTab(tab) {
   });
 
   // 관리자 배지 / 새로고침 버튼
-  const isAdmin = mobIsAdmin || sessionStorage.getItem('adminMode') === '1';
+  const isAdmin = mobIsAdmin || localStorage.getItem('mobAdminMode') === '1';
   const badge   = document.getElementById('mob-admin-badge');
   const refresh = document.getElementById('mob-admin-refresh-btn');
   if (badge)   badge.style.display   = isAdmin ? 'block' : 'none';
@@ -11614,7 +11614,7 @@ function mobRenderTripList() {
   if (!container) return;
 
   // 관리자 배지 + 새로고침 버튼 표시
-  const isAdmin = mobIsAdmin || sessionStorage.getItem('adminMode') === '1';
+  const isAdmin = mobIsAdmin || localStorage.getItem('mobAdminMode') === '1';
   const badge   = document.getElementById('mob-admin-badge');
   const refresh = document.getElementById('mob-admin-refresh-btn');
   if (badge)   badge.style.display   = isAdmin ? 'block' : 'none';
@@ -11661,7 +11661,7 @@ function mobRenderTripList() {
     const nights = trip.startDate && trip.endDate
       ? Math.round((new Date(trip.endDate)-new Date(trip.startDate))/86400000)
       : null;
-    const isAdmin = mobIsAdmin || sessionStorage.getItem('adminMode') === '1';
+    const isAdmin = mobIsAdmin || localStorage.getItem('mobAdminMode') === '1';
     return `<div class="mob-trip-card" onclick="mobSelectTrip('${trip.id}')">
       <div class="mob-trip-icon">${mobTripIcon(trip)}</div>
       <div class="mob-trip-info">
@@ -13491,7 +13491,7 @@ function mobRenderProfile() {
   // 관리자일 때 빌드 배지 표시
   const buildBadgeEl = document.getElementById('mob-build-badge');
   if (buildBadgeEl) {
-    if (mobIsAdmin || sessionStorage.getItem('adminMode') === '1') {
+    if (mobIsAdmin || localStorage.getItem('mobAdminMode') === '1') {
       buildBadgeEl.style.display = 'block';
       // PC build-badge에서 텍스트 가져오기
       const pcBadge = document.getElementById('build-badge');
@@ -13593,8 +13593,8 @@ async function mobAdminRefresh() {
 
 function mobLogout() {
   if (!confirm('로그아웃 할까요?')) return;
-  sessionStorage.removeItem('authOk');
-  sessionStorage.removeItem('adminMode');
+  localStorage.removeItem('mobAuthOk');
+  localStorage.removeItem('mobAdminMode');
   mobIsAdmin = false;
   window.isAdminMode = false;
   window._mobTripList = [];
@@ -13752,7 +13752,7 @@ function mobShowAuthGate() {
     </button>
 
     <div style="font-size:11px;color:#bbb;text-align:center;line-height:1.8;margin-top:4px;">
-      일반 비밀번호 또는 관리자 코드(2689)로 입장<br>
+      일반 비밀번호 또는 관리자 코드로 입장<br>
       <span style="color:#E07A3A;font-weight:600;">관리자는 Firebase의 모든 여행을 볼 수 있어요</span>
     </div>
   `;
@@ -13772,8 +13772,8 @@ async function mobTryAuth() {
   if (pw === MOB_ADMIN_PW) {
     mobIsAdmin = true;
     window.isAdminMode = true;
-    sessionStorage.setItem('adminMode', '1');
-    sessionStorage.setItem('authOk', '1');
+    localStorage.setItem('mobAdminMode', '1');
+    localStorage.setItem('mobAuthOk', '1');
     document.getElementById('mob-auth-gate')?.remove();
     mobShowToast('🔐 관리자 모드로 입장했어요');
     // Firebase 준비 대기 후 로드
@@ -13783,8 +13783,8 @@ async function mobTryAuth() {
 
   if (pw === MOB_AUTH_PW) {
     mobIsAdmin = false;
-    sessionStorage.removeItem('adminMode');
-    sessionStorage.setItem('authOk', '1');
+    localStorage.removeItem('mobAdminMode');
+    localStorage.setItem('mobAuthOk', '1');
     document.getElementById('mob-auth-gate')?.remove();
     mobInit();
     return;
@@ -13816,7 +13816,7 @@ async function mobLoadTripList() {
   try {
     let trips = [];
 
-    if (mobIsAdmin || sessionStorage.getItem('adminMode') === '1') {
+    if (mobIsAdmin || localStorage.getItem('mobAdminMode') === '1') {
       mobIsAdmin = true;
       trips = await withTimeout(window.fbGetAllTrips(), 10000);
     } else {
@@ -13863,40 +13863,54 @@ function mobInit() {
     mobToggleDarkMode();
   }
 
-  // 항상 auth gate 확인 후 진입
-  // sessionStorage는 탭 닫히면 초기화 — 새 탭이면 무조건 게이트 표시
-  const sessionOk = sessionStorage.getItem('authOk') === '1';
-  if (!sessionOk) {
+  // auth 상태 확인 (localStorage — Safari PWA에서도 앱 재실행 후 유지됨)
+  const authOk = localStorage.getItem('mobAuthOk') === '1';
+  if (!authOk) {
     mobShowAuthGate();
     return;
   }
 
-  mobIsAdmin = sessionStorage.getItem('adminMode') === '1';
+  mobIsAdmin = localStorage.getItem('mobAdminMode') === '1';
 
-  // Firebase가 완전히 준비될 때까지 대기 (최대 8초)
+  // Firebase 준비 대기 (최대 10초, 100ms 간격)
   let waited = 0;
   const waitReady = setInterval(() => {
     waited += 100;
-    if (typeof window.fbGetAllTrips === 'function' && typeof window.fbGetTripMeta === 'function') {
+    const ready = typeof window.fbGetAllTrips === 'function'
+               && typeof window.fbGetTripMeta === 'function'
+               && typeof window.fbSaveTrip    === 'function';
+    if (ready) {
       clearInterval(waitReady);
       mobLoadTripList();
-    } else if (waited >= 8000) {
+    } else if (waited >= 10000) {
       clearInterval(waitReady);
-      // Firebase 미준비 — 여행 영감만 표시
       window._mobTripList = [];
       mobRenderTripList();
-      mobShowToast('Firebase 연결 중… 잠시 후 다시 시도해주세요');
+      mobShowToast('⚠️ 네트워크 연결을 확인해주세요');
     }
   }, 100);
 }
 </script>
 <script>
-// 모바일 초기화 — DOMContentLoaded 후 실행
-// Firebase SDK는 동기 스크립트이므로 DOMContentLoaded 시점엔 이미 로드됨
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', mobInit);
-} else {
-  // 이미 로드된 경우 nextTick으로 실행
-  Promise.resolve().then(mobInit);
-}
+// 모바일 초기화 타이밍 — Safari PWA 포함 모든 환경 대응
+(function() {
+  function tryMobInit() {
+    if (typeof mobInit === 'function') mobInit();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tryMobInit);
+  } else {
+    // 이미 파싱 완료된 경우
+    tryMobInit();
+  }
+  // Safari PWA에서 페이지가 background→foreground 전환 시 재초기화
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && window.innerWidth <= 768) {
+      // mob-app이 이미 떠 있으면 여행 목록만 갱신
+      if (window._mobTripList !== undefined && localStorage.getItem('mobAuthOk') === '1') {
+        if (typeof mobLoadTripList === 'function') mobLoadTripList();
+      }
+    }
+  });
+})();
 </script>
