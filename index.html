@@ -4852,7 +4852,7 @@ async function showTripListScreen() {
     if (archivedTrips.length) {
       const sectionTitle = document.createElement('div');
       sectionTitle.className = 'tl-section-title';
-      sectionTitle.innerHTML = '🗂 지난 여행';
+      sectionTitle.innerHTML = '🕰️ 지난 여행';
       container.appendChild(sectionTitle);
 
       archivedTrips.forEach(meta => {
@@ -11872,7 +11872,7 @@ function mobRenderTripList() {
       font-size:12px;font-weight:700;color:#aaa;letter-spacing:0.5px;
     ">
       <div style="flex:1;height:1px;background:#ede9e2;"></div>
-      🗂 지난 여행
+      🕰️ 지난 여행
       <div style="flex:1;height:1px;background:#ede9e2;"></div>
     </div>`;
     html += pastTrips.map(t => renderCard(t, true)).join('');
