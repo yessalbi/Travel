@@ -4751,6 +4751,11 @@ async function showTripListScreen() {
       return;
     }
 
+    // 시작일 기준 최신순 정렬
+    const byStartDesc = (a, b) => (b.startDate||'').localeCompare(a.startDate||'');
+    trips.sort(byStartDesc);
+    archivedTrips.sort(byStartDesc);
+
     container.innerHTML = '';
 
     // 현재 여행 카드들
@@ -11779,15 +11784,13 @@ function mobRenderTripList() {
   const container = document.getElementById('mob-trip-list');
   if (!container) return;
 
-  // 관리자 배지 + 새로고침 버튼 표시
   const isAdmin = mobIsAdmin || localStorage.getItem('mobAdminMode') === '1';
   const badge   = document.getElementById('mob-admin-badge');
-  const refresh = document.getElementById('mob-admin-refresh-btn');
-  if (badge)   badge.style.display   = isAdmin ? 'block' : 'none';
-  if (refresh) refresh.style.display = isAdmin ? 'inline-flex' : 'none';
-  const trips = window._mobTripList || [];
+  if (badge) badge.style.display = isAdmin ? 'block' : 'none';
 
-  // 인사말 갱신
+  const allTrips = window._mobTripList || [];
+
+  // 인사말
   const greetEl = document.getElementById('mob-greeting');
   if (greetEl) {
     const h = new Date().getHours();
@@ -11795,7 +11798,7 @@ function mobRenderTripList() {
     greetEl.innerHTML = `${greet} ✈️<br><small style="font-size:14px;font-weight:400;color:#999;">다음 여행을 계획해볼까요?</small>`;
   }
 
-  if (!trips.length) {
+  if (!allTrips.length) {
     container.innerHTML = `<div class="mob-empty-state" style="padding:30px 0;">
       <div style="font-size:40px;">✈️</div>
       <div style="font-weight:700;margin:8px 0 4px;">아직 여행이 없어요</div>
@@ -11805,10 +11808,24 @@ function mobRenderTripList() {
     return;
   }
 
-  const filtered = mobCurrentFilter === 'all' ? trips
-    : trips.filter(t => mobGetTripStatus(t) === mobCurrentFilter);
+  // 시작일 기준 최신순 정렬
+  const byStartDesc = (a, b) => (b.startDate||'').localeCompare(a.startDate||'');
+  const today = new Date().toISOString().slice(0,10);
 
-  if (!filtered.length) {
+  // 지난 여행 = endDate가 오늘보다 전 (isArchived 포함)
+  const isPast = t => t.isArchived || (t.endDate && t.endDate < today && (!t.startDate || t.startDate < today));
+
+  // 필터 적용
+  let activeTrips, pastTrips;
+  if (mobCurrentFilter === 'all') {
+    activeTrips = allTrips.filter(t => !isPast(t)).sort(byStartDesc);
+    pastTrips   = allTrips.filter(t =>  isPast(t)).sort(byStartDesc);
+  } else {
+    activeTrips = allTrips.filter(t => !isPast(t) && mobGetTripStatus(t) === mobCurrentFilter).sort(byStartDesc);
+    pastTrips   = [];
+  }
+
+  if (!activeTrips.length && !pastTrips.length) {
     container.innerHTML = `<div class="mob-empty-state" style="padding:24px 0;">
       <div style="font-size:32px;">🔍</div>
       <div style="font-weight:700;margin:8px 0 4px;">해당 여행이 없어요</div>
@@ -11816,27 +11833,20 @@ function mobRenderTripList() {
     return;
   }
 
-  container.innerHTML = filtered.map(trip => {
-    const status = mobGetTripStatus(trip);
+  const renderCard = (trip, isPastCard) => {
+    const status = isPastCard ? 'done' : mobGetTripStatus(trip);
     const statusMap   = { ongoing:'여행 중', upcoming:'예정', done:'완료' };
     const statusColor = { ongoing:'#3AAF7A', upcoming:'#3A8FE0', done:'#aaa' };
-    const label = statusMap[status] || '';
+    const label = isPastCard ? '완료' : (statusMap[status] || '');
     const color = statusColor[status] || '#999';
     const nights = trip.startDate && trip.endDate
-      ? Math.round((new Date(trip.endDate)-new Date(trip.startDate))/86400000)
-      : null;
-    const isAdmin = mobIsAdmin || localStorage.getItem('mobAdminMode') === '1';
-
-    // PC와 동일한 color 매핑
-    const colorMap = {
-      red:'#E8430A', blue:'#1565C0', green:'#2E7D32',
-      purple:'#6A1B9A', amber:'#F57F17', pink:'#AD1457', teal:'#00695C',
-    };
-    const cardColor  = trip.color ? (colorMap[trip.color] || '') : '';
+      ? Math.round((new Date(trip.endDate)-new Date(trip.startDate))/86400000) : null;
+    const colorMap = { red:'#E8430A', blue:'#1565C0', green:'#2E7D32', purple:'#6A1B9A', amber:'#F57F17', pink:'#AD1457', teal:'#00695C' };
+    const cardColor   = trip.color ? (colorMap[trip.color] || '') : '';
     const borderStyle = cardColor ? `border-left:3.5px solid ${cardColor};` : 'border-left:3.5px solid #ede9e2;';
-    const iconBg     = cardColor ? `background:${cardColor}18;` : 'background:#f5f3ee;';
-
-    return `<div class="mob-trip-card" onclick="mobSelectTrip('${trip.id}')" style="${borderStyle}">
+    const iconBg      = cardColor ? `background:${cardColor}18;` : 'background:#f5f3ee;';
+    const opacity     = isPastCard ? 'opacity:0.7;' : '';
+    return `<div class="mob-trip-card" onclick="mobSelectTrip('${trip.id}')" style="${borderStyle}${opacity}">
       <div class="mob-trip-icon" style="${iconBg}">${mobTripIcon(trip)}</div>
       <div class="mob-trip-info">
         <div class="mob-trip-name">${trip.title || '(제목 없음)'}</div>
@@ -11844,9 +11854,27 @@ function mobRenderTripList() {
         ${nights !== null ? `<div class="mob-trip-detail">${nights}박${nights+1}일</div>` : ''}
       </div>
       ${label ? `<span class="mob-trip-badge ${status}" style="background:${color}18;color:${color};">${label}</span>` : ''}
-      ${isAdmin ? `<button class="mob-trip-del-btn" onclick="event.stopPropagation();mobAdminDeleteTrip('${trip.id}','${(trip.title||'(제목 없음)').replace(/'/g,"\\'")}')">🗑️</button>` : ''}
+      ${isAdmin ? `<button class="mob-trip-del-btn" onclick="event.stopPropagation();mobAdminDeleteTrip('${trip.id}','${(trip.title||'').replace(/'/g,"\\'")}')">🗑️</button>` : ''}
     </div>`;
-  }).join('');
+  };
+
+  let html = activeTrips.map(t => renderCard(t, false)).join('');
+
+  // 지난 여행 구분 섹션
+  if (pastTrips.length) {
+    html += `<div style="
+      display:flex;align-items:center;gap:8px;
+      margin:18px 0 10px;
+      font-size:12px;font-weight:700;color:#aaa;letter-spacing:0.5px;
+    ">
+      <div style="flex:1;height:1px;background:#ede9e2;"></div>
+      🗂 지난 여행
+      <div style="flex:1;height:1px;background:#ede9e2;"></div>
+    </div>`;
+    html += pastTrips.map(t => renderCard(t, true)).join('');
+  }
+
+  container.innerHTML = html;
 }
 
 function mobGetTripStatus(trip) {
