@@ -12812,46 +12812,103 @@ function mobRenderBooking() {
   if (!el) return;
   const d = mobCurrentTripData || {};
 
+  // 서브탭 이름 동적 변경
+  const bookingTab = document.querySelector('.mob-stab[onclick*="\'booking\'"]');
+  if (bookingTab) bookingTab.textContent = d.isDomestic ? '숙소' : '숙소/항공권';
+
+  // ── 국내 여행 ──────────────────────────────────────────────
   if (d.isDomestic) {
-    el.innerHTML = `<div style="padding:12px 0;">
+    el.innerHTML = `<div style="padding:12px 0 80px;">
       <div class="mob-booking-card">
-        <div class="mob-booking-header"><span class="mob-booking-type">🚗 국내 여행</span><span class="mob-booking-status">국내</span></div>
-        ${d.domHotelName?`<div class="mob-booking-name">${d.domHotelName}</div>`:''}
-        ${d.domHotelAddr?`<div class="mob-booking-sub">📍 ${d.domHotelAddr}</div>`:''}
-        ${d.domDepart?`<div class="mob-booking-sub">출발 ${d.domDepart}</div>`:''}
-        ${d.domReturn?`<div class="mob-booking-sub">귀가 ${d.domReturn}</div>`:''}
-        ${!d.domHotelName&&!d.domHotelAddr?'<div style="color:#999;font-size:13px;">숙소 정보 없음</div>':''}
+        <div class="mob-booking-header">
+          <span class="mob-booking-type">🏨 숙소 정보</span>
+        </div>
+        ${d.domHotelName
+          ? `<div class="mob-booking-name">${d.domHotelName}</div>
+             ${d.domHotelAddr ? `<div class="mob-booking-sub">📍 ${d.domHotelAddr}</div>` : ''}
+             ${d.domDepart   ? `<div class="mob-booking-sub">출발 ${d.domDepart}</div>` : ''}
+             ${d.domReturn   ? `<div class="mob-booking-sub">귀가 ${d.domReturn}</div>` : ''}`
+          : '<div style="color:#aaa;font-size:13px;text-align:center;padding:12px 0;">숙소 정보가 없어요</div>'}
       </div>
-      ${d.domHotelLat?`<button class="mob-primary-btn" style="margin-top:8px;" onclick="mobShowHotelOnMap()">🗺️ 숙소 지도에서 보기</button>`:''}
+      ${d.domHotelLat ? `<button class="mob-primary-btn" style="margin-top:8px;" onclick="mobShowHotelOnMap()">🗺️ 숙소 지도에서 보기</button>` : ''}
       <button class="mob-primary-btn" style="margin-top:8px;background:#3D3D38;" onclick="mobOpenTripSetup()">✏️ 숙소 정보 편집</button>
     </div>`;
     return;
   }
 
+  // ── 해외 여행 ──────────────────────────────────────────────
   const cards = [];
-  if (d.flightFrom||d.flightTo||d.flightAirline) {
+
+  // 항공편 카드
+  if (d.flightFrom || d.flightTo || d.flightAirline) {
     cards.push(`<div class="mob-booking-card">
       <div class="mob-booking-header">
         <span class="mob-booking-type">✈️ 출국편</span>
-        ${d.flightAirline?`<span class="mob-booking-status">${d.flightAirline}</span>`:''}
+        ${d.flightAirline ? `<span class="mob-booking-status">${d.flightAirline}</span>` : ''}
       </div>
       <div class="mob-booking-name">${d.flightFrom||'ICN'} → ${d.flightTo||'?'}</div>
-      ${d.flightDepart?`<div class="mob-booking-sub">출발 ${d.flightDepart}${d.flightArrive?' → 도착 '+d.flightArrive:''}</div>`:''}
+      ${d.flightDepart ? `<div class="mob-booking-sub">출발 ${d.flightDepart}${d.flightArrive?' → 도착 '+d.flightArrive:''}</div>` : ''}
     </div>`);
   }
-  if (d.returnFrom||d.returnTo||d.returnAirline) {
+  if (d.returnFrom || d.returnTo || d.returnAirline) {
     cards.push(`<div class="mob-booking-card">
       <div class="mob-booking-header">
         <span class="mob-booking-type">🛬 귀국편</span>
-        ${d.returnAirline?`<span class="mob-booking-status">${d.returnAirline}</span>`:''}
+        ${d.returnAirline ? `<span class="mob-booking-status">${d.returnAirline}</span>` : ''}
       </div>
       <div class="mob-booking-name">${d.returnFrom||'?'} → ${d.returnTo||'ICN'}</div>
-      ${d.returnDepart?`<div class="mob-booking-sub">출발 ${d.returnDepart}${d.returnArrive?' → 도착 '+d.returnArrive:''}</div>`:''}
+      ${d.returnDepart ? `<div class="mob-booking-sub">출발 ${d.returnDepart}${d.returnArrive?' → 도착 '+d.returnArrive:''}</div>` : ''}
+    </div>`);
+  }
+
+  // scheduleData에서 hotel 아이템 추출
+  const sched = window.scheduleData || {};
+  const start = d.startDate || '';
+  const hotelItems = [];
+  Object.entries(sched).forEach(([day, items]) => {
+    if (!Array.isArray(items)) return;
+    items.forEach(item => {
+      if (item.type !== 'hotel') return;
+      const dayNum = parseInt(day);
+      let dateStr = '';
+      if (start) {
+        const dt = new Date(start);
+        dt.setDate(dt.getDate() + dayNum - 1);
+        dateStr = `${dt.getMonth()+1}/${dt.getDate()}(${['일','월','화','수','목','금','토'][dt.getDay()]})`;
+      } else {
+        dateStr = `Day${dayNum}`;
+      }
+      hotelItems.push({ ...item, day: dayNum, dateStr });
+    });
+  });
+
+  if (hotelItems.length) {
+    const rows = hotelItems.map(item => {
+      const isIn  = item.hotelCheckType === 'checkin'  || !item.hotelCheckType;
+      const isOut = item.hotelCheckType === 'checkout';
+      const badge = isIn  ? '<span style="font-size:11px;color:#3A8FE0;font-weight:700;background:#EEF5FF;border-radius:6px;padding:2px 7px;">체크인</span>'
+                  : isOut ? '<span style="font-size:11px;color:#E07A3A;font-weight:700;background:#FFF0E6;border-radius:6px;padding:2px 7px;">체크아웃</span>'
+                  : '';
+      return `<div style="padding:10px 0;border-bottom:1px solid #f0ede8;display:flex;align-items:flex-start;gap:10px;">
+        <span style="font-size:20px;flex-shrink:0;">🏨</span>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+            <span style="font-size:14px;font-weight:700;color:#1a1a18;">${item.name}</span>
+            ${badge}
+          </div>
+          <div style="font-size:12px;color:#aaa;">${item.dateStr}${item.time?' · '+item.time:''}</div>
+          ${item.hotelPrice ? `<div style="font-size:12px;color:#3AAF7A;margin-top:2px;">₩${Number(item.hotelPrice).toLocaleString()}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    cards.push(`<div class="mob-booking-card" style="margin-top:4px;">
+      <div class="mob-booking-header"><span class="mob-booking-type">🏨 숙소 일정</span></div>
+      ${rows}
     </div>`);
   }
 
   // 바우처 완료 항목
-  const allV = [...(window.VOUCHER_ITEMS||[]), ...(window.customVoucherItems||[])];
+  const allV  = [...(window.VOUCHER_ITEMS||[]), ...(window.customVoucherItems||[])];
   const doneV = allV.filter(v => window.voucherData?.[v.id]);
   if (doneV.length) {
     cards.push(`<div class="mob-booking-card" style="margin-top:4px;">
@@ -12868,7 +12925,7 @@ function mobRenderBooking() {
     ${cards.length ? cards.join('') : `<div class="mob-empty-state">
       <div style="font-size:36px;">🎫</div>
       <div style="font-weight:700;margin:8px 0 4px;">예약 정보가 없어요</div>
-      <div style="font-size:13px;color:#999;">여행 정보 편집에서 항공편을 입력하세요</div>
+      <div style="font-size:13px;color:#999;">항공편 편집에서 정보를 입력하세요</div>
     </div>`}
     <button class="mob-primary-btn" style="margin-top:8px;" onclick="mobOpenFlightEdit()">✈️ 항공편 편집</button>
     <button class="mob-primary-btn" style="margin-top:8px;background:#3A8FE0;" onclick="
