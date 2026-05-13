@@ -11273,14 +11273,6 @@ document.addEventListener('keydown', (e) => {
 <div id="mob-app" style="display:none;">
 
   <!-- ══ 글로벌 새로고침 버튼 (모든 화면에서 표시) ══════════ -->
-  <button id="mob-global-refresh" onclick="mobSmartRefresh()"
-    style="position:fixed;top:14px;right:100px;z-index:19998;
-      width:32px;height:32px;border-radius:50%;border:none;
-      background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);
-      box-shadow:0 2px 10px rgba(0,0,0,0.15);
-      font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-      -webkit-tap-highlight-color:transparent;transition:transform .2s;">🔄</button>
-
   <!-- ══ 홈 레이어 ══════════════════════════════════════════ -->
   <div id="mob-home-layer" style="position:absolute;inset:0;display:flex;flex-direction:column;background:#f5f3ee;z-index:1;">
 
@@ -11290,6 +11282,8 @@ document.addEventListener('keydown', (e) => {
         <div class="mob-logo">travel<span>.</span></div>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <div id="mob-admin-badge" style="display:none;font-size:11px;background:#E07A3A;color:#fff;padding:3px 8px;border-radius:10px;font-weight:700;">관리자</div>
+          <button id="mob-global-refresh" onclick="mobSmartRefresh()"
+            style="border:none;background:none;font-size:18px;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent;transition:transform .3s;">🔄</button>
         </div>
       </div>
       <div class="mob-scroll">
@@ -11375,9 +11369,10 @@ document.addEventListener('keydown', (e) => {
     <div class="mob-header" id="mob-trip-layer-header" style="flex-shrink:0;">
       <button onclick="mobCloseTrip()" style="border:none;background:none;font-size:22px;cursor:pointer;padding:4px 8px 4px 0;color:#2c2c2a;-webkit-tap-highlight-color:transparent;">←</button>
       <div style="flex:1;min-width:0;overflow:hidden;">
-        <div id="mob-trip-layer-title" style="font-size:16px;font-weight:700;color:#2c2c2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        <div id="mob-trip-layer-title" style="font-size:16px;font-weight:700;color:#2c2c2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Playfair Display','Gowun Batang',serif;"></div>
         <div id="mob-trip-layer-date" style="font-size:11px;color:#aaa;margin-top:1px;"></div>
       </div>
+      <button onclick="mobSmartRefresh()" style="border:none;background:none;font-size:16px;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent;transition:transform .3s;">🔄</button>
       <button class="mob-icon-btn" onclick="mobSchedMore()">⋯</button>
     </div>
 
@@ -11602,28 +11597,39 @@ function mobStartRealtimeSync(tripId) {
   if (_mobRealtimeUnsub) { _mobRealtimeUnsub(); _mobRealtimeUnsub = null; }
   if (!tripId || typeof db === 'undefined') return;
   let isFirstLoad = true;
-  _mobRealtimeUnsub = db.collection('trips').doc(tripId)
-    .onSnapshot((snap) => {
-      if (isFirstLoad) { isFirstLoad = false; return; }
-      if (!snap.exists || document.querySelector('.mob-sheet')) return;
-      const data = snap.data();
-      if (data.schedule)    window.scheduleData  = data.schedule;
-      if (data.expenseData) window.expenseData   = data.expenseData;
-      if (data.checklist)   window.checklistData = data.checklist;
-      mobCurrentTripData = { ...mobCurrentTripData, ...data };
-      const activeTab = document.querySelector('.mob-detail-tab.active')?.id?.replace('mob-dtab-','');
-      if (activeTab === 'schedule') mobRenderSchedule();
-      if (activeTab === 'saved')    mobRenderSaved();
-      mobShowToast('✨ 다른 사람이 여행을 수정했어요');
-    }, (err) => console.warn('[RealtimeSync]', err.message));
+  try {
+    _mobRealtimeUnsub = db.collection('trips').doc(tripId)
+      .onSnapshot((snap) => {
+        if (isFirstLoad) { isFirstLoad = false; return; }
+        if (!snap.exists || document.querySelector('.mob-sheet')) return;
+        const data = snap.data();
+        if (data.schedule)    window.scheduleData  = data.schedule;
+        if (data.expenseData) window.expenseData   = data.expenseData;
+        if (data.checklist)   window.checklistData = data.checklist;
+        mobCurrentTripData = { ...mobCurrentTripData, ...data };
+        const activeTab = document.querySelector('.mob-detail-tab.active')?.id?.replace('mob-dtab-','');
+        if (activeTab === 'schedule') mobRenderSchedule();
+        if (activeTab === 'saved')    mobRenderSaved();
+        mobShowToast('✨ 다른 사람이 여행을 수정했어요');
+      }, (err) => {
+        // permission-denied 등 에러는 조용히 무시 (오프라인 토스트 방지)
+        if (err.code !== 'permission-denied') {
+          console.warn('[RealtimeSync]', err.message);
+        }
+      });
+  } catch(e) {
+    console.warn('[RealtimeSync init]', e.message);
+  }
 }
 function mobStopRealtimeSync() {
   if (_mobRealtimeUnsub) { _mobRealtimeUnsub(); _mobRealtimeUnsub = null; }
 }
 
 function mobSmartRefresh() {
-  const btn = document.getElementById('mob-global-refresh');
-  if (btn) { btn.style.transform='rotate(360deg)'; btn.style.transition='transform .3s'; }
+  document.querySelectorAll('button[onclick*="mobSmartRefresh"]').forEach(btn => {
+    btn.style.transform = 'rotate(360deg)';
+    btn.style.transition = 'transform .3s';
+  });
   const state = {
     tripId:    mobCurrentTrip || null,
     layerOpen: document.getElementById('mob-trip-layer')?.classList.contains('open') || false,
@@ -11936,6 +11942,9 @@ async function mobCreateTripConfirm() {
   }
 }
 async function mobSelectTrip(tripId) {
+  // 이전 여행 싱크 즉시 중단 (여행 고정 방지)
+  mobStopRealtimeSync();
+
   mobCurrentTrip    = tripId;
   mobCurrentTripData= null;
   window.TRIP_ID    = tripId;
@@ -11944,36 +11953,52 @@ async function mobSelectTrip(tripId) {
   url.searchParams.set('trip', tripId);
   history.replaceState({}, '', url);
 
-  // 상세 레이어 즉시 오픈 — 항상 개요 탭부터
+  // 레이어 오픈 + 로딩 상태 표시
   document.getElementById('mob-trip-layer').classList.add('open');
   document.getElementById('mob-trip-layer-title').textContent = '불러오는 중…';
   document.getElementById('mob-trip-layer-date').textContent = '';
 
-  // 탭 초기화: 항상 일정 탭 > 개요로 리셋
+  // 서브탭 초기화 (렌더는 데이터 로드 후)
   mobCurrentSchedTab = 'overview';
-  mobDetailTab(document.getElementById('mob-dtab-schedule'), 'schedule');
+  // 탭 UI만 전환 (렌더 없이)
+  document.querySelectorAll('.mob-detail-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mob-detail-page').forEach(p => p.classList.remove('active'));
+  document.getElementById('mob-dtab-schedule')?.classList.add('active');
+  document.getElementById('mob-dp-schedule')?.classList.add('active');
+  document.querySelectorAll('.mob-stab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mob-stab-page').forEach(p => p.classList.remove('active'));
+  document.querySelector('.mob-stab[onclick*="\'overview\'"]')?.classList.add('active');
+  document.getElementById('mob-stab-overview')?.classList.add('active');
 
   try {
     const data = await window.fbGetTrip(tripId);
     if (data) {
       mobCurrentTripData = data;
-      if (data.schedule)          window.scheduleData    = data.schedule;
-      if (data.expenseData)       window.expenseData     = data.expenseData;
-      if (data.checklist)         window.checklistData   = data.checklist;
-      if (data.vouchers)          window.voucherData     = data.vouchers;
-      if (data.customCheckItems)  window.customCheckItems  = data.customCheckItems  || [];
-      if (data.customVoucherItems)window.customVoucherItems= data.customVoucherItems|| [];
-      if (data.deletedCheckIds)   window.deletedCheckIds   = new Set(data.deletedCheckIds);
-      if (data.deletedVoucherIds) window.deletedVoucherIds = new Set(data.deletedVoucherIds);
-      if (data.transitModes)      window.transitModes    = data.transitModes;
-      if (data.placesSnapshot)    window.placesData      = data.placesSnapshot;
-      if (data.budgetTotal !== undefined) { const bi=document.getElementById('budget-total-input'); if(bi) bi.value=data.budgetTotal; }
-      if (data.budgetCurrency) { const bs=document.getElementById('budget-currency-select'); if(bs) bs.value=data.budgetCurrency; window.currentBudgetCurrency=data.budgetCurrency; }
+      // 전역 데이터 동기화
+      window.scheduleData     = data.schedule     || {};
+      window.expenseData      = data.expenseData   || {};
+      window.checklistData    = data.checklist     || {};
+      window.voucherData      = data.vouchers      || [];
+      window.customCheckItems   = data.customCheckItems   || [];
+      window.customVoucherItems = data.customVoucherItems || [];
+      window.deletedCheckIds    = new Set(data.deletedCheckIds   || []);
+      window.deletedVoucherIds  = new Set(data.deletedVoucherIds || []);
+      window.transitModes     = data.transitModes  || {};
+      window.placesData       = data.placesSnapshot || [];
+      if (data.budgetTotal !== undefined) {
+        const bi = document.getElementById('budget-total-input');
+        if (bi) bi.value = data.budgetTotal;
+      }
+      if (data.budgetCurrency) {
+        const bs = document.getElementById('budget-currency-select');
+        if (bs) bs.value = data.budgetCurrency;
+        window.currentBudgetCurrency = data.budgetCurrency;
+      }
       if (data.startDate && data.endDate) {
-        window.totalDays = Math.round((new Date(data.endDate)-new Date(data.startDate))/86400000)+1;
+        window.totalDays  = Math.round((new Date(data.endDate)-new Date(data.startDate))/86400000)+1;
         window.currentDay = 1;
       }
-      const sv=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v||'';};
+      const sv = (id,v) => { const el=document.getElementById(id); if(el&&v!==undefined) el.value=v||''; };
       sv('trip-title',data.title); sv('trip-start',data.startDate);
       sv('trip-end',data.endDate); sv('trip-author',data.author); sv('trip-note',data.note);
       const domestic = data.isDomestic ?? (typeof detectDomestic==='function' ? detectDomestic(data.title||'') : false);
@@ -11983,22 +12008,24 @@ async function mobSelectTrip(tripId) {
     } else {
       const snap = await window.offlineLoad?.(tripId);
       if (snap?.data) {
-        mobCurrentTripData = snap.data;
-        if (snap.data.schedule)    window.scheduleData  = snap.data.schedule;
-        if (snap.data.expenseData) window.expenseData   = snap.data.expenseData;
-        if (snap.data.checklist)   window.checklistData = snap.data.checklist;
-        if (snap.data.vouchers)    window.voucherData   = snap.data.vouchers;
+        mobCurrentTripData      = snap.data;
+        window.scheduleData     = snap.data.schedule  || {};
+        window.expenseData      = snap.data.expenseData || {};
+        window.checklistData    = snap.data.checklist || {};
+        window.voucherData      = snap.data.vouchers  || [];
       }
     }
   } catch(e) {
     console.warn('mobSelectTrip 오류:', e);
-    try { const snap=await window.offlineLoad?.(tripId); if(snap?.data){mobCurrentTripData=snap.data;window.scheduleData=snap.data.schedule||{};} } catch(_){}
+    try {
+      const snap = await window.offlineLoad?.(tripId);
+      if (snap?.data) { mobCurrentTripData=snap.data; window.scheduleData=snap.data.schedule||{}; }
+    } catch(_){}
   }
 
+  // 데이터 로드 완료 후 헤더 + 렌더
   mobUpdateLayerHeader();
   mobRenderSchedule();
-
-  // 실시간 협업 싱크 시작
   mobStartRealtimeSync(tripId);
 
   // 읽기 전용 권한 체크
@@ -12007,16 +12034,11 @@ async function mobSelectTrip(tripId) {
     window.fbGetUser(userId).then(user => {
       const access = user?.tripPerms?.[tripId] || 'edit';
       window._mobTripAccess = access;
-      // 읽기 전용이면 편집 버튼 숨기기
       const addBtn = document.querySelector('.mob-add-sched-btn');
-      const moreBtn = document.querySelector('#mob-trip-layer-header .mob-icon-btn');
       if (access === 'read') {
         if (addBtn) addBtn.style.display = 'none';
-        // 헤더에 읽기전용 배지 표시
         const dateEl = document.getElementById('mob-trip-layer-date');
-        if (dateEl && !dateEl.textContent.includes('읽기')) {
-          dateEl.textContent += '  👁️ 읽기 전용';
-        }
+        if (dateEl && !dateEl.textContent.includes('읽기')) dateEl.textContent += '  👁️ 읽기 전용';
       } else {
         if (addBtn) addBtn.style.display = '';
         window._mobTripAccess = 'edit';
@@ -12201,11 +12223,15 @@ function mobRenderOverview() {
   const typeRows  = Object.entries(typeCnt).map(([k,v]) =>
     `<span class="mob-tl-card-badge">${typeEmoji[k]||'📌'} ${v}곳</span>`).join('');
 
-  // 체크리스트 진행률
-  const checklist   = window.checklistData || [];
-  const totalCheck  = checklist.length;
-  const doneCheck   = checklist.filter(i => i.checked).length;
-  const checkPct    = totalCheck ? Math.round(doneCheck/totalCheck*100) : 0;
+  // 체크리스트 진행률 — CHECKLIST_ITEMS 기반 (객체 형태)
+  const checkItems    = typeof CHECKLIST_ITEMS !== 'undefined' ? CHECKLIST_ITEMS : [];
+  const deletedIds    = window.deletedCheckIds || new Set();
+  const customItems   = window.customCheckItems || [];
+  const allCheckItems = [...checkItems.filter(i => !deletedIds.has(i.id)), ...customItems];
+  const checkData     = window.checklistData || {};
+  const totalCheck    = allCheckItems.length;
+  const doneCheck     = allCheckItems.filter(i => checkData[i.id]).length;
+  const checkPct      = totalCheck ? Math.round(doneCheck/totalCheck*100) : 0;
 
   // 예산
   const budget   = d.budgetTotal || 0;
@@ -13999,7 +14025,6 @@ function mobGoToPC() {
     @media (max-width: 768px) {
       #mob-app { display: none !important; }
       #main, #header, #trip-list-screen { display: flex !important; }
-      #mob-global-refresh { display: none !important; }
     }
     #mob-app { display: none !important; }
   `;
