@@ -3373,14 +3373,14 @@ input[type="time"].mob-inp {
       position:absolute;top:12px;right:12px;z-index:10;
       display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:70%;
     "></div>
-    <!-- 경로 업데이트 버튼 — map-day-filter와 별도 (renderMapDayFilter에 덮어씌워지지 않도록) -->
+    <!-- 경로 업데이트 버튼 — 지도 중앙 상단 고정 -->
     <button id="pc-route-update-btn" onclick="invalidateAllRouteCache()"
       title="저장된 경로를 지우고 새로 불러옵니다"
-      style="position:absolute;top:12px;left:12px;z-index:10;
+      style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:10;
         border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
-        font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;
-        color:var(--ink3);white-space:nowrap;display:none;
-        box-shadow:0 1px 6px rgba(0,0,0,0.08);"
+        font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;
+        color:var(--ink3);white-space:nowrap;
+        box-shadow:0 1px 6px rgba(0,0,0,0.1);"
       onmouseover="this.style.background='var(--stone)';this.style.color='var(--accent)'"
       onmouseout="this.style.background='var(--white)';this.style.color='var(--ink3)'">↺ 경로 업데이트</button>
     <!-- 오프라인 지도 대체 레이어 -->
@@ -9680,9 +9680,6 @@ let mapDayFilter = 'all'; // 'all' | 숫자
 function renderMapDayFilter() {
   const el = document.getElementById('map-day-filter');
   if (!el) return;
-  // 경로 업데이트 버튼 표시
-  const routeBtn = document.getElementById('pc-route-update-btn');
-  if (routeBtn) routeBtn.style.display = '';
   const days = Object.keys(scheduleData || {}).map(Number).sort((a,b)=>a-b);
   if (!days.length) { el.innerHTML = ''; return; }
 
@@ -11508,21 +11505,22 @@ document.addEventListener('keydown', (e) => {
         </div>
         <div class="mob-stab-page" id="mob-stab-map">
           <div class="mob-day-chips" id="mob-map-day-chips"></div>
-          <div id="mob-map-view" style="position:relative; flex:1;"></div>
+          <div id="mob-map-view" style="position:relative; flex:1;">
+            <!-- 경로 업데이트 버튼 — 지도 중앙 상단 -->
+            <button onclick="mobInvalidateAllRouteCache()"
+              style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:10;
+                border:1.5px solid #e0ddd6;background:#fff;cursor:pointer;
+                font-size:11px;font-weight:600;padding:5px 10px;border-radius:8px;
+                color:#888;line-height:1;white-space:nowrap;
+                box-shadow:0 1px 6px rgba(0,0,0,0.1);
+                -webkit-tap-highlight-color:transparent;">↺ 경로 업데이트</button>
+          </div>
         </div>
       </div>
 
       <!-- 지도 탭 콘텐츠 -->
       <div class="mob-detail-page" id="mob-dp-map">
         <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
-        <!-- 경로 업데이트 버튼 — 지도 우상단 -->
-        <button onclick="mobInvalidateAllRouteCache()"
-          style="position:absolute;top:10px;right:10px;z-index:11;
-            border:1.5px solid #e0ddd6;background:#fff;cursor:pointer;
-            font-size:11px;font-weight:600;padding:5px 9px;border-radius:8px;
-            color:#888;line-height:1;white-space:nowrap;
-            box-shadow:0 1px 6px rgba(0,0,0,0.12);
-            -webkit-tap-highlight-color:transparent;">↺ 경로 업데이트</button>
         <div class="mob-map-searchbar">
           <input id="mob-map-search" placeholder="장소 검색..." class="mob-map-input"
             onkeydown="if(event.key==='Enter'){event.preventDefault();mobMapSearch();}">
