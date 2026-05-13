@@ -11311,7 +11311,7 @@ document.addEventListener('keydown', (e) => {
           <div style="width:1px;height:16px;background:#e0ddd6;margin:0 2px;align-self:center;"></div>
           <button class="mob-filter" onclick="mobFilterTrips(this,'upcoming')">예정</button>
           <button class="mob-filter" onclick="mobFilterTrips(this,'ongoing')">여행 중</button>
-          <button class="mob-filter" onclick="mobFilterTrips(this,'done')">완료</button>
+          <button class="mob-filter" onclick="mobFilterTrips(this,'done')">지난 여행</button>
         </div>
 
         <!-- 내 여행 목록 -->
@@ -11820,6 +11820,10 @@ function mobRenderTripList() {
   if (mobCurrentFilter === 'all') {
     activeTrips = allTrips.filter(t => !isPast(t)).sort(byStartDesc);
     pastTrips   = allTrips.filter(t =>  isPast(t)).sort(byStartDesc);
+  } else if (mobCurrentFilter === 'done') {
+    // "지난 여행" 필터 — isPast인 것만 표시 (구분선 없이 바로)
+    activeTrips = allTrips.filter(t => isPast(t)).sort(byStartDesc);
+    pastTrips   = [];
   } else {
     activeTrips = allTrips.filter(t => !isPast(t) && mobGetTripStatus(t) === mobCurrentFilter).sort(byStartDesc);
     pastTrips   = [];
@@ -11858,7 +11862,7 @@ function mobRenderTripList() {
     </div>`;
   };
 
-  let html = activeTrips.map(t => renderCard(t, false)).join('');
+  let html = activeTrips.map(t => renderCard(t, mobCurrentFilter === 'done' || isPast(t))).join('');
 
   // 지난 여행 구분 섹션
   if (pastTrips.length) {
