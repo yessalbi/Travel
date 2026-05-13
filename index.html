@@ -12091,13 +12091,16 @@ function mobSchedTab(el, tab) {
 function mobSchedMore() {
   const tripId = mobCurrentTrip;
   if (!tripId) return;
+  const isReadOnly = window._mobTripAccess === 'read';
   mobOpenSheet('mob-more-sheet', `
     <div class="mob-handle"></div>
     <div style="font-size:15px;font-weight:700;margin-bottom:14px;">여행 관리</div>
-    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobShareTrip('${tripId}')">🔗 여행 링크 공유하기</button>
-    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobSaveTripOffline('${tripId}')">📥 오프라인 저장하기</button>
-    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobArchiveTripMob('${tripId}')"  style="color:#888;">🗂 보관함으로 이동</button>
-    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet')"  style="color:#555;border-top:1px solid #f0ede8;margin-top:4px;">취소</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobOpenTripSetup()">✏️ 여행 정보 편집</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobShareTrip('${tripId}')">🔗 여행 공유하기</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobSaveTripOffline('${tripId}')">📥 오프라인 저장</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobArchiveTripMob('${tripId}')" style="color:#888;">🗂 보관함으로 이동</button>
+    ${!isReadOnly ? `<button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet');mobAdminDeleteTrip('${tripId}','')" style="color:#E53935;">🗑️ 여행 삭제</button>` : ''}
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-more-sheet')" style="color:#555;border-top:1px solid #f0ede8;margin-top:4px;">취소</button>
   `);
 }
 
@@ -14503,6 +14506,12 @@ function mobInit() {
   }
 
   mobIsAdmin = localStorage.getItem('mobAdminMode') === '1';
+
+  // iOS 뒤로가기 제스처 초기화 (한 번만)
+  if (!window._mobBackGestureInit) {
+    window._mobBackGestureInit = true;
+    mobInitBackGesture();
+  }
 
   // Firebase 준비 대기 (최대 10초, 100ms 간격)
   let waited = 0;
