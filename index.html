@@ -3372,15 +3372,17 @@ input[type="time"].mob-inp {
     <div id="map-day-filter" style="
       position:absolute;top:12px;right:12px;z-index:10;
       display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:70%;
-    ">
-      <!-- 경로 업데이트 버튼 — 날짜 칩 왼쪽 -->
-      <button onclick="invalidateAllRouteCache()" title="저장된 경로 캐시를 지우고 새로 불러옵니다"
-        style="border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
-               font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;
-               transition:all .14s;color:var(--ink3);white-space:nowrap;flex-shrink:0;"
-        onmouseover="this.style.background='var(--stone)';this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'"
-        onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--sand)';this.style.color='var(--ink3)'">↺ 경로 업데이트</button>
-    </div>
+    "></div>
+    <!-- 경로 업데이트 버튼 — map-day-filter와 별도 (renderMapDayFilter에 덮어씌워지지 않도록) -->
+    <button id="pc-route-update-btn" onclick="invalidateAllRouteCache()"
+      title="저장된 경로를 지우고 새로 불러옵니다"
+      style="position:absolute;top:12px;left:12px;z-index:10;
+        border:1.5px solid var(--sand);background:var(--white);cursor:pointer;
+        font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;
+        color:var(--ink3);white-space:nowrap;display:none;
+        box-shadow:0 1px 6px rgba(0,0,0,0.08);"
+      onmouseover="this.style.background='var(--stone)';this.style.color='var(--accent)'"
+      onmouseout="this.style.background='var(--white)';this.style.color='var(--ink3)'">↺ 경로 업데이트</button>
     <!-- 오프라인 지도 대체 레이어 -->
     <div id="offline-map-layer" style="display:none;position:absolute;inset:0;z-index:5;">
       <img id="offline-map-img" style="width:100%;height:100%;object-fit:cover;" />
@@ -9678,6 +9680,9 @@ let mapDayFilter = 'all'; // 'all' | 숫자
 function renderMapDayFilter() {
   const el = document.getElementById('map-day-filter');
   if (!el) return;
+  // 경로 업데이트 버튼 표시
+  const routeBtn = document.getElementById('pc-route-update-btn');
+  if (routeBtn) routeBtn.style.display = '';
   const days = Object.keys(scheduleData || {}).map(Number).sort((a,b)=>a-b);
   if (!days.length) { el.innerHTML = ''; return; }
 
@@ -11503,32 +11508,32 @@ document.addEventListener('keydown', (e) => {
         </div>
         <div class="mob-stab-page" id="mob-stab-map">
           <div class="mob-day-chips" id="mob-map-day-chips"></div>
-          <div id="mob-map-view" style="position:relative; flex:1;">
-            <button onclick="mobInvalidateAllRouteCache()"
-              style="position:absolute;top:10px;right:10px;z-index:10;
-                border:1.5px solid #e0ddd6;background:#fff;cursor:pointer;
-                font-size:11px;font-weight:600;padding:5px 9px;border-radius:8px;
-                color:#888;line-height:1;white-space:nowrap;
-                box-shadow:0 1px 6px rgba(0,0,0,0.1);
-                -webkit-tap-highlight-color:transparent;">↺ 경로 업데이트</button>
-          </div>
+          <div id="mob-map-view" style="position:relative; flex:1;"></div>
         </div>
       </div>
 
       <!-- 지도 탭 콘텐츠 -->
       <div class="mob-detail-page" id="mob-dp-map">
         <div id="mob-fullmap" style="position:absolute;inset:0;"></div>
+        <!-- 경로 업데이트 버튼 — 지도 우상단 -->
+        <button onclick="mobInvalidateAllRouteCache()"
+          style="position:absolute;top:10px;right:10px;z-index:11;
+            border:1.5px solid #e0ddd6;background:#fff;cursor:pointer;
+            font-size:11px;font-weight:600;padding:5px 9px;border-radius:8px;
+            color:#888;line-height:1;white-space:nowrap;
+            box-shadow:0 1px 6px rgba(0,0,0,0.12);
+            -webkit-tap-highlight-color:transparent;">↺ 경로 업데이트</button>
         <div class="mob-map-searchbar">
           <input id="mob-map-search" placeholder="장소 검색..." class="mob-map-input"
             onkeydown="if(event.key==='Enter'){event.preventDefault();mobMapSearch();}">
           <button onclick="mobMapSearch()" style="border:none;background:none;font-size:18px;padding:0 8px;cursor:pointer;">🔍</button>
         </div>
         <div class="mob-map-cats">
-          <button class="mob-cat active" onclick="mobMapCat(this,'food')">맛집</button>
-          <button class="mob-cat" onclick="mobMapCat(this,'cafe')">카페</button>
-          <button class="mob-cat" onclick="mobMapCat(this,'convenience')">편의점</button>
-          <button class="mob-cat" onclick="mobMapCat(this,'hotel')">숙소</button>
-          <button class="mob-cat" onclick="mobMapCat(this,'shop')">쇼핑</button>
+          <button class="mob-cat" onclick="mobMapCatToggle(this,'food')">맛집</button>
+          <button class="mob-cat" onclick="mobMapCatToggle(this,'cafe')">카페</button>
+          <button class="mob-cat" onclick="mobMapCatToggle(this,'convenience')">편의점</button>
+          <button class="mob-cat" onclick="mobMapCatToggle(this,'hotel')">숙소</button>
+          <button class="mob-cat" onclick="mobMapCatToggle(this,'shop')">쇼핑</button>
         </div>
         <div class="mob-places-sheet" id="mob-places-sheet">
           <div id="mob-places-handle" style="padding:12px 0 4px;touch-action:none;cursor:grab;">
@@ -11576,7 +11581,7 @@ let mobMap            = null;
 let mobMapInitialized = false;
 let mobCurrentFilter  = 'all';
 let mobIsDarkMode     = false;
-let mobCurrentCat     = 'food';
+let mobCurrentCat     = null; // 기본값 없음 — 지도 진입 시 칩 비활성
 let mobSchedMap       = null;   // 일정 탭 내부 지도
 function mobInspireDetail(rawIdx) {
   // 현재 렌더된 순서로 인덱스 재계산
@@ -11856,6 +11861,11 @@ function mobDetailTab(el, tab) {
   if (tab === 'schedule') mobRenderSchedule();
   if (tab === 'map') {
     mobInitFullMap();
+    // 지도 탭 진입 시 칩/시트 초기화
+    document.querySelectorAll('.mob-cat').forEach(b => b.classList.remove('active'));
+    mobCurrentCat = null;
+    const sheet = document.getElementById('mob-places-sheet');
+    if (sheet) { sheet.classList.add('collapsed'); sheet.style.maxHeight = ''; }
     // 이전 검색 상태 복원
     if (window._mobMapState?.query) {
       const input = document.getElementById('mob-map-search');
@@ -13698,9 +13708,25 @@ async function mobDrawRouteSegment(from, to, day, idx, dayCol) {
 }
 
 function mobMapCat(el, cat) {
+  // 하위 호환 — mobMapCatToggle 위임
+  mobMapCatToggle(el, cat);
+}
+
+function mobMapCatToggle(el, cat) {
+  const sheet = document.getElementById('mob-places-sheet');
+  // 이미 활성화된 칩을 다시 누르면 → 비활성화 + 시트 접기
+  if (mobCurrentCat === cat) {
+    el.classList.remove('active');
+    mobCurrentCat = null;
+    if (sheet) { sheet.classList.add('collapsed'); sheet.style.maxHeight = ''; }
+    return;
+  }
+  // 다른 칩 활성화
   document.querySelectorAll('.mob-cat').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   mobCurrentCat = cat;
+  // 시트 펼치기
+  if (sheet) { sheet.classList.remove('collapsed'); sheet.style.maxHeight = ''; }
   mobLoadPlaces();
 }
 
@@ -13719,7 +13745,7 @@ function mobMapSearch() {
 const MOB_TYPE_MAP = { food:'restaurant', cafe:'cafe', hotel:'lodging', shop:'shopping_mall', convenience:'convenience_store' };
 
 function mobLoadPlaces() {
-  if (!mobMap || !window.google) return;
+  if (!mobMap || !window.google || !mobCurrentCat) return; // 칩 선택 없으면 검색 안 함
   const svc = new google.maps.places.PlacesService(mobMap);
   if (mobCurrentCat === 'all') {
     svc.nearbySearch({ location:mobMap.getCenter(), rankBy:google.maps.places.RankBy.PROMINENCE, type:'tourist_attraction' },
