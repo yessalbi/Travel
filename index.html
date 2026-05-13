@@ -2581,9 +2581,7 @@ html, body {
 #mob-app #mob-places-sheet-title {
   font-family: 'Playfair Display', 'Gowun Batang', serif;
 }
-#mob-app /* 서브서브탭 — 상위 탭(일정/지도/준비물)과 동일 너비로 균등 배분 */
-.mob-stab-bar { justify-content: stretch; }
-.mob-stab { flex: 1; text-align: center; }
+#mob-app /* 서브서브탭 — 위 CSS 블록으로 통합됨 */
 /* PC: 완전 숨김 */
 #mob-trip-layer {
   display: none;
@@ -2721,6 +2719,18 @@ html, body {
 .mob-inp-lg { padding:11px 14px; }
 textarea.mob-inp { resize:vertical; }
 select.mob-inp { padding:10px 8px;cursor:pointer; }
+/* date/time input 크기 통일 — iOS에서 시스템 UI가 커지는 것 방지 */
+input[type="date"].mob-inp,
+input[type="time"].mob-inp {
+  height: 40px;
+  padding: 0 10px;
+  font-size: 13px;
+  line-height: 40px;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
 .mob-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;}
 .mob-cancel-btn{width:100%;margin-top:8px;padding:12px;border:1.5px solid #e0ddd6;background:#fff;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;}
 /* mob-dp-map, mob-dp-saved — 위 CSS 블록에 통합됨 */
@@ -2800,17 +2810,18 @@ select.mob-inp { padding:10px 8px;cursor:pointer; }
 .mob-stab-bar {
   display: flex; background: #faf9f6;
   border-bottom: 1px solid #ede9e2;
-  overflow-x: auto; scrollbar-width: none;
   flex-shrink: 0;
 }
-.mob-stab-bar::-webkit-scrollbar { display: none; }
 .mob-stab {
-  flex-shrink: 0; padding: 10px 16px;
+  flex: 1;
+  padding: 10px 4px;
   border: none; background: none;
-  font-size: 12px; font-weight: 600; color: #aaa;
+  font-size: 11px; font-weight: 600; color: #aaa;
   border-bottom: 2px solid transparent;
   cursor: pointer; font-family: inherit;
   transition: all .12s;
+  white-space: nowrap;
+  text-align: center;
 }
 .mob-stab.active { color: #E07A3A; border-bottom-color: #E07A3A; }
 /* 필터 칩 */
@@ -11701,6 +11712,10 @@ function mobUpdateLayerHeader() {
   if (dateEl)  dateEl.textContent  = start && end
     ? start.replace(/-/g,'.') + ' ~ ' + end.replace(/-/g,'.') + (nights!==null ? ` · ${nights}박${nights+1}일` : '')
     : '날짜 미설정';
+
+  // 국내/해외에 따라 서브탭 이름 즉시 반영
+  const bookingTab = document.querySelector('.mob-stab[onclick*="\'booking\'"]');
+  if (bookingTab) bookingTab.textContent = d.isDomestic ? '숙소' : '숙소/항공권';
 }
 
 function mobCloseTrip() {
@@ -12921,17 +12936,23 @@ function mobRenderBooking() {
     </div>`);
   }
 
+  // 항공편 카드 먼저, 그 아래 편집 버튼
+  const flightSection = cards.length
+    ? `${cards.filter((_, i) => i < 2).join('')}
+       <button class="mob-primary-btn" style="margin-top:4px;" onclick="mobOpenFlightEdit()">✈️ 항공편 편집</button>`
+    : `<div class="mob-empty-state">
+        <div style="font-size:36px;">✈️</div>
+        <div style="font-weight:700;margin:8px 0 4px;">항공편 정보가 없어요</div>
+        <div style="font-size:13px;color:#999;">아래 버튼으로 입력하세요</div>
+      </div>
+      <button class="mob-primary-btn" style="margin-top:4px;" onclick="mobOpenFlightEdit()">✈️ 항공편 편집</button>`;
+
+  // 숙소/바우처 카드 (항공편 제외)
+  const hotelVoucherCards = cards.slice(cards.findIndex((_, i) => i >= 2) >= 0 ? 2 : cards.length);
+
   el.innerHTML = `<div style="padding:12px 0 80px;">
-    ${cards.length ? cards.join('') : `<div class="mob-empty-state">
-      <div style="font-size:36px;">🎫</div>
-      <div style="font-weight:700;margin:8px 0 4px;">예약 정보가 없어요</div>
-      <div style="font-size:13px;color:#999;">항공편 편집에서 정보를 입력하세요</div>
-    </div>`}
-    <button class="mob-primary-btn" style="margin-top:8px;" onclick="mobOpenFlightEdit()">✈️ 항공편 편집</button>
-    <button class="mob-primary-btn" style="margin-top:8px;background:#3A8FE0;" onclick="
-      mobDetailTab(document.getElementById('mob-dtab-saved'),'saved');
-      setTimeout(()=>{ mobSavedTab(document.querySelectorAll('.mob-saved-tab')[1],'voucher'); },100);
-    ">🎫 바우처 관리</button>
+    ${flightSection}
+    ${hotelVoucherCards.join('')}
   </div>`;
 }
 
