@@ -11503,18 +11503,17 @@ document.addEventListener('keydown', (e) => {
         <div class="mob-stab-page" id="mob-stab-budget">
           <div class="mob-scroll" id="mob-budget-content"></div>
         </div>
-        <div class="mob-stab-page" id="mob-stab-map">
+        <div class="mob-stab-page" id="mob-stab-map" style="position:relative;">
           <div class="mob-day-chips" id="mob-map-day-chips"></div>
-          <div id="mob-map-view" style="position:relative; flex:1;">
-            <!-- 경로 업데이트 버튼 — 지도 중앙 상단 -->
-            <button onclick="mobInvalidateAllRouteCache()"
-              style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:10;
-                border:1.5px solid #e0ddd6;background:#fff;cursor:pointer;
-                font-size:11px;font-weight:600;padding:5px 10px;border-radius:8px;
-                color:#888;line-height:1;white-space:nowrap;
-                box-shadow:0 1px 6px rgba(0,0,0,0.1);
-                -webkit-tap-highlight-color:transparent;">↺ 경로 업데이트</button>
-          </div>
+          <div id="mob-map-view" style="flex:1;"></div>
+          <!-- 경로 업데이트 버튼 — mob-map-view 밖에 오버레이 (지도 생성 시 덮어쓰기 방지) -->
+          <button onclick="mobInvalidateAllRouteCache()"
+            style="position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:20;
+              border:1.5px solid #e0ddd6;background:rgba(255,255,255,0.95);cursor:pointer;
+              font-size:11px;font-weight:600;padding:6px 12px;border-radius:8px;
+              color:#888;white-space:nowrap;
+              box-shadow:0 2px 8px rgba(0,0,0,0.12);
+              -webkit-tap-highlight-color:transparent;">↺ 경로 업데이트</button>
         </div>
       </div>
 
