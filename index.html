@@ -127,12 +127,21 @@
     if (user.pwHash !== pwHash) return { error: '비밀번호가 맞지 않아요 🔒' };
     return { userId, name: user.name, tripIds: user.tripIds || [] };
   };
-  window.fbAddTripToUser = async (userId, tripId) => {
+  window.fbAddTripToUser = async (userId, tripId, access = 'edit') => {
     const user = await window.fbGetUser(userId);
     if (!user) return;
     const ids = user.tripIds || [];
+    const perms = user.tripPerms || {};
     if (!ids.includes(tripId)) {
-      await db.collection('users').doc(userId).update({ tripIds: [tripId, ...ids] });
+      perms[tripId] = access; // 'edit' or 'read'
+      await db.collection('users').doc(userId).update({
+        tripIds: [tripId, ...ids],
+        tripPerms: perms,
+      });
+    } else {
+      // 이미 있으면 권한만 업데이트
+      perms[tripId] = access;
+      await db.collection('users').doc(userId).update({ tripPerms: perms });
     }
   };
   window.fbGetUserTrips = async (userId) => {
@@ -2516,12 +2525,6 @@ html, body {
 .mob-trip-badge.ongoing { background: #fff3ec; color: #E07A3A; }
 .mob-trip-badge.upcoming { background: #EBF3FE; color: #1565C0; }
 .mob-trip-badge.done { background: #f0ede8; color: #999; }
-.mob-inspire-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
-.mob-inspire-list::-webkit-scrollbar { display: none; }
-.mob-inspire-card { min-width: 200px; height: 110px; border-radius: 14px; padding: 16px; flex-shrink: 0; cursor: pointer; transition: transform .12s; }
-.mob-inspire-card:active { transform: scale(0.97); }
-.mob-inspire-title { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.4; }
-.mob-inspire-sub { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 6px; }
 .mob-trip-summary { background: #fff; padding: 14px 16px; border-bottom: 1px solid #ede9e2; flex-shrink: 0; }
 .mob-trip-summary-name { font-size: 18px; font-weight: 800; color: #2c2c2a; }
 .mob-trip-summary-date { font-size: 13px; color: #888; margin-top: 3px; }
@@ -2562,10 +2565,7 @@ html, body {
 #mob-app #mob-places-sheet-title {
   font-family: 'Playfair Display', 'Gowun Batang', serif;
 }
-#mob-app .mob-inspire-title {
-  font-family: 'Playfair Display', 'Gowun Batang', serif;
-}
-/* 서브서브탭 — 상위 탭(일정/지도/준비물)과 동일 너비로 균등 배분 */
+#mob-app /* 서브서브탭 — 상위 탭(일정/지도/준비물)과 동일 너비로 균등 배분 */
 .mob-stab-bar { justify-content: stretch; }
 .mob-stab { flex: 1; text-align: center; }
 /* PC: 완전 숨김 */
@@ -2874,14 +2874,6 @@ select.mob-inp { padding:10px 8px;cursor:pointer; }
   -webkit-overflow-scrolling: touch;
 }
 /* 인스파이어 카드 */
-.mob-inspire-card {
-  min-width: 180px; height: 100px; border-radius: 16px;
-  padding: 14px; flex-shrink: 0; cursor: pointer;
-  transition: transform .12s;
-}
-.mob-inspire-card:active { transform: scale(0.97); }
-.mob-inspire-title { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.4; }
-.mob-inspire-sub { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 4px; }
 /* 그리팅 */
 .mob-greeting { font-size: 22px; font-weight: 800; color: #1a1a18; margin-bottom: 16px; line-height: 1.4; letter-spacing: -0.5px; }
 .mob-greeting small { font-size: 13px; font-weight: 400; color: #999; letter-spacing: 0; }
@@ -11281,7 +11273,6 @@ document.addEventListener('keydown', (e) => {
         <div class="mob-logo">travel<span>.</span></div>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <div id="mob-admin-badge" style="display:none;font-size:11px;background:#E07A3A;color:#fff;padding:3px 8px;border-radius:10px;font-weight:700;">관리자</div>
-          <button class="mob-icon-btn" onclick="mobShowNotifications()">🔔</button>
         </div>
       </div>
       <div class="mob-scroll">
@@ -11302,14 +11293,7 @@ document.addEventListener('keydown', (e) => {
           <button class="mob-text-btn" onclick="mobNewTrip()">＋ 새 여행</button>
         </div>
         <div id="mob-trip-list"></div>
-
-        <!-- 여행 영감 -->
-        <div class="mob-section-header" style="margin-top:8px;">
-          <span>여행 영감</span>
-          <button class="mob-text-btn" onclick="mobInspireMore()">더보기 ›</button>
-        </div>
-        <div class="mob-inspire-list" id="mob-inspire-list"></div>
-      </div>
+</div>
     </div>
 
     <!-- 프로필 페이지 -->
@@ -11484,100 +11468,6 @@ let mobCurrentFilter  = 'all';
 let mobIsDarkMode     = false;
 let mobCurrentCat     = 'all';
 let mobSchedMap       = null;   // 일정 탭 내부 지도
-const MOB_INSPIRE_DATA = [
-  // 계절별 태그 포함 (month 배열: 해당 달에 우선 표시)
-  {
-    title:'봄 벚꽃 🌸\n일본 교토',
-    sub:'기온·마루야마공원·철학의 길',
-    grad:'linear-gradient(135deg,#f9a8d4,#e879f9)',
-    months:[3,4], dest:'교토 여행', nights:4,
-    tips:['기온 게이샤 거리 새벽 산책','마루야마공원 밤 벚꽃 라이트업','철학의 길 벚꽃 터널 산책','난젠지·긴카쿠지 정원'],
-  },
-  {
-    title:'여름 해변 🌊\n오키나와',
-    sub:'에메랄드 바다, 슈리성, 국제거리',
-    grad:'linear-gradient(135deg,#06b6d4,#0ea5e9)',
-    months:[6,7,8], dest:'오키나와 여행', nights:4,
-    tips:['코우리지마 하트록 스노클링','국제거리 소키소바 맛집 탐방','슈리성 역사 탐방','아메리칸 빌리지 쇼핑'],
-  },
-  {
-    title:'가을 단풍 🍁\n설악산·속초',
-    sub:'내장산·설악산·지리산 코스',
-    grad:'linear-gradient(135deg,#f97316,#dc2626)',
-    months:[9,10,11], dest:'속초 여행', nights:2,
-    tips:['권금성 케이블카 단풍 뷰','속초 중앙시장 닭강정·오징어순대','울산바위 등산','대포항 회 먹방'],
-  },
-  {
-    title:'겨울 온천 ♨️\n홋카이도',
-    sub:'삿포로·노보리베쓰·니세코',
-    grad:'linear-gradient(135deg,#60a5fa,#6d28d9)',
-    months:[12,1,2], dest:'홋카이도 여행', nights:5,
-    tips:['노보리베쓰 지옥계곡 온천','삿포로 눈 축제 (2월)','니세코 스키장','오도리공원 일루미네이션'],
-  },
-  {
-    title:'가성비 여행 🇹🇭\n태국 방콕',
-    sub:'왓 아룬·카오산로드·짜뚜짝',
-    grad:'linear-gradient(135deg,#10b981,#14b8a6)',
-    months:[1,2,3,11,12], dest:'방콕 여행', nights:5,
-    tips:['왓 프라깨우(에메랄드 사원)','카오산로드 야시장 맛집','짜뚜짝 주말 시장 쇼핑','아이콘시암 쇼핑몰·루프탑바'],
-  },
-  {
-    title:'유럽 감성 🏛️\n프라하',
-    sub:'구시가지·카를교·흐라드차니',
-    grad:'linear-gradient(135deg,#a78bfa,#ec4899)',
-    months:[4,5,6,9,10], dest:'프라하 여행', nights:5,
-    tips:['구시가지 광장 천문시계','카를교 일출 산책','프라하 성·성 비투스 대성당','체스키크룸로프 당일치기'],
-  },
-  {
-    title:'미식 여행 🍜\n오사카',
-    sub:'도톤보리·구로몬 시장·신사이바시',
-    grad:'linear-gradient(135deg,#fb923c,#f43f5e)',
-    months:[3,4,5,9,10,11], dest:'오사카 여행', nights:3,
-    tips:['도톤보리 타코야키·오코노미야키','구로몬 시장 아침 식사','신사이바시 쇼핑','유니버설 스튜디오 재팬'],
-  },
-  {
-    title:'자연 힐링 🌿\n제주도',
-    sub:'한라산·성산일출봉·협재해수욕장',
-    grad:'linear-gradient(135deg,#4ade80,#22d3ee)',
-    months:[4,5,6,9,10], dest:'제주 여행', nights:3,
-    tips:['성산일출봉 일출 트레킹','협재 에메랄드 해변 피크닉','한라산 영실 코스 등산','제주 흑돼지 바베큐 맛집'],
-  },
-  {
-    title:'도시 트레킹 🗽\n뉴욕',
-    sub:'맨해튼·센트럴파크·브루클린',
-    grad:'linear-gradient(135deg,#1d4ed8,#7c3aed)',
-    months:[4,5,6,9,10], dest:'뉴욕 여행', nights:7,
-    tips:['센트럴파크 자전거 투어','첼시마켓·하이라인 파크','브루클린 브릿지 일몰 뷰','자유의 여신상 페리'],
-  },
-  {
-    title:'럭셔리 리조트 🌴\n발리',
-    sub:'우붓·꾸따·스미냑',
-    grad:'linear-gradient(135deg,#f59e0b,#10b981)',
-    months:[4,5,6,7,8,9], dest:'발리 여행', nights:5,
-    tips:['우붓 원숭이 숲·계단식 논','스미냑 선셋 비치 클럽','꾸따 서핑 레슨','울루와뚜 절벽 사원 케착 댄스'],
-  },
-];
-function mobRenderInspire(limit) {
-  const el = document.getElementById('mob-inspire-list');
-  if (!el) return;
-  const month = new Date().getMonth() + 1;
-  // 이번 달 관련 카드 우선, 나머지 뒤에
-  const sorted = [...MOB_INSPIRE_DATA].sort((a,b) => {
-    const aM = a.months.includes(month) ? 0 : 1;
-    const bM = b.months.includes(month) ? 0 : 1;
-    return aM - bM;
-  });
-  const data = limit ? sorted.slice(0, limit) : sorted;
-  el.innerHTML = data.map((d,i) => `
-    <div class="mob-inspire-card" style="background:${d.grad};" onclick="mobInspireDetail(${i})">
-      <div class="mob-inspire-title">${d.title.replace('\n','<br>')}</div>
-      <div class="mob-inspire-sub">${d.sub}</div>
-      <div style="margin-top:8px;font-size:10px;color:rgba(255,255,255,0.7);font-weight:600;">
-        ${d.nights}박${d.nights+1}일 추천 ›
-      </div>
-    </div>`).join('');
-}
-
 function mobInspireDetail(rawIdx) {
   // 현재 렌더된 순서로 인덱스 재계산
   const month = new Date().getMonth() + 1;
@@ -11809,7 +11699,6 @@ function mobRenderTripList() {
       <div style="font-size:13px;color:#999;">새 여행을 만들어보세요</div>
       <button class="mob-primary-btn" style="margin-top:16px;max-width:200px;" onclick="mobNewTrip()">＋ 새 여행 만들기</button>
     </div>`;
-    mobRenderInspire(4);
     return;
   }
 
@@ -11821,7 +11710,6 @@ function mobRenderTripList() {
       <div style="font-size:32px;">🔍</div>
       <div style="font-weight:700;margin:8px 0 4px;">해당 여행이 없어요</div>
     </div>`;
-    mobRenderInspire(4);
     return;
   }
 
@@ -11856,8 +11744,6 @@ function mobRenderTripList() {
       ${isAdmin ? `<button class="mob-trip-del-btn" onclick="event.stopPropagation();mobAdminDeleteTrip('${trip.id}','${(trip.title||'(제목 없음)').replace(/'/g,"\\'")}')">🗑️</button>` : ''}
     </div>`;
   }).join('');
-
-  mobRenderInspire(4);
 }
 
 function mobGetTripStatus(trip) {
@@ -12033,7 +11919,31 @@ async function mobSelectTrip(tripId) {
 
   mobUpdateLayerHeader();
   mobRenderSchedule();
+
+  // 읽기 전용 권한 체크
+  const userId = localStorage.getItem('mobUserId');
+  if (userId && typeof window.fbGetUser === 'function') {
+    window.fbGetUser(userId).then(user => {
+      const access = user?.tripPerms?.[tripId] || 'edit';
+      window._mobTripAccess = access;
+      // 읽기 전용이면 편집 버튼 숨기기
+      const addBtn = document.querySelector('.mob-add-sched-btn');
+      const moreBtn = document.querySelector('#mob-trip-layer-header .mob-icon-btn');
+      if (access === 'read') {
+        if (addBtn) addBtn.style.display = 'none';
+        // 헤더에 읽기전용 배지 표시
+        const dateEl = document.getElementById('mob-trip-layer-date');
+        if (dateEl && !dateEl.textContent.includes('읽기')) {
+          dateEl.textContent += '  👁️ 읽기 전용';
+        }
+      } else {
+        if (addBtn) addBtn.style.display = '';
+        window._mobTripAccess = 'edit';
+      }
+    }).catch(() => { window._mobTripAccess = 'edit'; });
+  }
 }
+
 function mobGoHome() { mobCloseTrip(); }
 
 function mobRenderSchedule() {
@@ -12091,10 +12001,9 @@ function mobSchedMore() {
 
 function mobShareTrip(tripId) {
   const url = location.origin + location.pathname + '?trip=' + tripId;
-  // 공유 링크 + 사용자에게 tripId 부여하는 시트
   mobOpenSheet('mob-share-sheet', `
     <div class="mob-handle"></div>
-    <div style="font-size:17px;font-weight:700;margin-bottom:14px;">🔗 여행 공유하기</div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:14px;font-family:'Playfair Display','Gowun Batang',serif;">🔗 여행 공유하기</div>
     <div style="background:#f5f3ee;border-radius:12px;padding:12px;margin-bottom:14px;word-break:break-all;font-size:12px;color:#555;">${url}</div>
     <button class="mob-primary-btn" onclick="
       navigator.share ? navigator.share({title:'여행 계획',url:'${url}'}).catch(()=>{}) :
@@ -12106,19 +12015,49 @@ function mobShareTrip(tripId) {
       <div style="font-size:13px;font-weight:700;margin-bottom:10px;">👤 특정 사람에게 직접 공유</div>
       <div style="font-size:11px;color:#999;margin-bottom:4px;">상대방 이름 (가입한 이름과 동일)</div>
       <input id="mob-share-target-name" type="text" placeholder="예: 홍길동" maxlength="20"
-        style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+        style="width:100%;border:1.5px solid #e0ddd6;border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px;"
         onfocus="this.style.borderColor='#E07A3A'" onblur="this.style.borderColor='#e0ddd6'" />
-      <button class="mob-primary-btn" style="margin-top:8px;background:#3A8FE0;" onclick="mobShareToUser('${tripId}')">
-        공유하기
-      </button>
+
+      <div style="font-size:11px;color:#999;font-weight:600;margin-bottom:6px;">권한 설정</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <label style="flex:1;display:flex;align-items:center;gap:8px;background:#f5f3ee;border-radius:10px;padding:10px 12px;cursor:pointer;border:1.5px solid transparent;" id="mob-share-perm-edit-label">
+          <input type="radio" name="mob-share-perm" value="edit" checked
+            onchange="document.getElementById('mob-share-perm-edit-label').style.borderColor='#E07A3A';document.getElementById('mob-share-perm-read-label').style.borderColor='transparent';"
+            style="accent-color:#E07A3A;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#1a1a18;">✏️ 편집 가능</div>
+            <div style="font-size:11px;color:#999;">일정 수정, 추가 가능</div>
+          </div>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:8px;background:#f5f3ee;border-radius:10px;padding:10px 12px;cursor:pointer;border:1.5px solid transparent;" id="mob-share-perm-read-label">
+          <input type="radio" name="mob-share-perm" value="read"
+            onchange="document.getElementById('mob-share-perm-read-label').style.borderColor='#E07A3A';document.getElementById('mob-share-perm-edit-label').style.borderColor='transparent';"
+            style="accent-color:#E07A3A;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#1a1a18;">👁️ 읽기 전용</div>
+            <div style="font-size:11px;color:#999;">보기만 가능</div>
+          </div>
+        </label>
+      </div>
+
+      <button class="mob-primary-btn" style="background:#3A8FE0;" onclick="mobShareToUser('${tripId}')">공유하기</button>
     </div>
     <button class="mob-cancel-btn" onclick="mobCloseSheet('mob-share-sheet')">닫기</button>
   `);
+  // 기본 권한 라벨 스타일
+  setTimeout(() => {
+    const el = document.getElementById('mob-share-perm-edit-label');
+    if (el) el.style.borderColor = '#E07A3A';
+  }, 50);
 }
 
 async function mobShareToUser(tripId) {
   const name = document.getElementById('mob-share-target-name')?.value.trim();
   if (!name) { mobShowToast('이름을 입력해주세요'); return; }
+
+  const accessInput = document.querySelector('input[name="mob-share-perm"]:checked');
+  const access = accessInput?.value || 'edit';
+
   if (typeof window.nameToId !== 'function' || typeof window.fbAddTripToUser !== 'function') {
     mobShowToast('연결 중... 잠시 후 다시 시도'); return;
   }
@@ -12126,9 +12065,10 @@ async function mobShareToUser(tripId) {
     const userId = window.nameToId(name);
     const user   = await window.fbGetUser(userId);
     if (!user) { mobShowToast(`"${name}"님이 아직 가입하지 않았어요`); return; }
-    await window.fbAddTripToUser(userId, tripId);
+    await window.fbAddTripToUser(userId, tripId, access);
     mobCloseSheet('mob-share-sheet');
-    mobShowToast(`✓ "${user.name}"님에게 공유됐어요!`);
+    const accessLabel = access === 'read' ? '읽기 전용' : '편집 가능';
+    mobShowToast(`✓ "${user.name}"님에게 공유됐어요 (${accessLabel})`);
   } catch(e) { mobShowToast('공유 실패: ' + (e.message||'')); }
 }
 
@@ -13734,32 +13674,6 @@ function mobRenderPlacesSaved() {
       </button>`:''}
     </div>`).join('');
 }
-function mobShowNotifications() {
-  const trips = window._mobTripList || [];
-  const today = new Date().toISOString().slice(0,10);
-  const notifs = [];
-  trips.forEach(t => {
-    if (!t.startDate) return;
-    const diff = Math.round((new Date(t.startDate)-new Date(today))/86400000);
-    if (diff===0)  notifs.push({ icon:'🎉', msg:`오늘 "${t.title}" 출발이에요!`, color:'#E07A3A' });
-    if (diff===1)  notifs.push({ icon:'✈️', msg:`내일 "${t.title}" 출발이에요!`, color:'#3A8FE0' });
-    if (diff===3)  notifs.push({ icon:'📅', msg:`"${t.title}" 출발 3일 전이에요`, color:'#3AAF7A' });
-    if (diff===7)  notifs.push({ icon:'🗓️', msg:`"${t.title}" 출발 1주일 전이에요`, color:'#888' });
-  });
-
-  mobOpenSheet('mob-notif-sheet', `
-    <div class="mob-handle"></div>
-    <div style="font-size:15px;font-weight:700;margin-bottom:12px;">🔔 알림</div>
-    ${notifs.length
-      ? notifs.map(n=>`<div style="display:flex;align-items:center;gap:10px;padding:12px;background:#FEF5EE;border-radius:10px;margin-bottom:8px;">
-          <span style="font-size:20px;">${n.icon}</span>
-          <span style="font-size:14px;font-weight:600;color:${n.color};">${n.msg}</span>
-        </div>`).join('')
-      : '<div style="text-align:center;padding:24px;color:#999;font-size:14px;">새 알림이 없어요</div>'
-    }
-    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-notif-sheet')"  style="color:#555;">닫기</button>
-  `);
-}
 function mobRenderProfile() {
   const userId   = localStorage.getItem('mobUserId') || '';
   const userName = localStorage.getItem('mobUserName') || '여행자';
@@ -13895,8 +13809,6 @@ function mobToggleDarkMode() {
       #mob-auth-gate { background:#111113!important; }
 
       /* 인스파이어 */
-      .mob-inspire-list { background:#111113!important; }
-
       /* 검색바 */
       .mob-map-searchbar { background:#1c1c1e!important; }
       .mob-map-input { color:#e8e8e6!important; }
@@ -14358,7 +14270,6 @@ async function mobLoadTripList() {
         ${isPerm ? `<button onclick="localStorage.removeItem('mobAuthOk');location.reload();" style="margin-top:8px;margin-left:8px;padding:8px 16px;border:1px solid #999;border-radius:8px;background:none;color:#666;font-size:13px;cursor:pointer;font-family:inherit;">재로그인</button>` : ''}
       </div>`;
     window._mobTripList = [];
-    mobRenderInspire(4);
   }
 }
 function mobInit() {
