@@ -11438,8 +11438,7 @@ document.addEventListener('keydown', (e) => {
           <button onclick="mobMapSearch()" style="border:none;background:none;font-size:18px;padding:0 8px;cursor:pointer;">🔍</button>
         </div>
         <div class="mob-map-cats">
-          <button class="mob-cat active" onclick="mobMapCat(this,'all')">전체</button>
-          <button class="mob-cat" onclick="mobMapCat(this,'food')">맛집</button>
+          <button class="mob-cat active" onclick="mobMapCat(this,'food')">맛집</button>
           <button class="mob-cat" onclick="mobMapCat(this,'cafe')">카페</button>
           <button class="mob-cat" onclick="mobMapCat(this,'convenience')">편의점</button>
           <button class="mob-cat" onclick="mobMapCat(this,'hotel')">숙소</button>
@@ -11491,7 +11490,7 @@ let mobMap            = null;
 let mobMapInitialized = false;
 let mobCurrentFilter  = 'all';
 let mobIsDarkMode     = false;
-let mobCurrentCat     = 'all';
+let mobCurrentCat     = 'food';
 let mobSchedMap       = null;   // 일정 탭 내부 지도
 function mobInspireDetail(rawIdx) {
   // 현재 렌더된 순서로 인덱스 재계산
@@ -11720,6 +11719,9 @@ function mobUpdateLayerHeader() {
 
 function mobCloseTrip() {
   mobStopRealtimeSync();
+  // 지도 상태 리셋 — 다음 여행 진입 시 fitBounds 재실행
+  window._mobMapFitted = false;
+  window._mobMapTripId = null;
   const layer = document.getElementById('mob-trip-layer');
   layer.classList.remove('open');
   mobHomeTab('home');
@@ -13331,36 +13333,77 @@ function mobInitFullMap() {
   const el = document.getElementById('mob-fullmap');
   if (!el || !window.google?.maps) {
     if (!window.google?.maps) {
-      // 아직 Maps 미로드 → 지금 로드 시작
       window.loadGoogleMaps?.();
       document.addEventListener('maps-ready', () => mobInitFullMap(), { once:true });
     }
     return;
   }
-  if (!mobMap) {
-    let center = { lat:35.6762, lng:139.6503 };
-    const allPins = Object.values(window.scheduleData||{}).flat().filter(i=>i.lat&&i.lng);
-    if (allPins.length) center = { lat:allPins[0].lat, lng:allPins[0].lng };
 
+  const allPins = Object.values(window.scheduleData||{}).flat().filter(i=>i.lat&&i.lng);
+  const defaultCenter = allPins.length
+    ? { lat:allPins[0].lat, lng:allPins[0].lng }
+    : { lat:35.6762, lng:139.6503 };
+
+  if (!mobMap) {
+    // 지도 최초 생성
     mobMap = new google.maps.Map(el, {
-      center, zoom:13,
-      disableDefaultUI:true,
-      zoomControl:true,
-      gestureHandling:'greedy',
+      center: defaultCenter, zoom: 12,
+      disableDefaultUI: true,
+      zoomControl: true,
+      gestureHandling: 'greedy',
     });
     mobMapInitialized = true;
-
-    // 일정 핀 표시
-    allPins.forEach(pin => {
-      new google.maps.Marker({
-        position:{lat:pin.lat, lng:pin.lng},
-        map:mobMap, title:pin.name,
-      });
-    });
+    window._mobMapTripId = mobCurrentTrip;
+    window._mobMapFitted = false;
   }
+
   google.maps.event.trigger(mobMap, 'resize');
+
+  // 여행이 바뀌었거나 처음 진입이면 → 전체 핀 fitBounds
+  const isNewTrip = window._mobMapTripId !== mobCurrentTrip;
+  if (isNewTrip || !window._mobMapFitted) {
+    window._mobMapTripId = mobCurrentTrip;
+    window._mobMapFitted = true;
+
+    // 기존 핀 마커 제거
+    (window._mobFullMapMarkers || []).forEach(m => m.setMap(null));
+    window._mobFullMapMarkers = [];
+
+    if (allPins.length) {
+      const bounds = new google.maps.LatLngBounds();
+      allPins.forEach(pin => {
+        const marker = new google.maps.Marker({
+          position: { lat:pin.lat, lng:pin.lng },
+          map: mobMap,
+          title: pin.name,
+        });
+        window._mobFullMapMarkers.push(marker);
+        bounds.extend({ lat:pin.lat, lng:pin.lng });
+      });
+      if (allPins.length === 1) {
+        mobMap.setCenter({ lat:allPins[0].lat, lng:allPins[0].lng });
+        mobMap.setZoom(14);
+      } else {
+        mobMap.fitBounds(bounds, { top:80, bottom:280, left:40, right:40 });
+      }
+    } else {
+      // 핀 없을 때 → 여행 제목으로 위치 특정
+      const title = (mobCurrentTripData||{}).title || '';
+      if (title && window.google?.maps) {
+        const geocoder = new google.maps.Geocoder();
+        const cleaned  = title.replace(/(여행|trip|travel|투어|tour|\d{4})/gi,'').trim();
+        geocoder.geocode({ address: cleaned, language:'ko' }, (results, status) => {
+          if (status === 'OK' && results[0]) {
+            mobMap.setCenter(results[0].geometry.location);
+            mobMap.setZoom(12);
+          }
+        });
+      }
+    }
+  }
+  // 탭 전환 후 돌아온 경우 → 이전 위치 그대로 유지 (아무것도 안 함)
+
   mobLoadPlaces();
-  // 처음 초기화 시 드래그 핸들 설정
   if (!window._mobPlacesDragInit) {
     window._mobPlacesDragInit = true;
     setTimeout(mobInitPlacesSheetDrag, 300);
