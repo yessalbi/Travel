@@ -247,8 +247,24 @@
     document.dispatchEvent(new Event("maps-ready"));
   };
 </script>
-<script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ&libraries=places,geometry&callback=initMap&language=ko">
+<script>
+// Google Maps lazy load — 지도 탭 진입 시 로드
+window._mapsLoaded = false;
+window._mapsCallbacks = [];
+function initMap() {
+  window._mapsLoaded = true;
+  window._mapsCallbacks.forEach(fn => fn());
+  window._mapsCallbacks = [];
+  document.dispatchEvent(new Event('maps-ready'));
+}
+window.loadGoogleMaps = function() {
+  if (window._mapsLoaded || document.getElementById('gmaps-script')) return;
+  const s = document.createElement('script');
+  s.id = 'gmaps-script';
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyAKSU95SekZf2Mwb_ojLbUddMLMCOgbRSQ&libraries=places,geometry&callback=initMap&language=ko';
+  s.async = true; s.defer = true;
+  document.head.appendChild(s);
+};
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -5096,8 +5112,9 @@ async function realInit() {
   // 기기에 저장된 PDF 로드
   loadAllPdfs();
 
-  // Maps 초기화 (별도 async 로드)
-  if (window.mapsReady) setupMap();
+  // Maps lazy load 시작 (아직 안 로드됐으면)
+  window.loadGoogleMaps?.();
+  if (window._mapsLoaded) setupMap();
   else document.addEventListener('maps-ready', setupMap);
 
   // Firebase는 이미 준비된 상태로 호출됨
@@ -11565,7 +11582,59 @@ function mobOpenSheet(id, html) {
   document.getElementById('mob-app').appendChild(sheet);
 }
 function mobCloseSheet(id) { document.getElementById(id)?.remove(); }
-// ── 글로벌 새로고침 ──────────────────────────────────────────
+// ── 7. iOS 뒤로가기 제스처 (popstate) ───────────────────────
+function mobInitBackGesture() {
+  // 여행 레이어 열릴 때 history 스택에 상태 추가
+  const origOpen = mobOpenTripLayer;
+  // popstate: 뒤로가기 시 여행 레이어 닫기
+  window.addEventListener('popstate', (e) => {
+    if (window.innerWidth > 768) return;
+    const layer = document.getElementById('mob-trip-layer');
+    if (layer?.classList.contains('open')) {
+      mobCloseTrip();
+    }
+  });
+}
+
+// mobOpenTripLayer 래핑 — 열 때 history push
+const _origOpenTripLayer = mobOpenTripLayer;
+function mobOpenTripLayer(tripId) {
+  history.pushState({ mobTripLayer: true, tripId }, '');
+  if (typeof _origOpenTripLayer === 'function') _origOpenTripLayer(tripId);
+}
+
+// mobCloseTrip 래핑 — 닫을 때 history 정리
+const _origCloseTrip = mobCloseTrip;
+function mobCloseTrip() {
+  if (history.state?.mobTripLayer) history.back();
+  if (typeof _origCloseTrip === 'function') _origCloseTrip();
+}
+
+// ── 14. 실시간 협업 — Firestore onSnapshot ───────────────────
+let _mobRealtimeUnsub = null;
+function mobStartRealtimeSync(tripId) {
+  if (_mobRealtimeUnsub) { _mobRealtimeUnsub(); _mobRealtimeUnsub = null; }
+  if (!tripId || typeof db === 'undefined') return;
+  let isFirstLoad = true;
+  _mobRealtimeUnsub = db.collection('trips').doc(tripId)
+    .onSnapshot((snap) => {
+      if (isFirstLoad) { isFirstLoad = false; return; }
+      if (!snap.exists || document.querySelector('.mob-sheet')) return;
+      const data = snap.data();
+      if (data.schedule)    window.scheduleData  = data.schedule;
+      if (data.expenseData) window.expenseData   = data.expenseData;
+      if (data.checklist)   window.checklistData = data.checklist;
+      mobCurrentTripData = { ...mobCurrentTripData, ...data };
+      const activeTab = document.querySelector('.mob-detail-tab.active')?.id?.replace('mob-dtab-','');
+      if (activeTab === 'schedule') mobRenderSchedule();
+      if (activeTab === 'saved')    mobRenderSaved();
+      mobShowToast('✨ 다른 사람이 여행을 수정했어요');
+    }, (err) => console.warn('[RealtimeSync]', err.message));
+}
+function mobStopRealtimeSync() {
+  if (_mobRealtimeUnsub) { _mobRealtimeUnsub(); _mobRealtimeUnsub = null; }
+}
+
 function mobSmartRefresh() {
   const btn = document.getElementById('mob-global-refresh');
   if (btn) { btn.style.transform='rotate(360deg)'; btn.style.transition='transform .3s'; }
@@ -11642,20 +11711,44 @@ function mobUpdateLayerHeader() {
       : '날짜 미설정';
 }
 function mobCloseTrip() {
+  mobStopRealtimeSync();
   const layer = document.getElementById('mob-trip-layer');
   layer.classList.remove('open');
-  // 홈 탭 활성화
   mobHomeTab('home');
 }
 function mobDetailTab(el, tab) {
+  // 현재 탭 상태 저장 (지도 검색 결과 등 보존)
+  const prevTab = document.querySelector('.mob-detail-tab.active')?.id?.replace('mob-dtab-','');
+  if (prevTab === 'map' && tab !== 'map') {
+    // 지도 탭 떠날 때 검색 상태 저장
+    window._mobMapState = {
+      query: document.getElementById('mob-map-search')?.value || '',
+      cat:   window._mobCurrentCat || 'all',
+      places: window._mobPlaces || [],
+    };
+  }
+
   document.querySelectorAll('.mob-detail-tab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.mob-detail-page').forEach(p => p.classList.remove('active'));
   el?.classList.add('active');
   document.getElementById('mob-dp-' + tab)?.classList.add('active');
   mobUpdateLayerHeader();
   if (tab === 'schedule') mobRenderSchedule();
-  if (tab === 'map')      mobInitFullMap();
-  if (tab === 'saved')    mobRenderSaved();
+  if (tab === 'map') {
+    mobInitFullMap();
+    // 이전 검색 상태 복원
+    if (window._mobMapState?.query) {
+      const input = document.getElementById('mob-map-search');
+      if (input && !input.value) {
+        input.value = window._mobMapState.query;
+        if (window._mobMapState.places?.length) {
+          window._mobPlaces = window._mobMapState.places;
+          mobRenderPlaces(window._mobPlaces, window._mobMapState.query);
+        }
+      }
+    }
+  }
+  if (tab === 'saved') mobRenderSaved();
 }
 function mobTab(tab) {
   // 홈/프로필은 홈 레이어에서
@@ -11920,6 +12013,9 @@ async function mobSelectTrip(tripId) {
   mobUpdateLayerHeader();
   mobRenderSchedule();
 
+  // 실시간 협업 싱크 시작
+  mobStartRealtimeSync(tripId);
+
   // 읽기 전용 권한 체크
   const userId = localStorage.getItem('mobUserId');
   if (userId && typeof window.fbGetUser === 'function') {
@@ -12099,6 +12195,19 @@ function mobRenderOverview() {
   const note   = d.note   || '';
   const nights = start && end ? Math.round((new Date(end)-new Date(start))/86400000) : null;
 
+  // D-day 계산
+  const today = new Date(); today.setHours(0,0,0,0);
+  let ddayHtml = '';
+  if (start) {
+    const startDt = new Date(start); startDt.setHours(0,0,0,0);
+    const endDt   = end ? new Date(end) : null; if(endDt) endDt.setHours(0,0,0,0);
+    const diff    = Math.round((startDt - today) / 86400000);
+    if (diff > 0)       ddayHtml = `<span style="color:#3A8FE0;font-weight:800;font-size:20px;">D-${diff}</span>`;
+    else if (diff === 0) ddayHtml = `<span style="color:#3AAF7A;font-weight:800;font-size:20px;">D-Day ✈️</span>`;
+    else if (endDt && today <= endDt) ddayHtml = `<span style="color:#E07A3A;font-weight:800;font-size:20px;">여행 중 🌏</span>`;
+    else ddayHtml = `<span style="color:#aaa;font-weight:700;font-size:16px;">완료됨 ✓</span>`;
+  }
+
   // 일정 요약
   const sched    = window.scheduleData || {};
   const allItems = Object.values(sched).flat();
@@ -12108,39 +12217,76 @@ function mobRenderOverview() {
   const typeRows  = Object.entries(typeCnt).map(([k,v]) =>
     `<span class="mob-tl-card-badge">${typeEmoji[k]||'📌'} ${v}곳</span>`).join('');
 
+  // 체크리스트 진행률
+  const checklist   = window.checklistData || [];
+  const totalCheck  = checklist.length;
+  const doneCheck   = checklist.filter(i => i.checked).length;
+  const checkPct    = totalCheck ? Math.round(doneCheck/totalCheck*100) : 0;
+
   // 예산
   const budget   = d.budgetTotal || 0;
-  const currency = d.budgetCurrency || 'JPY';
+  const currency = d.budgetCurrency || 'KRW';
   const expenses = window.expenseData || {};
   const totalSpent = Object.values(expenses).flat().reduce((s,e)=>s+(e.amountKrw||0),0);
+  const budgetPct  = budget ? Math.min(100, Math.round(totalSpent/budget*100)) : 0;
+  const budgetColor = budgetPct > 90 ? '#E53935' : budgetPct > 70 ? '#E07A3A' : '#3AAF7A';
 
-  el.innerHTML = `<div style="padding:12px 0 80px;">
-    ${title ? `<div class="mob-overview-section">
-      <div class="mob-overview-label">✈️ 여행지 / 제목</div>
-      <div class="mob-overview-value">${title}</div>
+  const isReadOnly = window._mobTripAccess === 'read';
+
+  el.innerHTML = `<div style="padding:16px 0 80px;">
+
+    <!-- D-day 카드 -->
+    ${ddayHtml ? `<div style="background:linear-gradient(135deg,#FFF7F0,#FEF0E4);border-radius:16px;padding:18px 20px;margin-bottom:12px;border:1px solid #f5e4d0;">
+      <div style="font-size:11px;color:#E07A3A;font-weight:700;letter-spacing:1px;margin-bottom:6px;">DEPARTURE</div>
+      <div>${ddayHtml}</div>
+      ${start ? `<div style="font-size:12px;color:#aaa;margin-top:4px;">${start.replace(/-/g,'.')}${end?' ~ '+end.replace(/-/g,'.'):''}${nights!==null?` · ${nights}박${nights+1}일`:''}</div>` : ''}
     </div>` : ''}
-    <div class="mob-overview-section">
-      <div class="mob-overview-label">📅 여행 기간</div>
-      <div class="mob-overview-value">${start && end
-        ? start.replace(/-/g,'.')+' ~ '+end.replace(/-/g,'.')
-          +(nights!==null ? `<span style="font-size:12px;color:#999;font-weight:400;"> · ${nights}박${nights+1}일</span>` : '')
-        : '(미설정)'}</div>
+
+    <!-- 2열 요약 카드 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid #f0ede8;">
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px;">📌 일정</div>
+        <div style="font-size:22px;font-weight:800;color:#1a1a18;">${allItems.length}<span style="font-size:12px;font-weight:400;color:#aaa;">곳</span></div>
+        <div style="font-size:10px;color:#ccc;margin-top:3px;">${Object.keys(sched).length}일 구성</div>
+      </div>
+      <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid #f0ede8;">
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px;">🎒 준비물</div>
+        <div style="font-size:22px;font-weight:800;color:${checkPct===100&&totalCheck?'#3AAF7A':'#1a1a18'};">${doneCheck}<span style="font-size:14px;font-weight:400;color:#aaa;">/${totalCheck}</span></div>
+        <div style="background:#f0ede8;border-radius:4px;height:4px;margin-top:6px;overflow:hidden;">
+          <div style="background:${checkPct===100?'#3AAF7A':'#E07A3A'};height:100%;width:${checkPct}%;transition:width .3s;"></div>
+        </div>
+      </div>
     </div>
-    ${author ? `<div class="mob-overview-section"><div class="mob-overview-label">👤 작성자</div><div class="mob-overview-value">${author}</div></div>` : ''}
-    ${allItems.length ? `<div class="mob-overview-section">
-      <div class="mob-overview-label">📌 일정 요약 (${allItems.length}개)</div>
-      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;">${typeRows}</div>
+
+    <!-- 예산 카드 -->
+    ${budget ? `<div style="background:#fff;border-radius:14px;padding:14px;border:1px solid #f0ede8;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:11px;color:#aaa;">💰 예산 사용률</div>
+        <div style="font-size:12px;font-weight:700;color:${budgetColor};">${budgetPct}%</div>
+      </div>
+      <div style="background:#f0ede8;border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px;">
+        <div style="background:${budgetColor};height:100%;width:${budgetPct}%;transition:width .3s;border-radius:4px;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#aaa;">
+        <span>사용 ₩${totalSpent.toLocaleString()}</span>
+        <span>총 ${currency==='KRW'?'₩':'¥'}${Number(budget).toLocaleString()}</span>
+      </div>
     </div>` : ''}
-    ${budget ? `<div class="mob-overview-section">
-      <div class="mob-overview-label">💰 예산 / 지출</div>
-      <div class="mob-overview-value">${currency==='KRW'?'₩':'¥'}${Number(budget).toLocaleString()}
-        <span style="font-size:13px;color:#E07A3A;"> / 사용 ₩${totalSpent.toLocaleString()}</span></div>
+
+    <!-- 일정 유형 분포 -->
+    ${typeRows ? `<div class="mob-overview-section" style="margin-bottom:12px;">
+      <div class="mob-overview-label">📊 일정 유형</div>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;">${typeRows}</div>
     </div>` : ''}
-    ${note ? `<div class="mob-overview-section">
+
+    <!-- 메모 -->
+    ${note ? `<div class="mob-overview-section" style="margin-bottom:12px;">
       <div class="mob-overview-label">📝 메모</div>
-      <div style="font-size:13px;color:#555;white-space:pre-wrap;margin-top:4px;line-height:1.6;">${note}</div>
+      <div style="font-size:13px;color:#555;white-space:pre-wrap;margin-top:6px;line-height:1.7;">${note}</div>
     </div>` : ''}
-    <button class="mob-primary-btn" style="margin-top:8px;" onclick="mobOpenTripSetup()">✏️ 여행 정보 편집</button>
+
+    <!-- 편집 버튼 -->
+    ${!isReadOnly ? `<button class="mob-primary-btn" onclick="mobOpenTripSetup()">✏️ 여행 정보 편집</button>` : ''}
   </div>`;
 }
 function mobOpenTripSetup() {
@@ -12372,20 +12518,47 @@ function mobRenderDayTimeline(day) {
 function mobTimelineItemHtml(item, origIdx, day, localIdx, isLast, typeIcon, typeLabel, typeColor) {
   const color   = typeColor[item.type] || '#E07A3A';
   const timeStr = item.time ? (typeof fmtTime==='function' ? fmtTime(item.time) : item.time) : '';
-  return `<div class="mob-timeline-item">
+  const isReadOnly = window._mobTripAccess === 'read';
+  return `<div class="mob-timeline-item" id="mob-tl-item-${day}-${origIdx}">
     <div class="mob-timeline-time">${timeStr}</div>
     <div class="mob-timeline-line">
       <div class="mob-tl-dot" style="background:${color};box-shadow:0 0 0 3px ${color}30;"></div>
       ${!isLast?'<div class="mob-tl-bar"></div>':''}
     </div>
-    <div class="mob-timeline-card" style="border-left-color:${color};" onclick="mobShowItemDetail(${day},${origIdx})">
-      <div class="mob-tl-card-type" style="color:${color};">${typeIcon[item.type]||'📌'} ${typeLabel[item.type]||''}</div>
-      <div class="mob-tl-card-name">${item.name}</div>
-      ${item.desc?`<div class="mob-tl-card-sub">${item.desc}</div>`:''}
-      ${item.memo?`<span class="mob-tl-card-badge">📝 메모</span>`:''}
-      ${item.lat?`<span class="mob-tl-card-badge" style="color:#3AAF7A;">📍 위치</span>`:''}
+    <div style="flex:1;min-width:0;">
+      <div class="mob-timeline-card" style="border-left-color:${color};"
+        onclick="mobShowItemDetail(${day},${origIdx})"
+        oncontextmenu="event.preventDefault();${isReadOnly?'':` mobQuickEdit(${day},${origIdx})`}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">
+          <div style="flex:1;min-width:0;">
+            <div class="mob-tl-card-type" style="color:${color};">${typeIcon[item.type]||'📌'} ${typeLabel[item.type]||''}</div>
+            <div class="mob-tl-card-name">${item.name}</div>
+            ${item.desc?`<div class="mob-tl-card-sub">${item.desc}</div>`:''}
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">
+              ${item.memo?`<span class="mob-tl-card-badge">📝 메모</span>`:''}
+              ${item.lat?`<span class="mob-tl-card-badge" style="color:#3AAF7A;">📍 위치</span>`:''}
+            </div>
+          </div>
+          ${!isReadOnly ? `<button onclick="event.stopPropagation();mobQuickEdit(${day},${origIdx})"
+            style="flex-shrink:0;border:none;background:none;color:#ccc;font-size:16px;cursor:pointer;padding:2px 4px;-webkit-tap-highlight-color:transparent;">⋯</button>` : ''}
+        </div>
+      </div>
     </div>
   </div>`;
+}
+
+function mobQuickEdit(day, idx) {
+  const item = (window.scheduleData||{})[day]?.[idx];
+  if (!item) return;
+  mobOpenSheet('mob-quick-edit-sheet', `
+    <div class="mob-handle"></div>
+    <div style="font-size:15px;font-weight:700;color:#1a1a18;margin-bottom:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name}</div>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-quick-edit-sheet');mobShowItemDetail(${day},${idx})">📋 상세 보기</button>
+    <button class="mob-sheet-btn" onclick="mobCloseSheet('mob-quick-edit-sheet');mobEditItem(${day},${idx})">✏️ 편집</button>
+    ${item.lat?`<button class="mob-sheet-btn" style="color:#3A8FE0;" onclick="mobCloseSheet('mob-quick-edit-sheet');mobShowPinOnMap(${item.lat},${item.lng},'${item.name.replace(/'/g,"\\'")}')">🗺️ 지도에서 보기</button>`:''}
+    <button class="mob-sheet-btn" style="color:#E53935;" onclick="mobCloseSheet('mob-quick-edit-sheet');mobDeleteItem(${day},${idx})">🗑️ 삭제</button>
+    <button class="mob-cancel-btn" onclick="mobCloseSheet('mob-quick-edit-sheet')">취소</button>
+  `);
 }
 
 function mobShowItemDetail(day, idx) {
@@ -12514,6 +12687,7 @@ function mobSearchPlaceForAdd() {
 }
 
 async function mobSaveAddSchedule() {
+  if (window._mobTripAccess === 'read') { mobShowToast('읽기 전용 여행이에요'); return; }
   const name = document.getElementById('mob-add-name')?.value.trim();
   if (!name) { mobShowToast('장소 이름을 입력해주세요'); return; }
 
@@ -12992,6 +13166,8 @@ function mobInitFullMap() {
   const el = document.getElementById('mob-fullmap');
   if (!el || !window.google?.maps) {
     if (!window.google?.maps) {
+      // 아직 Maps 미로드 → 지금 로드 시작
+      window.loadGoogleMaps?.();
       document.addEventListener('maps-ready', () => mobInitFullMap(), { once:true });
     }
     return;
