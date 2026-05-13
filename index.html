@@ -11274,7 +11274,7 @@ document.addEventListener('keydown', (e) => {
 
   <!-- ══ 글로벌 새로고침 버튼 (모든 화면에서 표시) ══════════ -->
   <button id="mob-global-refresh" onclick="mobSmartRefresh()"
-    style="position:fixed;top:14px;right:58px;z-index:19998;
+    style="position:fixed;top:14px;right:100px;z-index:19998;
       width:32px;height:32px;border-radius:50%;border:none;
       background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);
       box-shadow:0 2px 10px rgba(0,0,0,0.15);
@@ -11679,6 +11679,20 @@ function mobOpenTripLayer(tripId) {
   layer.classList.add('open');
   mobUpdateLayerHeader();
   mobDetailTab(document.getElementById('mob-dtab-schedule'), 'schedule');
+}
+
+function mobUpdateLayerHeader() {
+  const d = mobCurrentTripData || {};
+  const title  = d.title || document.getElementById('trip-title')?.value || '';
+  const start  = d.startDate || '';
+  const end    = d.endDate   || '';
+  const nights = start && end ? Math.round((new Date(end)-new Date(start))/86400000) : null;
+  const titleEl = document.getElementById('mob-trip-layer-title');
+  const dateEl  = document.getElementById('mob-trip-layer-date');
+  if (titleEl) titleEl.textContent = title || '여행';
+  if (dateEl)  dateEl.textContent  = start && end
+    ? start.replace(/-/g,'.') + ' ~ ' + end.replace(/-/g,'.') + (nights!==null ? ` · ${nights}박${nights+1}일` : '')
+    : '날짜 미설정';
 }
 
 function mobCloseTrip() {
