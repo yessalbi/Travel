@@ -2918,30 +2918,70 @@ input[type="time"].mob-inp {
 <!-- 로그인 게이트 -->
 <div id="auth-gate" style="display:none;">
   <div style="position:fixed;inset:0;background:var(--cream);z-index:9997;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;">
-    <div style="font-family:'Playfair Display', 'Gowun Batang', serif;font-size:36px;font-weight:700;color:var(--ink);">
-      travel<span style="color:var(--accent);">.</span>
-    </div>
-    <div style="font-size:14px;color:var(--ink3);" data-i18n-auth="desc">비밀번호를 입력해주세요</div>
-    <input id="auth-pw-input" type="password" placeholder="비밀번호 4자리" maxlength="4"
-      style="width:200px;border:2px solid var(--sand);border-radius:14px;padding:14px 20px;
-             font-family:inherit;font-size:20px;text-align:center;outline:none;
-             letter-spacing:8px;background:var(--white);color:var(--ink);
-             transition:border-color .2s;"
-      onfocus="this.style.borderColor='var(--accent)'"
-      onblur="this.style.borderColor='var(--sand)'"
-      oninput="onAuthInput(this)"
-      onkeydown="if(event.key==='Enter')tryAuth()" />
-    <div id="auth-error" style="font-size:12px;color:#E53935;min-height:18px;"></div>
-    <button onclick="tryAuth()"
-      style="padding:12px 40px;border-radius:12px;border:none;
-             background:var(--accent);color:#fff;font-family:inherit;
-             font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s;"
-      onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-      <span data-i18n-auth="enter">입장하기</span>
-    </button>
-    <div style="font-size:11px;color:var(--ink3);margin-top:12px;opacity:0.5;" data-i18n-auth="hint">
-      친구에게 비밀번호를 물어보세요 🔑
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:40px 28px;box-sizing:border-box;font-family:'DM Sans','Noto Sans KR',sans-serif;">
+    <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:20px;">
+
+      <!-- 로고 -->
+      <div style="text-align:center;margin-bottom:4px;">
+        <div style="font-family:'Playfair Display','Gowun Batang',serif;font-size:42px;font-weight:700;color:var(--ink);letter-spacing:-1.5px;line-height:1;">
+          travel<span style="color:var(--accent);">.</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink3);margin-top:6px;letter-spacing:2px;text-transform:uppercase;">여행 계획 앱</div>
+      </div>
+
+      <!-- 탭 -->
+      <div style="display:flex;background:var(--stone);border-radius:12px;padding:3px;gap:2px;">
+        <button id="pc-auth-tab-login" onclick="pcAuthSwitchTab('login')"
+          style="flex:1;padding:9px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--accent);color:#fff;transition:all .15s;white-space:nowrap;">로그인</button>
+        <button id="pc-auth-tab-register" onclick="pcAuthSwitchTab('register')"
+          style="flex:1;padding:9px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:var(--ink3);transition:all .15s;white-space:nowrap;">첫 방문</button>
+        <button id="pc-auth-tab-admin" onclick="pcAuthSwitchTab('admin')"
+          style="flex:1;padding:9px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:var(--ink3);transition:all .15s;white-space:nowrap;">관리자</button>
+      </div>
+
+      <!-- 입력 폼 -->
+      <div id="pc-auth-user-form" style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <div style="font-size:11px;color:var(--ink3);font-weight:600;margin-bottom:5px;letter-spacing:0.3px;">이름</div>
+          <input id="pc-auth-name" type="text" placeholder="홍길동" maxlength="20"
+            style="width:100%;border:1.5px solid var(--sand);border-radius:10px;padding:13px 14px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;background:var(--white);color:var(--ink);transition:border-color .12s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--sand)'"
+            onkeydown="if(event.key==='Enter')document.getElementById('pc-auth-pw').focus()" />
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--ink3);font-weight:600;margin-bottom:5px;letter-spacing:0.3px;">비밀번호 4자리</div>
+          <input id="pc-auth-pw" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
+            style="width:100%;border:1.5px solid var(--sand);border-radius:10px;padding:13px 14px;font-size:24px;text-align:center;letter-spacing:12px;font-family:inherit;outline:none;box-sizing:border-box;background:var(--white);transition:border-color .12s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--sand)'"
+            oninput="if(this.value.length===4&&window._pcAuthTab!=='admin')pcTryAuth()"
+            onkeydown="if(event.key==='Enter')pcTryAuth()" />
+        </div>
+      </div>
+
+      <div id="pc-auth-admin-form" style="display:none;flex-direction:column;gap:10px;">
+        <div>
+          <div style="font-size:11px;color:var(--ink3);font-weight:600;margin-bottom:5px;letter-spacing:0.3px;">관리자 코드</div>
+          <input id="pc-auth-admin-pw" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
+            style="width:100%;border:1.5px solid var(--sand);border-radius:10px;padding:13px 14px;font-size:24px;text-align:center;letter-spacing:12px;font-family:inherit;outline:none;box-sizing:border-box;background:var(--white);transition:border-color .12s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--sand)'"
+            oninput="if(this.value.length===4)pcTryAuth()"
+            onkeydown="if(event.key==='Enter')pcTryAuth()" />
+          <div style="font-size:11px;color:var(--ink3);margin-top:8px;text-align:center;">모든 여행을 관리할 수 있어요</div>
+        </div>
+      </div>
+
+      <div id="auth-error" style="font-size:12px;color:#E53935;text-align:center;min-height:16px;margin:-8px 0;"></div>
+
+      <button onclick="pcTryAuth()"
+        style="width:100%;padding:15px;border-radius:12px;border:none;background:var(--accent);color:#fff;
+               font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-0.2px;
+               transition:opacity .1s;"
+        onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">입장하기</button>
+
+      <div style="font-size:11px;color:var(--ink3);text-align:center;line-height:1.6;opacity:0.7;">
+        처음 오셨으면 <b>첫 방문</b> 탭에서 이름과 비밀번호를 등록하세요
+      </div>
     </div>
   </div>
 </div>
@@ -5038,47 +5078,97 @@ function showAuthGate() {
   setTimeout(() => document.getElementById('auth-pw-input')?.focus(), 100);
 }
 
-function onAuthInput(el) {
-  // 4자리 입력 시 자동 시도
-  if (el.value.length === 4) tryAuth();
+window._pcAuthTab = 'login';
+
+function pcAuthSwitchTab(tab) {
+  window._pcAuthTab = tab;
+  const tabs = ['login','register','admin'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`pc-auth-tab-${t}`);
+    if (!btn) return;
+    const isActive = t === tab;
+    btn.style.background = isActive ? 'var(--accent)' : 'none';
+    btn.style.color = isActive ? '#fff' : 'var(--ink3)';
+  });
+  const userForm  = document.getElementById('pc-auth-user-form');
+  const adminForm = document.getElementById('pc-auth-admin-form');
+  const errEl     = document.getElementById('auth-error');
+  if (errEl) errEl.textContent = '';
+  if (tab === 'admin') {
+    if (userForm)  userForm.style.display  = 'none';
+    if (adminForm) adminForm.style.display = 'flex';
+    setTimeout(() => document.getElementById('pc-auth-admin-pw')?.focus(), 50);
+  } else {
+    if (userForm)  userForm.style.display  = 'flex';
+    if (adminForm) adminForm.style.display = 'none';
+    setTimeout(() => document.getElementById('pc-auth-name')?.focus(), 50);
+  }
 }
 
-async function tryAuth() {
-  const input = document.getElementById('auth-pw-input');
-  const error = document.getElementById('auth-error');
-  const pw = input?.value || '';
+async function pcTryAuth() {
+  const errEl = document.getElementById('auth-error');
+  const tab   = window._pcAuthTab || 'login';
 
-  if (pw !== AUTH_PW) {
-    error.textContent = _T().authWrong||'비밀번호가 맞지 않아요';
-    input.value = '';
-    input.focus();
-    input.style.borderColor = '#E53935';
-    setTimeout(() => { input.style.borderColor = 'var(--sand)'; }, 1500);
+  // 관리자
+  if (tab === 'admin') {
+    const pw = document.getElementById('pc-auth-admin-pw')?.value || '';
+    if (pw !== ADMIN_PW) {
+      if (errEl) errEl.textContent = '관리자 코드가 맞지 않아요';
+      return;
+    }
+    isAdminMode = true;
+    localStorage.setItem('pcAuthOk', '1');
+    localStorage.setItem('mobAuthOk', '1');
+    localStorage.setItem('pcAdminMode', '1');
+    document.getElementById('auth-gate').style.display = 'none';
+    try { await firebase.auth().signInAnonymously(); } catch(e) {}
+    await realInit();
     return;
   }
 
-  error.textContent = _T().authLoading||'로그인 중…';
+  const name = document.getElementById('pc-auth-name')?.value.trim();
+  const pw   = document.getElementById('pc-auth-pw')?.value || '';
+  if (!name) { if (errEl) errEl.textContent = '이름을 입력해주세요'; return; }
+  if (pw.length < 4) { if (errEl) errEl.textContent = '비밀번호 4자리를 입력해주세요'; return; }
+
+  if (errEl) errEl.textContent = '확인 중…';
+
   try {
     await firebase.auth().signInAnonymously();
     isAuthenticated = true;
-    // 세션 동안 재입력 방지
-    localStorage.setItem('pcAuthOk', '1');
+  } catch(e) {}
+
+  try {
+    if (tab === 'register') {
+      // 신규 가입
+      if (typeof window.fbCreateUser !== 'function') throw new Error('Firebase 연결 중');
+      await window.fbCreateUser(name, pw);
+      const userId = window.nameToId ? window.nameToId(name) : name.toLowerCase();
+      localStorage.setItem('mobAuthOk', '1');
+      localStorage.setItem('mobUserId', userId);
+      localStorage.setItem('mobUserName', name);
+      localStorage.setItem('pcAuthOk', '1');
+    } else {
+      // 로그인
+      if (typeof window.fbLoginUser !== 'function') throw new Error('Firebase 연결 중');
+      const userId = await window.fbLoginUser(name, pw);
+      if (!userId) { if (errEl) errEl.textContent = '이름 또는 비밀번호가 맞지 않아요'; return; }
+      localStorage.setItem('mobAuthOk', '1');
+      localStorage.setItem('mobUserId', userId);
+      localStorage.setItem('mobUserName', name);
+      localStorage.setItem('pcAuthOk', '1');
+    }
+    if (errEl) errEl.textContent = '';
     document.getElementById('auth-gate').style.display = 'none';
-    document.getElementById('loading').style.display = 'flex';
     await realInit();
   } catch(e) {
-    console.error('Auth 실패:', e);
-    error.textContent = _T().authFail||'로그인 실패 — 네트워크를 확인해주세요';
-    // 오프라인이면 로컬 데이터로 진행
-    if (!navigator.onLine) {
-      isAuthenticated = true;
-      localStorage.setItem('pcAuthOk', '1');
-      document.getElementById('auth-gate').style.display = 'none';
-      document.getElementById('loading').style.display = 'flex';
-      await realInit();
-    }
+    if (errEl) errEl.textContent = e.message || '오류가 발생했어요';
   }
 }
+
+// 기존 tryAuth/onAuthInput — 하위 호환 유지
+function onAuthInput(el) { if (el.value.length === 4) pcTryAuth(); }
+function tryAuth() { pcTryAuth(); }
 
 // 앱 진입점: 인증 상태 확인 후 게이트 or 메인 진행
 async function init() {
