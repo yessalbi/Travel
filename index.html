@@ -14963,25 +14963,12 @@ async function mobLoadTripList() {
   const container = document.getElementById('mob-trip-list');
   if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;font-size:13px;">불러오는 중…</div>';
 
-  // Firebase Auth 보장 — 현재 유저가 없으면 auth 상태 복구 대기
-  try {
-    const user = firebase.auth().currentUser;
-    if (!user) {
-      // onAuthStateChanged로 기존 세션 복구 대기 (최대 3초)
-      await new Promise((resolve) => {
-        const unsub = firebase.auth().onAuthStateChanged(u => {
-          unsub();
-          resolve(u);
-        });
-        setTimeout(() => resolve(null), 3000);
-      });
-      // 여전히 없으면 익명 로그인
-      if (!firebase.auth().currentUser) {
-        await firebase.auth().signInAnonymously();
-      }
-    }
-  } catch(authErr) {
-    console.warn('[mobLoadTripList] Auth 실패:', authErr.message);
+  // 캐시된 목록 먼저 표시
+  if (window._mobTripList?.length) mobRenderTripList();
+
+  // Auth — 이미 있으면 그냥 진행, 없으면 빠르게 익명 로그인
+  if (!firebase.auth().currentUser) {
+    try { await firebase.auth().signInAnonymously(); } catch(e) {}
   }
 
   const withTimeout = (promise, ms) => Promise.race([
@@ -14994,13 +14981,12 @@ async function mobLoadTripList() {
 
     if (mobIsAdmin || localStorage.getItem('mobAdminMode') === '1') {
       mobIsAdmin = true;
-      trips = await withTimeout(window.fbGetAllTrips(), 10000);
+      trips = await withTimeout(window.fbGetAllTrips(), 15000);
     } else {
       const userId = localStorage.getItem('mobUserId');
       if (userId && typeof window.fbGetUserTrips === 'function') {
-        // Firebase 유저 trips 로드 (공유받은 것 포함)
-        trips = await withTimeout(window.fbGetUserTrips(userId), 10000);
-        // 로컬 tripList와 병합 (오프라인 추가분 반영)
+        trips = await withTimeout(window.fbGetUserTrips(userId), 15000);
+        // 로컬 tripList와 병합
         const localIds = JSON.parse(localStorage.getItem('tripList')||'[]');
         const remoteIds = trips.map(t=>t.id);
         const extra = localIds.filter(id => !remoteIds.includes(id));
@@ -15008,17 +14994,21 @@ async function mobLoadTripList() {
           const extraMetas = await Promise.all(extra.map(id=>window.fbGetTripMeta(id).catch(()=>null)));
           extraMetas.forEach(m => { if(m) trips.push(m); });
         }
+        // 성공 시 로컬에 ID 캐시
+        if (trips.length) {
+          const ids = trips.map(t=>t.id);
+          localStorage.setItem('tripList', JSON.stringify(ids));
+        }
       } else {
-        // 폴백: localStorage tripList
         const myList = typeof getTripList === 'function' ? getTripList() : [];
         if (myList.length) {
           const metas = await withTimeout(
             Promise.all(myList.map(id => window.fbGetTripMeta(id).catch(() => null))),
-            10000
+            15000
           );
           metas.forEach(meta => { if (meta?.title !== undefined) trips.push(meta); });
         }
-        if (!trips.length) trips = await withTimeout(window.fbGetAllTrips(), 10000);
+        if (!trips.length) trips = await withTimeout(window.fbGetAllTrips(), 15000);
       }
     }
 
@@ -15044,7 +15034,31 @@ async function mobLoadTripList() {
     const isTimeout  = e.message === 'timeout';
     const isPerm     = e.message?.includes('permission') || e.message?.includes('Permission') || e.code === 'permission-denied';
 
-    // 권한 오류 → Auth 재시도 1회만 (재귀 방지)
+    // 타임아웃 시 — 로컬 캐시로 폴백 (이전 성공 데이터)
+    if (isTimeout) {
+      const cached = window._mobTripList;
+      if (cached?.length) {
+        mobRenderTripList();
+        mobShowToast('⚡ 캐시된 목록을 표시합니다. 당겨서 새로고침하세요');
+        return;
+      }
+      // 캐시도 없으면 localStorage tripList로 시도
+      const localIds = JSON.parse(localStorage.getItem('tripList')||'[]');
+      if (localIds.length) {
+        try {
+          const metas = await Promise.all(localIds.map(id => window.fbGetTripMeta(id).catch(()=>null)));
+          const trips = metas.filter(Boolean);
+          if (trips.length) {
+            window._mobTripList = trips;
+            mobRenderTripList();
+            mobShowToast('⚡ 일부 여행만 표시됩니다');
+            return;
+          }
+        } catch(e2) {}
+      }
+    }
+
+    // 권한 오류 → Auth 재시도 1회만
     if (isPerm && !window._mobAuthRetried) {
       window._mobAuthRetried = true;
       try {
@@ -15057,16 +15071,15 @@ async function mobLoadTripList() {
       }
     }
 
-    // 관리자 모드인데 실패 → 일반 유저 목록으로 폴백
+    // 관리자 모드 폴백
     if (mobIsAdmin && !isTimeout) {
-      console.warn('관리자 fbGetAllTrips 실패, 유저 목록으로 폴백');
       const userId = localStorage.getItem('mobUserId');
       if (userId && typeof window.fbGetUserTrips === 'function') {
         try {
           const trips = await window.fbGetUserTrips(userId);
           window._mobTripList = trips;
           mobRenderTripList();
-          mobShowToast('⚠️ 관리자 전체 목록 불가 — 내 여행만 표시');
+          mobShowToast('⚠️ 전체 목록 불가 — 내 여행만 표시');
           return;
         } catch(e3) {}
       }
@@ -15079,7 +15092,7 @@ async function mobLoadTripList() {
         <button onclick="window._mobAuthRetried=false;mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;font-family:inherit;">다시 시도</button>
         ${isPerm ? `<button onclick="localStorage.removeItem('mobAuthOk');location.reload();" style="margin-top:8px;margin-left:8px;padding:8px 16px;border:1px solid #999;border-radius:8px;background:none;color:#666;font-size:13px;cursor:pointer;font-family:inherit;">재로그인</button>` : ''}
       </div>`;
-    window._mobTripList = [];
+    window._mobTripList = window._mobTripList || [];
   }
 }
 function mobInit() {
