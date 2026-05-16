@@ -14969,52 +14969,35 @@ async function mobLoadTripList() {
   const container = document.getElementById('mob-trip-list');
   if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;font-size:13px;">불러오는 중…</div>';
 
-  // 캐시된 목록 먼저 표시
-  if (window._mobTripList?.length) mobRenderTripList();
-
-  // Auth — 이미 있으면 그냥 진행, 없으면 빠르게 익명 로그인
-  if (!firebase.auth().currentUser) {
-    try { await firebase.auth().signInAnonymously(); } catch(e) {}
-  }
-
   const withTimeout = (promise, ms) => Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
   ]);
+
+  if (!firebase.auth().currentUser) {
+    try { await firebase.auth().signInAnonymously(); } catch(e) {}
+  }
 
   try {
     let trips = [];
 
     if (mobIsAdmin || localStorage.getItem('mobAdminMode') === '1') {
       mobIsAdmin = true;
-      trips = await withTimeout(window.fbGetAllTrips(), 15000);
+      trips = await withTimeout(window.fbGetAllTrips(), 10000);
     } else {
       const userId = localStorage.getItem('mobUserId');
       if (userId && typeof window.fbGetUserTrips === 'function') {
-        trips = await withTimeout(window.fbGetUserTrips(userId), 15000);
-        // 로컬 tripList와 병합
-        const localIds = JSON.parse(localStorage.getItem('tripList')||'[]');
-        const remoteIds = trips.map(t=>t.id);
-        const extra = localIds.filter(id => !remoteIds.includes(id));
-        if (extra.length) {
-          const extraMetas = await Promise.all(extra.map(id=>window.fbGetTripMeta(id).catch(()=>null)));
-          extraMetas.forEach(m => { if(m) trips.push(m); });
-        }
-        // 성공 시 로컬에 ID 캐시
-        if (trips.length) {
-          const ids = trips.map(t=>t.id);
-          localStorage.setItem('tripList', JSON.stringify(ids));
-        }
+        trips = await withTimeout(window.fbGetUserTrips(userId), 10000);
       } else {
         const myList = typeof getTripList === 'function' ? getTripList() : [];
         if (myList.length) {
           const metas = await withTimeout(
             Promise.all(myList.map(id => window.fbGetTripMeta(id).catch(() => null))),
-            15000
+            10000
           );
           metas.forEach(meta => { if (meta?.title !== undefined) trips.push(meta); });
         }
-        if (!trips.length) trips = await withTimeout(window.fbGetAllTrips(), 15000);
+        if (!trips.length) trips = await withTimeout(window.fbGetAllTrips(), 10000);
       }
     }
 
@@ -15025,11 +15008,8 @@ async function mobLoadTripList() {
       await mobRestoreRefreshState();
     } else {
       const url = new URL(location.href);
-      // PC 모드거나 PC 모드 전환 후 리로드된 경우 — trip 파라미터 유지 (PC가 처리)
-      const isPCMode = localStorage.getItem('mobPCMode') === '1'
-                    || !isMobilePhone();
+      const isPCMode = localStorage.getItem('mobPCMode') === '1' || !isMobilePhone();
       if (!isPCMode && url.searchParams.has('trip')) {
-        // 모바일 앱 새로 실행 시 홈에서 시작
         url.searchParams.delete('trip');
         history.replaceState({}, '', url);
       }
@@ -15037,70 +15017,19 @@ async function mobLoadTripList() {
 
   } catch(e) {
     console.warn('mobLoadTripList 오류:', e.message || e);
-    const isTimeout  = e.message === 'timeout';
-    const isPerm     = e.message?.includes('permission') || e.message?.includes('Permission') || e.code === 'permission-denied';
-
-    // 타임아웃 시 — 로컬 캐시로 폴백 (이전 성공 데이터)
-    if (isTimeout) {
-      const cached = window._mobTripList;
-      if (cached?.length) {
-        mobRenderTripList();
-        mobShowToast('⚡ 캐시된 목록을 표시합니다. 당겨서 새로고침하세요');
-        return;
-      }
-      // 캐시도 없으면 localStorage tripList로 시도
-      const localIds = JSON.parse(localStorage.getItem('tripList')||'[]');
-      if (localIds.length) {
-        try {
-          const metas = await Promise.all(localIds.map(id => window.fbGetTripMeta(id).catch(()=>null)));
-          const trips = metas.filter(Boolean);
-          if (trips.length) {
-            window._mobTripList = trips;
-            mobRenderTripList();
-            mobShowToast('⚡ 일부 여행만 표시됩니다');
-            return;
-          }
-        } catch(e2) {}
-      }
-    }
-
-    // 권한 오류 → Auth 재시도 1회만
-    if (isPerm && !window._mobAuthRetried) {
-      window._mobAuthRetried = true;
-      try {
-        await firebase.auth().signInAnonymously();
-        window._mobAuthRetried = false;
-        return mobLoadTripList();
-      } catch(e2) {
-        console.warn('[Auth 재시도 실패]', e2.message);
-        window._mobAuthRetried = false;
-      }
-    }
-
-    // 관리자 모드 폴백
-    if (mobIsAdmin && !isTimeout) {
-      const userId = localStorage.getItem('mobUserId');
-      if (userId && typeof window.fbGetUserTrips === 'function') {
-        try {
-          const trips = await window.fbGetUserTrips(userId);
-          window._mobTripList = trips;
-          mobRenderTripList();
-          mobShowToast('⚠️ 전체 목록 불가 — 내 여행만 표시');
-          return;
-        } catch(e3) {}
-      }
-    }
-
+    if (window._mobTripList?.length) { mobRenderTripList(); return; }
+    const isTimeout = e.message === 'timeout';
+    const isPerm    = e.code === 'permission-denied' || e.message?.includes('permission');
     if (container) container.innerHTML = `
       <div style="text-align:center;padding:20px;color:#E53935;font-size:13px;">
         ${isPerm ? '🔒 권한 오류 — 재로그인 해주세요' : isTimeout ? '⏱ 연결 시간 초과' : '불러오기 실패'}<br>
         <small style="color:#aaa;font-size:11px;">${e.message||''}</small><br>
-        <button onclick="window._mobAuthRetried=false;mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;font-family:inherit;">다시 시도</button>
-        ${isPerm ? `<button onclick="localStorage.removeItem('mobAuthOk');location.reload();" style="margin-top:8px;margin-left:8px;padding:8px 16px;border:1px solid #999;border-radius:8px;background:none;color:#666;font-size:13px;cursor:pointer;font-family:inherit;">재로그인</button>` : ''}
+        <button onclick="mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;font-family:inherit;">다시 시도</button>
       </div>`;
-    window._mobTripList = window._mobTripList || [];
+    window._mobTripList = [];
   }
 }
+
 function mobInit() {
   if (!isMobilePhone()) return;
 
