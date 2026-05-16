@@ -12291,6 +12291,10 @@ async function mobSelectTrip(tripId) {
 
   try {
     const data = await window.fbGetTrip(tripId);
+
+    // 로드 완료 전에 다른 여행으로 이동했으면 무시
+    if (mobCurrentTrip !== tripId) return;
+
     if (data) {
       mobCurrentTripData = data;
       // 전역 데이터 동기화
