@@ -18,6 +18,27 @@
   <link rel="icon" href="https://github.com/yessalbi/Travel/blob/main/icon_new.png?raw=true">
   <link id="dynamic-manifest" rel="manifest">
   <script>
+
+// ── 기기 감지 — 폰이면 모바일 UI, 태블릿/PC면 PC UI ──────────
+function isMobilePhone() {
+  const ua = navigator.userAgent;
+  if (/iPad/i.test(ua)) return false;
+  if (/iPhone|Android/i.test(ua)) return true;
+  if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return false;
+  return window.innerWidth <= 768; // 최후 수단
+}
+
+// 폰이면 html에 is-phone 클래스 부여 — 가로 모드에서도 모바일 유지
+(function applyPhoneClass() {
+  if (isMobilePhone()) document.documentElement.classList.add('is-phone');
+  else document.documentElement.classList.remove('is-phone');
+})();
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    if (isMobilePhone()) document.documentElement.classList.add('is-phone');
+    else document.documentElement.classList.remove('is-phone');
+  }, 100);
+});
     (function() {
       const tripId = new URLSearchParams(location.search).get('trip') || '';
       const startUrl = location.origin + location.pathname + (tripId ? '?trip=' + tripId : '');
@@ -2504,9 +2525,18 @@ html, body {
   /* PC 보안: JS 없이도 PC에서 절대 표시 안 됨 */
   display: none;
 }
+/* 기기 감지 기반 모바일/PC 분기 — JS의 isMobilePhone()과 연동 */
+/* 폰에서 가로 모드여도 모바일 UI 강제 표시 */
 @media (max-width: 768px) {
   #mob-app { display: flex !important; }
 }
+/* 태블릿/PC에서 모바일 UI 완전 숨김 */
+@media (min-width: 769px) {
+  #mob-app { display: none !important; }
+}
+/* is-phone 클래스 — 화면 너비와 무관하게 폰에서 모바일 UI 강제 */
+html.is-phone #mob-app { display: flex !important; }
+html.is-phone #main, html.is-phone #header, html.is-phone #trip-list-screen { display: none !important; }
 .mob-page {
   display: none; flex-direction: column; flex: 1; overflow: hidden;
   position: absolute; inset: 0; bottom: 64px; background: #f5f3ee;
@@ -5025,7 +5055,7 @@ function formatDateRange(startDate, endDate) {
 
 function enterTrip(tripId) {
   // PC 모드(모바일에서 PC 전환 포함)이면 리로드 없이 직접 로드
-  if (localStorage.getItem('mobPCMode') === '1' || window.innerWidth > 768) {
+  if (localStorage.getItem('mobPCMode') === '1' || !isMobilePhone()) {
     const url = new URL(location.href);
     url.searchParams.set('trip', tripId);
     history.pushState({}, '', url);
@@ -8052,7 +8082,7 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
     </div>`;
   cardContainer.classList.remove('sheet-full','sheet-peek');
   cardContainer.classList.add('show');
-  if (!isOverlay && window.innerWidth <= 768) {
+  if (!isOverlay && isMobilePhone()) {
     initSheetDrag(cardContainer);
     panMapForSheet('half', targetMap || map);
   }
@@ -8071,7 +8101,7 @@ function openMapPlaceCardOnMap(placeId, targetMap) {
       renderMapPlaceCard(place, { ...place, _overlayMap: false, _targetMap: targetMap });
     }
     // PC: 단순 패닝 (모바일은 panMapForSheet에서 처리)
-    if (window.innerWidth > 768 && targetMap && place.geometry) {
+    if (!isMobilePhone() && targetMap && place.geometry) {
       setTimeout(() => { targetMap.panTo(place.geometry.location); }, 100);
     }
   });
@@ -8100,7 +8130,7 @@ function renderMapPlaceCardInto(place, container, targetMap) {
   if (backBtn) backBtn.onclick = closeOverlayPlaceCard;
 
   // 모바일: 드래그 시트 초기화
-  if (window.innerWidth <= 768) {
+  if (isMobilePhone()) {
     initSheetDrag(container);
     panMapForSheet('half', targetMap);
   }
@@ -8119,7 +8149,7 @@ function openMapPlaceCard(place, idx) {
   // PC: 지도 기준으로 카드 위치 설정
   const card = document.getElementById('map-place-card');
   const mapWrapper = document.getElementById('map-wrapper');
-  if (card && mapWrapper && window.innerWidth > 768) {
+  if (card && mapWrapper && !isMobilePhone()) {
     const rect = mapWrapper.getBoundingClientRect();
     card.style.left = (rect.left + 16) + 'px';
     card.style.top  = (rect.top  + 16) + 'px';
@@ -8138,7 +8168,7 @@ function openMapPlaceCard(place, idx) {
     </div>`;
   card.classList.remove('sheet-full', 'sheet-peek');
   card.classList.add('show');
-  if (window.innerWidth <= 768) {
+  if (isMobilePhone()) {
     initSheetDrag(card);
     panMapForSheet('half', map);
   }
@@ -8313,7 +8343,7 @@ function renderMapPlaceCard(d, fb) {
   card.classList.remove('sheet-full', 'sheet-peek');
   card.classList.add('show');
   // 모바일: half 상태로 열고 드래그 초기화 + 지도 패닝
-  if (window.innerWidth <= 768) {
+  if (isMobilePhone()) {
     initSheetDrag(card);
     panMapForSheet('half', fb && fb._targetMap ? fb._targetMap : (overlayMap || map));
   }
@@ -11061,7 +11091,7 @@ function openSchPlacePanel() {
   const overlay = document.getElementById('schedule-overlay');
   const popup   = overlay.querySelector('.popup');
 
-  const isMobile = window.innerWidth <= 768;
+  const isMobile = isMobilePhone();
 
   if (!isMobile) {
     // PC: 팝업 오른쪽에 딱 붙여서 배치
@@ -11798,7 +11828,7 @@ function mobInvalidateRouteCache(day) {
 
 function mobInitBackGesture() {
   window.addEventListener('popstate', () => {
-    if (window.innerWidth > 768) return;
+    if (!isMobilePhone()) return;
     const layer = document.getElementById('mob-trip-layer');
     if (layer?.classList.contains('open')) {
       // popstate는 이미 history.back()이 처리됨 — 레이어만 닫기
@@ -14992,7 +15022,7 @@ async function mobLoadTripList() {
       const url = new URL(location.href);
       // PC 모드거나 PC 모드 전환 후 리로드된 경우 — trip 파라미터 유지 (PC가 처리)
       const isPCMode = localStorage.getItem('mobPCMode') === '1'
-                    || window.innerWidth > 768;
+                    || !isMobilePhone();
       if (!isPCMode && url.searchParams.has('trip')) {
         // 모바일 앱 새로 실행 시 홈에서 시작
         url.searchParams.delete('trip');
@@ -15027,7 +15057,7 @@ async function mobLoadTripList() {
   }
 }
 function mobInit() {
-  if (window.innerWidth > 768) return;
+  if (!isMobilePhone()) return;
 
   // PC 모드 복원 (여행 클릭으로 리로드된 경우)
   if (localStorage.getItem('mobPCMode') === '1') {
@@ -15112,7 +15142,7 @@ function mobInit() {
   }
   // Safari PWA에서 페이지가 background→foreground 전환 시 재초기화
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && window.innerWidth <= 768) {
+    if (document.visibilityState === 'visible' && isMobilePhone()) {
       // mob-app이 이미 떠 있으면 여행 목록만 갱신
       if (window._mobTripList !== undefined && localStorage.getItem('mobAuthOk') === '1') {
         if (typeof mobLoadTripList === 'function') mobLoadTripList();
