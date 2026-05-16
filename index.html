@@ -63,11 +63,23 @@ window.addEventListener('orientationchange', () => {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;600&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
 
-<!-- Firebase compat SDK -->
+<!-- Firebase compat SDK — app/firestore/auth 우선 로드, database는 비동기 -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+// firebase-database는 동행 기능에만 사용 — 앱 초기화 후 비동기 로드
+window._dbSdkLoaded = false;
+function loadFirebaseDatabase() {
+  if (window._dbSdkLoaded) return;
+  window._dbSdkLoaded = true;
+  const s = document.createElement('script');
+  s.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js';
+  document.head.appendChild(s);
+}
+// 페이지 로드 완료 후 로드 (초기 렌더링 블로킹 방지)
+window.addEventListener('load', () => setTimeout(loadFirebaseDatabase, 1000));
+</script>
 <script>
 // Service Worker 등록 — Firebase SDK + 앱 자체를 캐시해서 PWA 오프라인/빠른 로딩
 if ('serviceWorker' in navigator) {
@@ -9185,7 +9197,18 @@ let companionWatchId = null;
 let companionMarkers = {};
 let companionRef = null;
 let companionUnsub = null;
-const rtdb = firebase.database();
+let _rtdb = null;
+function getRtdb() {
+  if (!_rtdb) {
+    if (typeof firebase.database !== 'function') {
+      // database SDK 아직 미로드 — 로드 후 재시도
+      loadFirebaseDatabase();
+      return null;
+    }
+    _rtdb = firebase.database();
+  }
+  return _rtdb;
+}
 
 function getCompanionName() {
   return document.getElementById('trip-author')?.value?.trim()
@@ -9216,7 +9239,7 @@ function startCompanionSharing() {
 
   const name = getCompanionName();
   const uid = firebase.auth().currentUser?.uid || 'anon-' + Math.random().toString(36).slice(2,6);
-  companionRef = rtdb.ref(`companions/${TRIP_ID}/${uid}`);
+  companionRef = getRtdb()?.ref(`companions/${TRIP_ID}/${uid}`);
 
   companionWatchId = navigator.geolocation.watchPosition(pos => {
     companionRef.set({
@@ -9228,7 +9251,7 @@ function startCompanionSharing() {
   }, null, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
 
   // 다른 동행자 위치 감시
-  companionUnsub = rtdb.ref(`companions/${TRIP_ID}`).on('value', snap => {
+  companionUnsub = getRtdb()?.ref(`companions/${TRIP_ID}`).on('value', snap => {
     const data = snap.val() || {};
     renderCompanionMarkers(data, uid);
     renderCompanionList(data, uid);
@@ -9248,7 +9271,7 @@ function stopCompanionSharing() {
   document.getElementById('companion-toggle-label').textContent = t.companionStart||'위치 공유 시작';
   if (companionWatchId !== null) { navigator.geolocation.clearWatch(companionWatchId); companionWatchId = null; }
   if (companionRef) { companionRef.remove(); companionRef = null; }
-  if (companionUnsub) { rtdb.ref(`companions/${TRIP_ID}`).off('value', companionUnsub); companionUnsub = null; }
+  if (companionUnsub) { getRtdb()?.ref(`companions/${TRIP_ID}`).off('value', companionUnsub); companionUnsub = null; }
   Object.values(companionMarkers).forEach(m => m.setMap(null));
   companionMarkers = {};
 }
