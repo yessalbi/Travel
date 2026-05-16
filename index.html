@@ -14963,16 +14963,25 @@ async function mobLoadTripList() {
   const container = document.getElementById('mob-trip-list');
   if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;font-size:13px;">불러오는 중…</div>';
 
-  // ★ Firestore 접근 전 Firebase Auth 보장 (PWA 재실행 시 토큰 복구)
+  // Firebase Auth 보장 — 현재 유저가 없으면 auth 상태 복구 대기
   try {
     const user = firebase.auth().currentUser;
     if (!user) {
-      // 익명 로그인 시도 (이미 세션 있으면 자동 복구됨)
-      await firebase.auth().signInAnonymously();
+      // onAuthStateChanged로 기존 세션 복구 대기 (최대 3초)
+      await new Promise((resolve) => {
+        const unsub = firebase.auth().onAuthStateChanged(u => {
+          unsub();
+          resolve(u);
+        });
+        setTimeout(() => resolve(null), 3000);
+      });
+      // 여전히 없으면 익명 로그인
+      if (!firebase.auth().currentUser) {
+        await firebase.auth().signInAnonymously();
+      }
     }
   } catch(authErr) {
     console.warn('[mobLoadTripList] Auth 실패:', authErr.message);
-    // Auth 실패해도 관리자 모드가 아니면 계속 진행 (오프라인 가능성)
   }
 
   const withTimeout = (promise, ms) => Promise.race([
@@ -15031,18 +15040,35 @@ async function mobLoadTripList() {
     }
 
   } catch(e) {
-    console.warn('mobLoadTripList 오류:', e);
+    console.warn('mobLoadTripList 오류:', e.message || e);
     const isTimeout  = e.message === 'timeout';
     const isPerm     = e.message?.includes('permission') || e.message?.includes('Permission') || e.code === 'permission-denied';
 
-    // 권한 오류 → Auth 재시도 후 재로드
-    if (isPerm) {
+    // 권한 오류 → Auth 재시도 1회만 (재귀 방지)
+    if (isPerm && !window._mobAuthRetried) {
+      window._mobAuthRetried = true;
       try {
         await firebase.auth().signInAnonymously();
-        // 한 번만 재시도
+        window._mobAuthRetried = false;
         return mobLoadTripList();
       } catch(e2) {
         console.warn('[Auth 재시도 실패]', e2.message);
+        window._mobAuthRetried = false;
+      }
+    }
+
+    // 관리자 모드인데 실패 → 일반 유저 목록으로 폴백
+    if (mobIsAdmin && !isTimeout) {
+      console.warn('관리자 fbGetAllTrips 실패, 유저 목록으로 폴백');
+      const userId = localStorage.getItem('mobUserId');
+      if (userId && typeof window.fbGetUserTrips === 'function') {
+        try {
+          const trips = await window.fbGetUserTrips(userId);
+          window._mobTripList = trips;
+          mobRenderTripList();
+          mobShowToast('⚠️ 관리자 전체 목록 불가 — 내 여행만 표시');
+          return;
+        } catch(e3) {}
       }
     }
 
@@ -15050,7 +15076,7 @@ async function mobLoadTripList() {
       <div style="text-align:center;padding:20px;color:#E53935;font-size:13px;">
         ${isPerm ? '🔒 권한 오류 — 재로그인 해주세요' : isTimeout ? '⏱ 연결 시간 초과' : '불러오기 실패'}<br>
         <small style="color:#aaa;font-size:11px;">${e.message||''}</small><br>
-        <button onclick="mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;font-family:inherit;">다시 시도</button>
+        <button onclick="window._mobAuthRetried=false;mobLoadTripList()" style="margin-top:8px;padding:8px 16px;border:1px solid #E07A3A;border-radius:8px;background:none;color:#E07A3A;font-size:13px;cursor:pointer;font-family:inherit;">다시 시도</button>
         ${isPerm ? `<button onclick="localStorage.removeItem('mobAuthOk');location.reload();" style="margin-top:8px;margin-left:8px;padding:8px 16px;border:1px solid #999;border-radius:8px;background:none;color:#666;font-size:13px;cursor:pointer;font-family:inherit;">재로그인</button>` : ''}
       </div>`;
     window._mobTripList = [];
