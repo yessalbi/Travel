@@ -15141,17 +15141,7 @@ function mobInit() {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', tryMobInit);
   } else {
-    // 이미 파싱 완료된 경우
     tryMobInit();
   }
-  // Safari PWA에서 페이지가 background→foreground 전환 시 재초기화
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && isMobilePhone()) {
-      // mob-app이 이미 떠 있으면 여행 목록만 갱신
-      if (window._mobTripList !== undefined && localStorage.getItem('mobAuthOk') === '1') {
-        if (typeof mobLoadTripList === 'function') mobLoadTripList();
-      }
-    }
-  });
 })();
 </script>
