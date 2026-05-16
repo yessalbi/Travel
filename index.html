@@ -217,6 +217,9 @@ if ('serviceWorker' in navigator) {
       return result.sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''));
     }
   };
+
+  // Firebase 함수 모두 정의 완료 — 준비됨 신호 발생
+  window.dispatchEvent(new Event('fbReady'));
 </script>
 
 <!-- ── 오프라인 스냅샷 (IndexedDB) ── -->
@@ -14989,6 +14992,7 @@ async function mobTryAuth() {
 
 
 async function mobLoadTripList() {
+  window._mobTripListLoaded = true;
   const container = document.getElementById('mob-trip-list');
   if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;font-size:13px;">불러오는 중…</div>';
 
@@ -15106,30 +15110,22 @@ function mobInit() {
     mobInitBackGesture();
   }
 
-  // Firebase 준비 대기 (최대 10초, 100ms 간격)
-  let waited = 0;
-  // 캐시된 목록 즉시 표시 (Firebase 로드 전에도)
-  if (window._mobTripList?.length) {
-    mobRenderTripList();
-  }
-
-  const waitReady = setInterval(() => {
-    waited += 50;
-    const ready = typeof window.fbGetAllTrips === 'function'
-               && typeof window.fbGetTripMeta === 'function'
-               && typeof window.fbSaveTrip    === 'function';
-    if (ready) {
-      clearInterval(waitReady);
-      mobLoadTripList();
-    } else if (waited >= 10000) {
-      clearInterval(waitReady);
-      if (!window._mobTripList?.length) {
-        window._mobTripList = [];
-        mobRenderTripList();
+  // Firebase 준비되면 즉시 로드
+  // firebase-init 스크립트가 끝나면 window.fbReady 이벤트를 발생시킴
+  if (typeof window.fbGetAllTrips === 'function') {
+    // 이미 준비됨 — 즉시 실행
+    mobLoadTripList();
+  } else {
+    // 아직 준비 안 됨 — 이벤트 대기
+    window.addEventListener('fbReady', () => mobLoadTripList(), { once: true });
+    // 10초 폴백
+    setTimeout(() => {
+      if (!window._mobTripListLoaded) {
+        if (typeof window.fbGetAllTrips === 'function') mobLoadTripList();
+        else { window._mobTripList = []; mobRenderTripList(); mobShowToast('⚠️ 네트워크 연결을 확인해주세요'); }
       }
-      mobShowToast('⚠️ 네트워크 연결을 확인해주세요');
-    }
-  }, 50);
+    }, 10000);
+  }
 }
 </script>
 <script>
