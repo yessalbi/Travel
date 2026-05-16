@@ -15012,19 +15012,39 @@ async function mobLoadTripList() {
       mobIsAdmin = true;
       trips = await withTimeout(window.fbGetAllTrips(), 10000);
     } else {
+      // 원래 방식: localStorage tripList → fbGetTripMeta 병렬 호출 (빠름)
       const userId = localStorage.getItem('mobUserId');
-      if (userId && typeof window.fbGetUserTrips === 'function') {
-        trips = await withTimeout(window.fbGetUserTrips(userId), 10000);
-      } else {
-        const myList = typeof getTripList === 'function' ? getTripList() : [];
-        if (myList.length) {
-          const metas = await withTimeout(
-            Promise.all(myList.map(id => window.fbGetTripMeta(id).catch(() => null))),
-            10000
-          );
-          metas.forEach(meta => { if (meta?.title !== undefined) trips.push(meta); });
-        }
-        if (!trips.length) trips = await withTimeout(window.fbGetAllTrips(), 10000);
+      const localIds = JSON.parse(localStorage.getItem('tripList') || '[]');
+
+      if (localIds.length) {
+        // 로컬 ID 목록으로 메타 병렬 조회 (빠름)
+        const metas = await withTimeout(
+          Promise.all(localIds.map(id => window.fbGetTripMeta(id).catch(() => null))),
+          10000
+        );
+        metas.forEach(meta => { if (meta?.title !== undefined) trips.push(meta); });
+      }
+
+      // 로컬에 없으면 Firebase users 컬렉션에서 보완 (공유받은 여행 등)
+      if (userId && typeof window.fbGetUser === 'function') {
+        try {
+          const user = await withTimeout(window.fbGetUser(userId), 5000);
+          const remoteIds = (user?.tripIds || []).filter(id => !localIds.includes(id));
+          if (remoteIds.length) {
+            const extraMetas = await Promise.all(
+              remoteIds.map(id => window.fbGetTripMeta(id).catch(() => null))
+            );
+            extraMetas.forEach(m => { if (m?.title !== undefined) trips.push(m); });
+            // 로컬에도 저장
+            const allIds = [...localIds, ...remoteIds];
+            localStorage.setItem('tripList', JSON.stringify(allIds));
+          }
+        } catch(e2) { /* 보완 실패는 무시 */ }
+      }
+
+      // 로컬도 없고 유저 정보도 없으면 전체 조회
+      if (!trips.length) {
+        trips = await withTimeout(window.fbGetAllTrips(), 10000);
       }
     }
 
