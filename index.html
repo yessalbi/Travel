@@ -5255,7 +5255,11 @@ async function loadFromFirebase() {
       }
     } catch(e) {
       console.warn('Firebase 로드 실패, 로컬 스냅샷으로 폴백:', e);
-      await loadFromLocalSnapshot();
+      try {
+        await loadFromLocalSnapshot();
+      } catch(e2) {
+        console.warn('로컬 스냅샷 로드 실패:', e2);
+      }
     }
   } else {
     // 오프라인 — 로컬 스냅샷에서 복원
@@ -6407,7 +6411,7 @@ function buildTransitCard(from, to, fromIdx) {
   const key  = transitKey(currentDay, fromIdx);
   const mode = transitModes[key] || 'driving';
   const _ML = getModeList();
-  const modeInfo = _ML.find(m => m.id === mode);
+  const modeInfo = _ML.find(m => m.id === mode) || _ML.find(m => m.id === 'driving') || { icon:'🚗', label:'자동차' };
 
   const wrap = document.createElement('div');
   wrap.className = 'transit-card';
@@ -6417,7 +6421,7 @@ function buildTransitCard(from, to, fromIdx) {
     <div class="transit-line"></div>
     <div class="transit-body" id="tc-body-${fromIdx}">
       <button class="transit-mode-btn" onclick="openModePicker(event,${fromIdx})" title="이동수단 선택">
-        ${modeInfo.icon}
+        ${modeInfo.icon || '🚗'}
       </button>
       <div class="transit-info" id="tc-info-${fromIdx}">
         <span class="transit-no-loc">${_T().transitNoLoc||'위치 핀을 찍으면 거리가 표시돼요'}</span>
